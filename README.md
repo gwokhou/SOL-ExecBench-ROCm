@@ -164,6 +164,31 @@ uv run pytest tests/
 GPU tests declare their ROCm and architecture prerequisites. Build the optional
 container with `./scripts/run_docker.sh --build`.
 
+GPU entry points require explicit `GPU_LOCK_DIR` and the full AMD-SMI
+`GPU_LOCK_UUID`. They use `gpu-<UUID>.L1-ownership.lock` for cross-project
+ownership and `gpu-<UUID>.L2-execution.lock` for serialized device work. The
+native owner retains L1 through child/container cleanup, clock restoration and
+its final receipt. Container workers borrow that owner and contend for L2;
+borrowing never transfers restoration responsibility. Old index-based lock
+variables are rejected. Switching versions requires a coordinated idle
+maintenance window; old and UUID locks must not be used concurrently.
+
+Evaluation, marked GPU tests, ExecBench's SOLAR analysis/release bridge,
+standalone profiler collectors and the documented calibration scripts enter
+this native lifecycle. CPU analysis does not inspect GPU configuration or
+hardware. An optional `solar analyze --device-stage-lock` adds serialization;
+it does not replace either shared lock. Nested stages reuse their current
+thread's scope without relocking the same flock inode. Direct SOLAR library GPU
+requests must supply `AnalysisExecutionPolicy.device_stage_context`; controlled
+low-level execution helpers require an already active native scope.
+
+SIGTERM/SIGINT drain supervised child process groups before unlocking. Device
+synchronization and cleanup remain inside the scope on exceptions. Unverified
+cleanup or restoration leaves native recovery evidence blocking a later owner.
+These guarantees do not make a scheduler mandatory or automatically recover
+from SIGKILL. See [GPU configuration](docs/user/CONFIGURATION.md#gpu-ownership-and-recovery)
+for private history, Docker mounts and coordinated migration.
+
 See [SOLAR boundary](docs/SOLAR-BOUNDARY.md) and
 [scoring contract](docs/SCORING-V3.md) for the normative architecture. The
 recorded GPU engineering evidence is limited to RX 9060 XT `gfx1200` on the

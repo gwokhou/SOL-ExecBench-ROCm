@@ -17,7 +17,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-from sol_execbench.core.bench.gpu_lock import acquire_gpu_lock
+from sol_execbench.core.bench.gpu_execution import native_gpu_execution
 from sol_execbench.core.data.json_utils import (
     atomic_write_json_value,
     load_json_value,
@@ -204,7 +204,7 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="upgrade-compiler-") as cache:
         os.environ["TORCHINDUCTOR_CACHE_DIR"] = str(Path(cache) / "inductor")
         os.environ["TRITON_CACHE_DIR"] = str(Path(cache) / "triton")
-        with acquire_gpu_lock(0, timeout_seconds=30):
+        with native_gpu_execution(timeout_seconds=30):
             result = measure(args.root, item, timed=args.timed)
     atomic_write_json_value(args.output, result)
     args.output.chmod(0o644)

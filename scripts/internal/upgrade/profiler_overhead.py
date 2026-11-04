@@ -11,6 +11,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from scripts.internal.upgrade.paired_analysis import BLOCKS, summarize
+from sol_execbench.core.bench.gpu_execution import native_gpu_execution
 from sol_execbench.core.bench.rocm_profiler.hip_event_artifacts import (
     read_hip_events,
 )
@@ -59,11 +60,12 @@ def observe(mode: Mode, root: Path, block: int) -> dict:
     """Keep raw per-process and application timings and trace byte costs."""
     root.mkdir(parents=True)
     started = time.perf_counter()
-    result = run_in_process_group_bounded(
-        command(mode, root),
-        timeout=TIMEOUT_SECONDS,
-        max_capture_bytes=CAPTURE_BYTES,
-    )
+    with native_gpu_execution():
+        result = run_in_process_group_bounded(
+            command(mode, root),
+            timeout=TIMEOUT_SECONDS,
+            max_capture_bytes=CAPTURE_BYTES,
+        )
     elapsed = (time.perf_counter() - started) * 1000
     if result.returncode:
         raise RuntimeError(f"{mode} block {block} exited {result.returncode}")

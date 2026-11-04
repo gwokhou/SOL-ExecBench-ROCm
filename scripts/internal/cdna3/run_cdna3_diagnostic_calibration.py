@@ -23,6 +23,7 @@ import json
 import tempfile
 from pathlib import Path
 
+from sol_execbench.core.bench.gpu_execution import native_gpu_execution
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
 from sol_execbench.core.platform.amdgpu_code_object import extract_code_object
@@ -92,68 +93,69 @@ def _run_probe(binary: Path) -> float:
 
 def run_calibration(*, output: Path) -> Path:
     """Compile and run the gfx942 MFMA probes, then write a summary receipt."""
-    hipcc = resolve_rocm_tool("hipcc")
-    if hipcc is None:
-        raise RuntimeError("hipcc is unavailable")
-    device = detect_rocm_device()
-    if device.gfx_target != "gfx942":
-        raise RuntimeError(
-            f"cdna3 diagnostic calibration requires gfx942, got "
-            f"{device.gfx_target}"
-        )
-    probes: list[dict[str, object]] = []
-    with tempfile.TemporaryDirectory() as workspace_dir:
-        workspace = Path(workspace_dir)
-        for source_name, expected_instruction in _MFMA_PROBES:
-            source = _PROBES_DIR / source_name
-            binary = workspace / source.with_suffix("").name
-            _compile_probe(hipcc, source, device.gfx_target, binary)
-            peak_tflops = _run_probe(binary)
-            extracted = extract_code_object(
-                binary,
-                device.gfx_target,
-                workspace,
-                timeout_seconds=COMMAND_TIMEOUT_SECONDS,
+    with native_gpu_execution():
+        hipcc = resolve_rocm_tool("hipcc")
+        if hipcc is None:
+            raise RuntimeError("hipcc is unavailable")
+        device = detect_rocm_device()
+        if device.gfx_target != "gfx942":
+            raise RuntimeError(
+                f"cdna3 diagnostic calibration requires gfx942, got "
+                f"{device.gfx_target}"
             )
-            analysis = analyze_isa_disassembly(
-                device.gfx_target,
-                extracted.disassembly,
-                expected_instructions=(expected_instruction,),
-            )
-            if not analysis.matched_instruction_counts.get(
-                expected_instruction
-            ):
-                raise RuntimeError(
-                    f"{source_name} did not emit {expected_instruction}"
+        probes: list[dict[str, object]] = []
+        with tempfile.TemporaryDirectory() as workspace_dir:
+            workspace = Path(workspace_dir)
+            for source_name, expected_instruction in _MFMA_PROBES:
+                source = _PROBES_DIR / source_name
+                binary = workspace / source.with_suffix("").name
+                _compile_probe(hipcc, source, device.gfx_target, binary)
+                peak_tflops = _run_probe(binary)
+                extracted = extract_code_object(
+                    binary,
+                    device.gfx_target,
+                    workspace,
+                    timeout_seconds=COMMAND_TIMEOUT_SECONDS,
                 )
-            probes.append(
-                {
-                    "source": source_name,
-                    "expected_instruction": expected_instruction,
-                    "peak_tflops": peak_tflops,
-                    "binary_sha256": sha256_file(binary),
-                    "code_object_sha256": extracted.sha256,
-                    "disassembly_sha256": extracted.disassembly_sha256,
-                    "decoded_instruction_count": (
-                        analysis.decoded_instruction_count
-                    ),
-                    "matched_instruction_counts": dict(
-                        analysis.matched_instruction_counts,
-                    ),
-                    "spec_provenance": analysis.provenance.to_dict(),
-                },
-            )
-    payload = {
-        "confidence": "inexact",
-        "gfx_target": device.gfx_target,
-        "device_name": device.name,
-        "rocm_hip_version": device.hip_version,
-        "created_at": utc_timestamp(),
-        "probe_summary_sha256": stable_json_checksum(probes),
-        "probes": probes,
-    }
-    atomic_write_json_value(output, payload)
-    return output
+                analysis = analyze_isa_disassembly(
+                    device.gfx_target,
+                    extracted.disassembly,
+                    expected_instructions=(expected_instruction,),
+                )
+                if not analysis.matched_instruction_counts.get(
+                    expected_instruction
+                ):
+                    raise RuntimeError(
+                        f"{source_name} did not emit {expected_instruction}"
+                    )
+                probes.append(
+                    {
+                        "source": source_name,
+                        "expected_instruction": expected_instruction,
+                        "peak_tflops": peak_tflops,
+                        "binary_sha256": sha256_file(binary),
+                        "code_object_sha256": extracted.sha256,
+                        "disassembly_sha256": extracted.disassembly_sha256,
+                        "decoded_instruction_count": (
+                            analysis.decoded_instruction_count
+                        ),
+                        "matched_instruction_counts": dict(
+                            analysis.matched_instruction_counts,
+                        ),
+                        "spec_provenance": analysis.provenance.to_dict(),
+                    },
+                )
+        payload = {
+            "confidence": "inexact",
+            "gfx_target": device.gfx_target,
+            "device_name": device.name,
+            "rocm_hip_version": device.hip_version,
+            "created_at": utc_timestamp(),
+            "probe_summary_sha256": stable_json_checksum(probes),
+            "probes": probes,
+        }
+        atomic_write_json_value(output, payload)
+        return output
 
 
 def main() -> int:

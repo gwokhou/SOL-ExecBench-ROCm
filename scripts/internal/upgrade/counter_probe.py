@@ -5,14 +5,14 @@ import json
 
 import torch
 
-from sol_execbench.core.bench.gpu_lock import acquire_gpu_lock
+from sol_execbench.core.bench.gpu_execution import native_gpu_execution
 
 ELEMENTS = 4096
 
 
 def main() -> None:
     """Detect replay that accidentally applies an in-place update twice."""
-    with acquire_gpu_lock(0, timeout_seconds=30):
+    with native_gpu_execution(timeout_seconds=30):
         if torch.cuda.device_count() != 1:
             raise RuntimeError("counter probe requires one visible GPU")
         if (

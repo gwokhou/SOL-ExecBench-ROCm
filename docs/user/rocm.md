@@ -192,16 +192,22 @@ explicit ownership transfer emit a `gpu_clock_lease_leaked` error. Cross-process
 Docker cleanup and deliberate `--no-reset-clocks` use explicit transfer so that
 intentional retention is not reported as a leak.
 
-The Docker image and `scripts/setup_rocm_clock_sudoers.py` install sudoers
-coverage for the exact `amd-smi` commands used by the runtime. If clock locking
+The Docker image retains its existing container-local sudoers policy.
+The host generator `scripts/setup_rocm_clock_sudoers.py` requires an explicit
+`--gpu-uuid` and grants only that device's STABLE_PEAK and AUTO setters through
+the stable `/usr/bin/amd-smi` path by default. See the project-owned
+[host rule and installation instructions](ROCM-CLOCK-SUDOERS.md).
+If clock locking
 is unavailable, use a config with `"lock_clocks": false` only for functional
 diagnostics. Such a trace is labeled with the diagnostic timing protocol and
 cannot support an official claim.
 
-The set commands apply to every visible AMD GPU because no `-g` selector is
-used. The setup script is self-documenting; run it with `--help`. Its default
-`check` mode is read-only, while `verify-live` explicitly exercises
-`STABLE_PEAK` and guarantees an `AUTO` cleanup attempt.
+Legacy runtime set commands without a `-g` selector still affect every visible
+AMD GPU; the host rule above does not authorize those calls. The setup script
+is self-documenting; run it with `--help`. Its default `check` mode only queries
+sudo's command list and does not verify passwordless execution. `verify-live`
+changes the selected GPU to STABLE_PEAK and always attempts AUTO cleanup;
+it requires separate approval to change hardware state.
 
 ## Hardware Scope
 
