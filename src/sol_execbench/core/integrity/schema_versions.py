@@ -17,6 +17,13 @@ from typing import Final
 class SchemaVersion(StrEnum):
     """Current string-valued first-party wire-schema identifiers."""
 
+    HIP_TRACE_JOURNAL = "sol_execbench.hip_trace_journal.v1"
+    HIP_TRACE_SCOPE = "sol_execbench.hip_trace_scope.v1"
+    HIP_SDK_LEDGER = "sol_execbench.hip_sdk_ledger.v1"
+    HIP_EVALUATE_SCOPE = "sol_execbench.hip_evaluate_scope.v1"
+    HIP_EVALUATE_RECEIPT = "sol_execbench.hip_evaluate_receipt.v1"
+    HIP_EVALUATE_INTENT = "sol_execbench.hip_evaluate_intent.v1"
+    HIP_TORCH_SCOPE = "sol_execbench.hip_torch_scope.v1"
     GPU_ADMISSION = "gpu-admission.v1"
     AGENT_FEEDBACK = "sol_execbench.agent_feedback.v7"
     AMD_ISA_RELEASE_LOCK = "sol_execbench.amd_isa_release_lock.v1"
@@ -134,7 +141,7 @@ class SchemaVersion(StrEnum):
         "sol_execbench.performance_schedule_evidence.v2"
     )
     PERFORMANCE_TIMING_EVIDENCE = "sol_execbench.performance_timing_evidence.v3"
-    PROFILE_SUMMARY = "sol_execbench.profile_summary.v4"
+    PROFILE_SUMMARY = "sol_execbench.profile_summary.v5"
     RDNA4_DIAGNOSTIC_CORPUS_DESIGN = "rdna4_diagnostic_corpus_design.v1"
     RDNA4_VALIDATION = "sol_execbench.rdna4_validation.v2"
     REFERENCE_IPC = "sol_execbench.reference_ipc.v2"

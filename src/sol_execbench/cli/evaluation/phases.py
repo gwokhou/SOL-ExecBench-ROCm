@@ -25,6 +25,8 @@ from sol_execbench.cli.evaluation import (
 )
 from sol_execbench.cli.evaluation.profile_mode import ProfileMode
 from sol_execbench.cli.evaluation.requests import EvaluationRequest
+from sol_execbench.cli.evaluation.scope_policy import scope_clock_window
+from sol_execbench.cli.evaluation.scope_replay import collect_scope_replays
 from sol_execbench.cli.protocol import CliExitCode, CliFailure
 from sol_execbench.cli.sidecars import static_evidence as cli_static_evidence
 from sol_execbench.cli.sidecars.mode import SidecarMode
@@ -32,12 +34,16 @@ from sol_execbench.core.bench.gpu_execution import native_gpu_execution
 from sol_execbench.core.bench.gpu_lock import (
     GPULockVerificationError,
 )
+from sol_execbench.core.bench.rocm_profiler.evaluate_scope_models import (
+    EvaluateScopeStatus,
+)
 from sol_execbench.core.bench.rocm_profiler.pmc_clock import (
     configured_pmc_clock_options,
 )
 from sol_execbench.core.bench.static_kernel.evidence import (
     StaticKernelEvidenceSidecar,
 )
+from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_DEVICE,
     ENV_SOL_EXECBENCH_INPUT_NONCE,
@@ -90,7 +96,7 @@ def require_execution_isolation(request: EvaluationRequest) -> None:
 @contextmanager
 def evaluation_execution_boundary(
     request: EvaluationRequest,
-) -> Iterator[None]:
+) -> Iterator[Path | None]:
     """Mark unsafe runs and serialize access to the selected GPU."""
     unsafe_name = ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION
     device_name = ENV_SOL_EXECBENCH_DEVICE
@@ -105,7 +111,11 @@ def evaluation_execution_boundary(
                 timeout_seconds=min(float(request.timeout), 60.0),
                 manage_clocks=request.lock_clocks
                 or (
-                    request.profile == ProfileMode.ROCPROFV3_COUNTERS
+                    request.profile
+                    in {
+                        ProfileMode.ROCPROFV3_COUNTERS,
+                        ProfileMode.ROCPROFV3_SCOPE,
+                    }
                     and configured_pmc_clock_options() is not None
                 ),
             ),
@@ -124,7 +134,8 @@ def evaluation_execution_boundary(
             ):
                 os.environ[unsafe_name] = "1"
             try:
-                yield
+                with scope_clock_window(request) as archive:
+                    yield archive
             finally:
                 if previous_unsafe is None:
                     os.environ.pop(unsafe_name, None)
@@ -310,3 +321,24 @@ def handle_no_trace_failure(
             else None,
         },
     )
+
+
+def run_scope_phase(
+    packager: ProblemPackager,
+    traces: list[Trace],
+    archive: Path | None,
+    *,
+    timeout: int,
+    console: Console,
+) -> bool | None:
+    """Keep replay diagnostics separate and report conservative admission counts."""
+    if archive is None:
+        return None
+    results = collect_scope_replays(packager, traces, archive, timeout=timeout)
+    qualified = sum(
+        result.status is EvaluateScopeStatus.QUALIFIED for result in results
+    )
+    console.print(
+        f"[dim]Scope qualification: {qualified}/{len(results)}; {archive}[/dim]"
+    )
+    return bool(results) and qualified == len(results)

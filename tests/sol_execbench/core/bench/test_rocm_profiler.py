@@ -58,7 +58,7 @@ def test_build_rocprofv3_command_places_application_after_separator():
     ]
 
 
-def test_build_rocprofv3_profile_command_prefers_rocpd_artifacts():
+def test_build_rocprofv3_profile_command_keeps_json_host_evidence():
     command = build_rocprofv3_profile_command(
         ["python", "eval_driver.py"],
         output_directory="out/profile",
@@ -72,6 +72,7 @@ def test_build_rocprofv3_profile_command_prefers_rocpd_artifacts():
         "--hip-runtime-trace",
         "--output-format",
         "rocpd",
+        "json",
         "--output-directory",
         "out/profile",
         "--output-file",
@@ -818,6 +819,21 @@ def test_live_collection_labels_missing_csv_as_fallback(tmp_path):
     assert result.evidence is None
     assert result.selection.fallback_applied is True
     assert "did not produce a CSV" in result.selection.reason
+
+
+def test_kernel_only_rocpd_command_does_not_add_runtime_json():
+    command = build_rocprofv3_profile_command(
+        ["probe"],
+        output_directory="out",
+        output_file="probe",
+        include_hip_runtime=False,
+    )
+    assert "--hip-runtime-trace" not in command
+    assert command[
+        command.index("--output-format") + 1 : command.index(
+            "--output-directory"
+        )
+    ] == ["rocpd"]
 
 
 pytestmark = pytest.mark.usefixtures("native_gpu_cpu_observation")

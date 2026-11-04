@@ -529,6 +529,35 @@ def test_counter_profile_restages_reference_before_each_application(
     assert packager.restage_calls == 2
 
 
+def test_scope_profile_does_not_instrument_canonical_timing(
+    tmp_path, monkeypatch
+):
+    packager = _FakePackager(traces=[_trace()])
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("scope replay must not instrument canonical timing")
+
+    monkeypatch.setattr(cli_evaluation, "_run_profiled_evaluation", unexpected)
+    monkeypatch.setattr(
+        cli_evaluation,
+        "_run_evaluation_command",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=["python"], returncode=0, stdout="canonical\n", stderr=""
+        ),
+    )
+    result = evaluation_runtime.run_evaluation_runtime(
+        packager,
+        eval_cmd=["python", "candidate.py"],
+        staging_dir=tmp_path,
+        output_file=tmp_path / "trace.jsonl",
+        timeout=5,
+        profile=ProfileMode.ROCPROFV3_SCOPE,
+    )
+    assert isinstance(result, evaluation_runtime.EvaluationRuntimeSuccess)
+    assert result.profile_result is None
+    assert packager.converted_stdout == "canonical\n"
+
+
 def test_profile_failure_restages_consumed_reference_before_fallback(
     tmp_path, monkeypatch
 ):

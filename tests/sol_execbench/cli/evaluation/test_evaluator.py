@@ -123,3 +123,69 @@ def test_materialized_problem_accepts_matching_exact_device_target(
     )
 
     problem_io.require_materialized_target_match(problem_dir, "cuda:1")
+
+
+def test_scope_owner_does_not_relabel_canonical_timing(tmp_path, monkeypatch):
+    config = BenchmarkConfig(lock_clocks=True)
+    expected_protocol = config.timing_protocol
+    loaded = SimpleNamespace(
+        definition=SimpleNamespace(name="toy"),
+        workloads=[],
+        solution=SimpleNamespace(name="candidate"),
+        config=config,
+    )
+    monkeypatch.setattr(
+        evaluator.cli_problem_io,
+        "resolve_problem_inputs",
+        lambda **_: SimpleNamespace(config_file=None),
+    )
+    monkeypatch.setattr(
+        evaluator.cli_problem_io, "load_problem_inputs", lambda _: loaded
+    )
+    monkeypatch.setattr(
+        evaluator.cli_problem_io,
+        "require_materialized_target_match",
+        lambda *_: None,
+    )
+
+    @contextmanager
+    def boundary(_):
+        yield tmp_path / "scope-archive"
+
+    class Inspected(Exception):
+        pass
+
+    def packager(**kwargs):
+        assert kwargs["config"].lock_clocks
+        assert kwargs["config"].timing_protocol == expected_protocol
+        raise Inspected
+
+    monkeypatch.setattr(
+        evaluator.cli_phases, "evaluation_execution_boundary", boundary
+    )
+    monkeypatch.setattr(evaluator, "ProblemPackager", packager)
+    request = EvaluationRequest(
+        problem_dir=tmp_path,
+        definition_file=None,
+        workload_file=None,
+        solution_file=tmp_path / "solution.json",
+        config_file=None,
+        compile_timeout=30,
+        timeout=60,
+        output_file=tmp_path / "trace.jsonl",
+        json_output=False,
+        lock_clocks=True,
+        keep_staging=False,
+        profile=ProfileMode.ROCPROFV3_SCOPE,
+        static_evidence=SidecarMode.NONE,
+        decision=SidecarMode.NONE,
+        feedback_target_id=None,
+        feedback_run_id=None,
+        feedback_candidate_id=None,
+        feedback_source_sha256=None,
+        feedback_sol_version=None,
+        verbose=False,
+        unsafe_local_execution=True,
+    )
+    with pytest.raises(Inspected):
+        evaluator.run_evaluation_cli(request=request)

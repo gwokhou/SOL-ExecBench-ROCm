@@ -13,6 +13,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+from sol_execbench.core.bench.rocm_profiler.evaluate_scope_models import (
+    SCOPE_ENV,
+)
 from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_INPUT_NONCE,
 )
@@ -23,12 +26,20 @@ from sol_execbench.driver.reference_runtime_api import (
     REFERENCE_TOKEN_ENV,
     TRUSTED_DEFINITION_FILE,
 )
+from sol_execbench.driver.scope_environment import (
+    exec_scope_candidate,
+    unprofiled_reference_environment,
+)
 
 STAGING_DIR = Path(__file__).parent.resolve()
 _token = secrets.token_hex(32)
 _request_read, _request_write = os.pipe()
 _response_read, _response_write = os.pipe()
-_worker_environment = dict(os.environ)
+_worker_environment = (
+    unprofiled_reference_environment(os.environ)
+    if SCOPE_ENV in os.environ
+    else dict(os.environ)
+)
 _worker_environment[REFERENCE_REQUEST_FD_ENV] = str(_request_read)
 _worker_environment[REFERENCE_RESPONSE_FD_ENV] = str(_response_write)
 _worker_environment[REFERENCE_TOKEN_ENV] = _token
@@ -74,6 +85,8 @@ try:
     # a candidate-created worker.  Set this before eval_driver imports torch;
     # the strict timing-region thread monitor therefore needs no allowlist.
     _candidate_environment["TORCHINDUCTOR_COMPILE_THREADS"] = "1"
+    if SCOPE_ENV in os.environ:
+        exec_scope_candidate(STAGING_DIR, _candidate_environment)
     os.execve(
         sys.executable,
         [sys.executable, "eval_driver.py"],

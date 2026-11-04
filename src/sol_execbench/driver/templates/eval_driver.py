@@ -70,6 +70,7 @@ from sol_execbench.driver.eval_runtime_api import (  # noqa: F401
     connect_reference_worker,
     dtype_str_to_torch_dtype,
     emit_trace_jsonl,
+    evaluate_driver_workloads,
     evaluate_workloads,
     load_staged_problem,
     load_user_function,
@@ -185,27 +186,26 @@ try:
         _reference_client.close()
         os._exit(0)
     _timing_records = []
-    evaluate_workloads(
-        WorkloadEvaluationRequest(
-            definition=definition,
-            workloads=workloads,
-            solution_name=_solution_name,
-            device=_device,
-            output_names=_output_names,
-            output_dtypes_torch=_output_dtypes_torch,
-            bench_config=bench_config,
-            destination_passing_style=_dps,
-            dependencies=EvaluationDependencies(
-                reference_client=_reference_client,
-                user_fn=user_fn,
-                integrity_snapshot=_integrity_snapshot,
-                check_integrity=_check_integrity,
-                driver_globals=globals(),
-                real_stdout=_real_stdout,
-                timing_recorder=_timing_records.append,
-            ),
+    _request = WorkloadEvaluationRequest(
+        definition=definition,
+        workloads=workloads,
+        solution_name=_solution_name,
+        device=_device,
+        output_names=_output_names,
+        output_dtypes_torch=_output_dtypes_torch,
+        bench_config=bench_config,
+        destination_passing_style=_dps,
+        dependencies=EvaluationDependencies(
+            reference_client=_reference_client,
+            user_fn=user_fn,
+            integrity_snapshot=_integrity_snapshot,
+            check_integrity=_check_integrity,
+            driver_globals=globals(),
+            real_stdout=_real_stdout,
+            timing_recorder=_timing_records.append,
         ),
     )
+    evaluate_driver_workloads(_request, STAGING_DIR)
     if _timing_records:
         _timing_name = (
             f"performance-replay-raw-{os.getpid()}.jsonl"
