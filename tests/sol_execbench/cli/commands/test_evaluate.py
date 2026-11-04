@@ -8,7 +8,9 @@ from click.testing import CliRunner
 from sol_execbench.cli.main import cli
 
 
-@pytest.mark.parametrize("profile", ["rocprofv3", "rocprofv3-counters"])
+@pytest.mark.parametrize(
+    "profile", ["rocprofv3", "rocprofv3-counters", "rocprofv3-scope"]
+)
 def test_evaluate_profile_choice_accepts_wire_value(profile: str) -> None:
     result = CliRunner().invoke(
         cli,

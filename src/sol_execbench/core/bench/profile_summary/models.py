@@ -11,6 +11,9 @@ from typing import Literal
 from pydantic import ConfigDict, Field
 
 from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticConfidence
+from sol_execbench.core.bench.rocm_profiler.hip_causality_models import (
+    HIPEventCausality,
+)
 from sol_execbench.core.bench.rocm_profiler.hip_events import HIPEventRecord
 from sol_execbench.core.bench.rocm_profiler.models import (
     Rocprofv3ArtifactCoverageStatus,
@@ -166,3 +169,5 @@ class ProfileSummaryContent(BaseModelWithDocstrings):
     """Bounded artifact parse warnings."""
     hip_events: list[HIPEventRecord] = Field(default_factory=list)
     """Observed GPU barriers; missing wait generations are not causal edges."""
+    hip_event_causality: list[HIPEventCausality] = Field(default_factory=list)
+    """Capture-local host-order links, not complete workload schedules."""

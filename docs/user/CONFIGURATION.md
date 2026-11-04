@@ -61,7 +61,7 @@ uv run sol-execbench evaluate \
 | `--lock-clocks` | off | force the clock-lock requirement |
 | `--unsafe-local-execution` | off | allow diagnostic host execution |
 | `--keep-staging` | off | preserve staged process assets |
-| `--profile` | `none` | `none`, `rocprofv3` or `rocprofv3-counters` |
+| `--profile` | `none` | `none`, `rocprofv3`, `rocprofv3-scope` or `rocprofv3-counters` |
 | `--static-evidence` | `none` | `none` or `auto` |
 | `--decision` | `none` | `none` or `auto` |
 | `--feedback-*` | none | optional derived-sidecar identities |
@@ -72,6 +72,12 @@ uv run sol-execbench evaluate \
 `rocprofv3-counters` collects replay evidence **after canonical timing**. Its
 clock policy is independent of benchmark `lock_clocks` and trace-only profiling.
 The existing evaluation GPU lock and owned `ClockLockLease` teardown are reused.
+
+`rocprofv3-scope` reuses the same verified window for its independent
+per-workload scope replay after evaluation. It requires `--trace-output`, a
+single physical `ROCR_VISIBLE_DEVICES` UUID, and a verified STABLE_PEAK window;
+it reports `scope_qualified` separately from `all_passed`. See the
+[profile summary sidecar](profile_summary_sidecar.md) for the artifact contract.
 
 | Environment option | Default | Meaning |
 | --- | --- | --- |

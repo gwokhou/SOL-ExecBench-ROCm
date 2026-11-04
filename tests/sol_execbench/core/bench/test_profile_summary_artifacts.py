@@ -296,5 +296,6 @@ def test_structured_profile_evidence_reports_missing_artifacts(
         "missing_kernel_trace.csv: profiler artifact is missing",
         "missing_counters.csv: profiler artifact is missing",
         "missing_profile.json: hip_event_artifact_invalid_or_unsupported",
+        "missing_profile.json: hip_causality_artifact_invalid",
         "missing_profile.json: profiler artifact is missing",
     ]

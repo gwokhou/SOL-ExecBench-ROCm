@@ -40,6 +40,7 @@ from sol_execbench.core.data.solution import Solution
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.platform.runtime import pin_cuda_device
+from sol_execbench.driver.scope_replay import evaluate_driver_workloads
 
 __all__ = [
     "BenchmarkConfig",
@@ -63,6 +64,7 @@ __all__ = [
     "connect_reference_worker",
     "dtype_str_to_torch_dtype",
     "emit_trace_jsonl",
+    "evaluate_driver_workloads",
     "evaluate_workloads",
     "gen_inputs",
     "load_staged_problem",

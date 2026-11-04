@@ -25,15 +25,18 @@ def hip_event_feedback(
     if not evidence.hip_events:
         return []
     captures = sorted({record.capture for record in evidence.hip_events})
+    linked_waits = sum(len(item.links) for item in evidence.hip_event_causality)
     return [
         AgentFeedbackItem(
             code="hip_event_observations",
             severity=AgentFeedbackSeverity.INFO,
             bottleneck=AgentFeedbackBottleneck.UNKNOWN,
             message=(
-                "GPU HIP event barriers were observed. Record ordinals describe this "
-                "capture only; wait generations and dispatch dependencies remain "
-                "unverified. Barrier duration is not proven synchronization overhead."
+                f"GPU HIP event barriers were observed; {linked_waits} waits have "
+                "capture-local host-order dispatch links. Unresolved waits, capture "
+                "completeness and workload scope remain unverified. These links do "
+                "not qualify a cross-stream prediction or synchronization removal. "
+                "Barrier duration is not proven synchronization overhead."
             ),
             source_refs=[
                 DiagnosticSourceRef(kind="profile", label=capture)

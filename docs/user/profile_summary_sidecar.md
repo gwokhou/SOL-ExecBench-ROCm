@@ -1,6 +1,6 @@
 # Profile Summary Sidecar
 
-`sol_execbench.profile_summary.v4` is an optional diagnostic sidecar written
+`sol_execbench.profile_summary.v5` is an optional diagnostic sidecar written
 next to canonical Trace JSONL using the profile-summary JSON suffix. It normalizes
 bounded `rocprofv3` profile metadata for downstream adapters while preserving
 Trace JSONL as the only authority for correctness, timing, scoring, and
@@ -8,7 +8,7 @@ evaluation status.
 
 The evaluator contract advertises this artifact through the optional
 `profile_summary.sidecar` capability key. The concrete artifact schema remains
-`sol_execbench.profile_summary.v4`.
+`sol_execbench.profile_summary.v5`.
 
 The summary sidecar does not replace the raw profile JSON sidecar. The existing
 profile metadata sidecar remains the raw diagnostic metadata record and is cited
@@ -49,11 +49,32 @@ unresolved waits produce parse warnings. JSON and rocpd copies remain separately
 scoped captures; consumers must not add their event counts together. A barrier's
 duration is not a measurement of avoidable synchronization overhead.
 
+`summary.hip_event_causality[]` adds conditional event-to-dispatch links from
+successful collections with ROCProfiler JSON host arguments and return values.
+The default runtime-enabled rocpd diagnostic command also writes JSON for this
+purpose. Each link uses host correlation IDs and submission order to connect the
+last producer dispatch before RECORD to the first consumer dispatch after WAIT.
+It retains the source SHA-256, capture/process identity, event handle, device,
+queues, streams, and all four host call IDs. It does not reinterpret the GPU-only
+`hip_events[].generation` field or join JSON to rocpd rows.
+
+The supported subset is a single device and host submission thread with explicit
+nondefault streams, successful ordinary record/wait/launch calls, and completed
+rerecords. Missing identities, duplicate IDs, failed calls, ambiguous order,
+unsupported graphs/IPC/PTDS or incomplete observations cannot supply a link.
+Unresolved waits and rejection codes remain visible. Even a capture with all
+observed waits linked has `status: partial`: dropped records cannot be ruled out,
+and dispatch IDs have not been bound to the complete workload/candidate scope.
+Consumers must preserve these limitations and must not infer that unlinked
+work is independent. An explicitly successful `hipEventSynchronize` for the same
+event can establish completion before rerecording; an event observation timestamp
+alone is not an exact completion fence. See the [acceptance criteria and evidence boundary](../internal/hip-event-causality-acceptance.md).
+
 The performance model's `sol_execbench.performance_schedule_evidence.v2`
 retains only verified same-lane precedence. Timestamp order across lanes does
 not establish a dependency. Multi-lane predictions return
 `cross_lane_event_dependencies_unverified` until event generations and dispatch
-scope are verified; receiving HIP event observations alone does not remove that
+scope are verified; receiving observations or conditional diagnostic links does not remove that
 restriction.
 
 Schedule identity and lane checks include every observed dispatch, even a helper
@@ -111,7 +132,7 @@ conclusions. When counters are missing or insufficient, SOL emits
 `insufficient_counters` or `unknown` instead of speculating.
 
 Profiler-derived bottleneck hints remain in the
-`sol_execbench.profile_summary.v4` sidecar; SOL does not surface them as
+`sol_execbench.profile_summary.v5` sidecar; SOL does not surface them as
 `agent_feedback.items[]`. HIP adapters that want one prompt-facing hint list
 should merge profile-summary hints with agent-feedback items only after each
 source sidecar passes strict freshness and authority checks. The separate
@@ -163,3 +184,51 @@ benchmark evidence and do not represent real profiler output.
    promoted.
 6. Keep canonical Trace JSONL as the only source for correctness, timing,
    scoring, and status.
+
+
+## Controlled executor scope qualification
+
+The separate `sol_execbench.hip_trace_scope.v1` artifact checks a controller-owned
+run/workload/candidate identity against an independent
+`sol_execbench.hip_trace_journal.v1` application journal. It requires a bijection
+for the audited launch/event call domains and binds every dispatch, including
+otherwise independent work. Missing or extra rows, identity conflicts, failed
+calls, incomplete journals and missing completion fences reject qualification.
+
+This is conditional on a trusted, audited native executor; an arbitrary candidate
+cannot grant itself this authority by writing a journal. The ordinary summary
+continues to report partial causal observations. A qualified controlled scope
+also has `schedule_complete=false` and `performance_authority=false`; it does not
+cover every dependency domain or enable cross-stream prediction. See the
+[scope acceptance report](../internal/hip-trace-scope-acceptance.md) for the exact
+conditions, measured coverage, and remaining boundary.
+
+The separate `sol_execbench.hip_torch_scope.v1` qualification extends this to an
+audited eager PyTorch executor. A `sol_execbench.hip_sdk_ledger.v1` collector
+records SDK enqueue callbacks and LOSSLESS buffered completions, requires zero
+drops and explicit stop/flush, and checks the entire exported dispatch set.
+Internal memory helper kernels are retained, including reported stream zero.
+Workload membership comes from executor boundaries and submission order.
+
+This opt-in path covers a single process/GPU/submission thread and one record
+generation per event in scope. No-op waits without a GPU barrier remain
+unqualified. Callback and buffer channels share the SDK/runtime; common omissions
+are not excluded. The ordinary summary remains partial, and neither the separate
+artifact nor its proximity on disk authorizes timing, cross-stream prediction,
+or synchronization removal. See [PyTorch scope acceptance](../internal/hip-torch-scope-acceptance.md).
+
+
+The production `evaluate --profile rocprofv3-scope --trace-output TRACE.jsonl`
+mode replays each workload independently after the ordinary evaluation, binding
+identity from workload content, candidate source, executor, and physical GPU.
+It requires a single `ROCR_VISIBLE_DEVICES` UUID and a verified STABLE_PEAK
+window, and writes `sol_execbench.hip_evaluate_intent.v1`,
+`sol_execbench.hip_evaluate_receipt.v1`, and
+`sol_execbench.hip_evaluate_scope.v1` artifacts (reusing the
+`sol_execbench.hip_sdk_ledger.v1` collector) under `TRACE.jsonl.hip-scope/<run>/`
+without reusing canonical timing samples. When any workload lacks evidence or is
+unsupported, its qualification result is `rejected` and the CLI fails, while the
+completed canonical trace is preserved. `all_passed` and `scope_qualified`
+report the two outcomes separately. The ordinary profile summary keeps its own
+authority and never scans that archive to promote qualification. See the
+[evaluate scope acceptance report](../internal/evaluate-hip-scope-acceptance.md).

@@ -27,6 +27,12 @@ from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ArtifactKind,
     Rocprofv3ProfileResult,
 )
+from sol_execbench.core.bench.rocm_profiler.hip_causality_artifacts import (
+    read_hip_event_causality,
+)
+from sol_execbench.core.bench.rocm_profiler.hip_causality_models import (
+    HIPEventCausality,
+)
 from sol_execbench.core.bench.rocm_profiler.hip_event_artifacts import (
     read_hip_events,
 )
@@ -58,6 +64,7 @@ class StructuredProfileEvidence(BaseModelWithDocstrings):
     )
     parse_warnings: list[str] = Field(default_factory=list)
     hip_events: list[HIPEventRecord] = Field(default_factory=list)
+    hip_event_causality: list[HIPEventCausality] = Field(default_factory=list)
 
 
 def structured_profile_evidence(
@@ -77,6 +84,7 @@ def structured_profile_evidence(
     kernel_metrics: list[ProfileSummaryKernelMetric] = []
     parse_warnings: list[str] = []
     hip_events: list[HIPEventRecord] = []
+    hip_event_causality: list[HIPEventCausality] = []
 
     for artifact in profile_result.artifacts:
         if artifact.kind in {
@@ -86,6 +94,13 @@ def structured_profile_evidence(
             events, warnings = read_hip_events(artifact.path)
             hip_events.extend(events)
             parse_warnings.extend(warnings)
+            if (
+                artifact.kind is Rocprofv3ArtifactKind.METADATA_JSON
+                and profile_result.succeeded
+            ):
+                links, warnings = read_hip_event_causality(artifact.path)
+                hip_event_causality.extend(links)
+                parse_warnings.extend(warnings)
         if artifact.kind is Rocprofv3ArtifactKind.TRACE_CSV:
             parsed_metrics, warnings = _parse_trace_csv_artifact(artifact.path)
             kernel_metrics.extend(parsed_metrics)
@@ -126,6 +141,7 @@ def structured_profile_evidence(
         bottleneck_hints=derive_bottleneck_hints(kernel_metrics),
         parse_warnings=parse_warnings,
         hip_events=hip_events,
+        hip_event_causality=hip_event_causality,
     )
 
 

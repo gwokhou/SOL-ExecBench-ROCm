@@ -25,10 +25,8 @@ from sol_execbench.cli.evaluation.requests import (
     select_evaluation_workloads,
 )
 from sol_execbench.cli.protocol import (
-    CliExitCode,
     CliFailure,
     CliResult,
-    artifact,
 )
 from sol_execbench.driver.problem_packager import ProblemPackager
 
@@ -76,7 +74,7 @@ def run_evaluation_cli(*, request: EvaluationRequest) -> CliResult:
     with ExitStack() as resources:
         if not request.keep_staging:
             resources.callback(shutil.rmtree, staging_dir, ignore_errors=True)
-        resources.enter_context(
+        archive = resources.enter_context(
             cli_phases.evaluation_execution_boundary(
                 dataclasses.replace(request, lock_clocks=config.lock_clocks)
             ),
@@ -85,6 +83,8 @@ def run_evaluation_cli(*, request: EvaluationRequest) -> CliResult:
             request.problem_dir,
             request.device,
         )
+        # Preserve the canonical timing contract. The packager borrows the
+        # already-held native clock lease; it does not become a second owner.
         packager = resources.enter_context(
             ProblemPackager(
                 definition=definition,
@@ -102,6 +102,7 @@ def run_evaluation_cli(*, request: EvaluationRequest) -> CliResult:
             loaded=dataclasses.replace(loaded, workloads=workloads),
             staging_dir=staging_dir,
             packager=packager,
+            scope_archive=archive,
         )
 
 
@@ -111,6 +112,7 @@ def _run_packaged_evaluation(
     loaded: cli_problem_io.LoadedProblemInputs,
     staging_dir: Path,
     packager: ProblemPackager,
+    scope_archive: Path | None = None,
 ) -> CliResult:
     """Run compile, runtime, sidecar, and result phases for staged inputs."""
     definition = loaded.definition
@@ -130,6 +132,13 @@ def _run_packaged_evaluation(
     trace_run_id = cli_outputs.write_trace_output(
         output_file=request.output_file,
         traces=traces,
+        console=console,
+    )
+    scope_qualified = cli_phases.run_scope_phase(
+        packager,
+        traces,
+        scope_archive,
+        timeout=request.timeout,
         console=console,
     )
     cli_sidecar_writer.write_optional_sidecars(
@@ -156,25 +165,13 @@ def _run_packaged_evaluation(
         traces=traces,
         json_output=request.json_output,
     )
-    passed = sum(1 for trace in traces if trace.is_successful())
-    all_passed = cli_outputs.all_traces_passed(traces)
-    artifacts = (
-        (artifact(request.output_file, "canonical_trace_jsonl"),)
-        if request.output_file is not None
-        else ()
-    )
-    return CliResult(
-        data={
-            "problem": definition.name,
-            "solution": solution.name,
-            "workloads": len(traces),
-            "passed": passed,
-            "all_passed": all_passed,
-        },
-        artifacts=artifacts,
-        exit_code=(
-            CliExitCode.SUCCESS if all_passed else CliExitCode.RESULT_FAILED
-        ),
+    return cli_outputs.build_evaluation_result(
+        definition.name,
+        solution.name,
+        traces,
+        output_file=request.output_file,
+        scope_archive=scope_archive,
+        scope_qualified=scope_qualified,
     )
 
 

@@ -143,6 +143,7 @@ def _profile_summary_content(
         bottleneck_hints=structured.bottleneck_hints,
         parse_warnings=structured.parse_warnings,
         hip_events=structured.hip_events,
+        hip_event_causality=structured.hip_event_causality,
     )
 
 

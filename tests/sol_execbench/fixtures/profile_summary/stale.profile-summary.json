@@ -62,7 +62,7 @@
     "Raw rocprofv3 metadata remains in the separate profile sidecar when present."
   ],
   "reason_code": "profile_summary_generated",
-  "schema_version": "sol_execbench.profile_summary.v4",
+  "schema_version": "sol_execbench.profile_summary.v5",
   "status": "available",
   "summary": {
     "artifact_count": 4,
