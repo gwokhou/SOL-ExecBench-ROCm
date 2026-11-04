@@ -31,7 +31,7 @@
 | P1：主要功能投资 | ShapesSpec → 自有形状域契约 → 可验证 IR | 共享、派生、范围和整除约束不再隐含于单一样例 | 标量/断言表示、约束验证、序列化、具体化与 bound 域标识 |
 | P1：较小独立增量 | 静态 fake 取图试点 | 可能减少取图中的真实计算和显存需求 | 输入/输出元信息、mutation、常量、数据依赖拒绝路径与真实回放验收 |
 | P1/P2：按实际 corpus | 2.14 图与算子覆盖差分 | 避免新 ATen lowering 导致原支持工作负载失效 | 比较两条固定路径、精度、alias、mutation、前向/梯度和资源计数 |
-| P2：外围诊断 | HIP event 依赖与 profiler qualification | 解释实际耗时与理想下界之间的差距 | 补齐事件 generation 与 dispatch 因果证据；保持 SOLAR 边界 |
+| P2：外围诊断 | HIP event 依赖与 profiler qualification | 解释实际耗时与理想下界之间的差距 | 原生及受控 PyTorch eager 的范围和隐式 dispatch 已验收；生产 evaluate 的 eager 范围已接入验收；完整调度仍待验证 |
 | P2：性能工程 | 有界批处理与 mapper CPU 配额 | 减少排队内存、CPU 超卖 | 先量 stage 时间，再决定 executor 与配额实现 |
 | P3：研究对照 | Origami / grouped GEMM / CK 路径 | 比较 tile 选择与容量约束 | 架构、dtype、shape 限定的独立对照，不替代 Orojenesis |
 
@@ -103,7 +103,24 @@ PyTorch 2.14 新增实验性 `ShapesSpec` / `ShapeVar` / `dynamic_spec`，支持
 
 10.1 提供 HIP event barrier 活动、gfx12 ATT occupancy 修复、profiler 初始化/共存修复和 beta kernel replay；HIP event 的原生输出是 JSON/rocpd。[固定版本说明](https://rocm.docs.amd.com/en/docs-10.1.0/about/release-notes.html)
 
-当前工作区已经实现事件解析和摘要，下一步应解决 **WAIT 对应哪次 RECORD、对应哪些 dispatch**。现有 [normalize_event_generations](../../src/sol_execbench/core/bench/rocm_profiler/hip_events.py)明确将 generation 保持为观察值；[schedule_evidence.py](../../src/sol_execbench/core/bench/performance_model/schedule_evidence.py)跨 lane 仍标为 unverified。这是有意保守的边界。没有因果证据时，不能仅按时间戳把等待连成调度边。
+当前已补齐限定场景内 **WAIT 对应哪次 RECORD、对应哪些 dispatch** 的诊断关联：
+同一 JSON capture 内以主机 correlation ID 和提交顺序连接四个调用，校验 GPU 屏障及
+设备/queue/stream。gfx1200 的 STABLE_PEAK 验收中，重录、销毁重建、独立 stream、
+未记录事件等待四种场景各运行三次，全部符合预定边和数值结果；结束后已核验 AUTO。
+[验收条件、结果与证据边界](hip-event-causality-acceptance.md)单独归档了这次结果。
+
+后续[独立账本验收](hip-trace-scope-acceptance.md)进一步验证了受控原生执行器的相关
+记录完整性和全部 dispatch 范围：9 次 STABLE_PEAK 采集覆盖 39 个 dispatch，真实 trace
+副本中的成对丢失及额外 helper 均被拒绝。资格限定于经过审计的执行器。
+
+进一步的 [PyTorch 实际 workload 验收](hip-torch-scope-acceptance.md)已接入 SDK 提交回调、
+LOSSLESS 完成缓冲与整份导出核对。GEMM、复合矩阵乘及跨流 event 三组各三次正例，
+共核对 93 个 dispatch，绑定 workload 内 45 个（含 27 个内部复制 helper），闭合 3 条边；
+23 种真实 trace 故障副本全部拒绝。小矩阵未产生 WAIT barrier 的三次运行保留为负例。
+受控 eager 诊断子项可以关闭，第 3 项的完整跨 lane 调度目标仍未关闭；条件与范围见该报告。
+
+普通采集仍是 `partial` 诊断：没有独立账本时，trace 无丢失和完整 workload dispatch 范围尚未获证，不能升级成
+跨 lane 预测或同步删除建议。现有 [normalize_event_generations](../../src/sol_execbench/core/bench/rocm_profiler/hip_events.py)明确将 generation 保持为观察值；[schedule_evidence.py](../../src/sol_execbench/core/bench/performance_model/schedule_evidence.py)跨 lane 仍标为 unverified。这是有意保守的边界。没有因果证据时，不能仅按时间戳把等待连成调度边。
 
 这类信息用于解释实际执行与 SOLAR 下界之差；应留在 `sol_execbench` 诊断 sidecar / performance model，经 bridge 使用 SOLAR 结果，不让 SOLAR 反向依赖 profiler 或候选时间。
 
@@ -129,3 +146,9 @@ Origami 的 2.14 变化是 ROCm max-autotune 默认启用分析式 tile 选择�
 4. **按测得瓶颈再优化**：mapper 配额与有界队列；profiler 因果证据、replay、Origami 作为独立外层工作。
 
 初次分析完成了源码审计、官方资料核查、三份 retained artifact 的 hash 核验、JUnit 汇总及一次 CPU-only serializer 探针，当时未重跑全套测试、未取得新 GPU 资源资格，也未实施上述升级。[官方来源核查附录](solar-upgrade-official-source-check-2026-10-11.md)。随后完成的 P0 采集、回归验证及证据边界另见 [P0 完成报告](solar-p0-rocm101-completion-2026-10-11.md)。
+
+
+2026-10-12 后续：生产 `evaluate --profile rocprofv3-scope` 已实现自动身份绑定、
+独立重放和保守拒绝，两个 workload × 两个同名不同源码候选通过 GPU 验收。
+这关闭了生产 eager 接入缺口，不关闭完整调度目标；详见
+[生产资格检查验收](evaluate-hip-scope-acceptance.md)。
