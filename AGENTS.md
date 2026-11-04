@@ -39,8 +39,15 @@ Downloaded/generated data belongs under uncommitted `data/`.
 - Reserve `tools/` for external integrations; domain packages must not re-export
   generic helpers. Wrappers need a documented test seam and focused coverage.
   Migrate callers and remove obsolete imports. Orchestrators use typed stage
-  contracts, parsers validate raw JSON, and writers emit canonical artifacts
-  atomically.
+  contracts; writers emit canonical artifacts atomically.
+- Validate at trust boundaries; reuse validated contracts internally. Recheck
+  only invariants a transformation can invalidate; preserve correctness and
+  evidence guarantees.
+- Catch only expected recoverable errors. Distinguish invalid data and invariant
+  failures from unsupported or unproved cases. Add retries and fallbacks only
+  for supported failure modes.
+- Bound actual work/output before computation or allocation; test both rejected
+  excessive work and accepted inexpensive cases.
 
 ## Naming and Resources
 
