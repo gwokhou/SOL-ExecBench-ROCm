@@ -44,10 +44,9 @@ What it does:
 Prerequisite:
   The exact amd-smi path must have passwordless coverage for `version`,
   `set -l STABLE_PEAK`, and `set -l AUTO`. These set commands affect every
-  visible AMD GPU. From the repository root:
-
-    sudo .venv/bin/python scripts/setup_rocm_clock_sudoers.py \
-      --mode install --user "${USER}" --amd-smi /opt/rocm/bin/amd-smi
+  visible AMD GPU. The current setup_rocm_clock_sudoers.py generates only
+  UUID-scoped setter rules and cannot authorize this legacy wrapper. Its
+  permissions require separate review; see docs/user/ROCM-CLOCK-SUDOERS.md.
 
 After installation:
   Run the patched profiler with normal rocprofv3 arguments:
