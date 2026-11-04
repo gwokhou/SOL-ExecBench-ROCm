@@ -182,7 +182,7 @@ Layer R — Resource (static-inferable; backed by the current data layer)
   CACHE_LINE_MISALIGNED         # RDNA 128 B / CDNA 64 B coalescing risk
 Layer C — Compile-time (disassembly-derived; outside the static decision path)
   INSTRUCTION_MIX_SKEW          # low MFMA/WMMA or high scalar share
-Layer M — Runtime measured (injected from profile_summary.v4; static path never emits)
+Layer M — Runtime measured (injected from profile_summary.v5; static path never emits)
   COMPUTE_BOUND / MEMORY_BOUND / LATENCY_BOUND
 ```
 
@@ -209,12 +209,12 @@ inferred_low     # boundary-adjacent or needs runtime confirmation (AMD red zone
 ```
 
 The `inferred_*` prefix distinguishes static hints from `measured_*` runtime
-values in `profile_summary.v4`, realizing the precedence rule.
+values in `profile_summary.v5`, realizing the precedence rule.
 
 ### 8.4 Precedence
 
 ```
-runtime measured (profile_summary.v4)  >  static inferred (footprint + budget)  >  no data
+runtime measured (profile_summary.v5)  >  static inferred (footprint + budget)  >  no data
 on conflict, the static hint is demoted into limitations[] and never overrides runtime.
 ```
 
