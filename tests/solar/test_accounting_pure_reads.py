@@ -296,6 +296,6 @@ def test_literal_scalar_read_contract_is_narrow(target, inputs, operand, known):
         },
         "tensor_names": {"inputs": inputs, "outputs": ["out"]},
     }
-    assert _blocking_reason(layer, access) == (
+    assert _blocking_reason(layer, access, {}, {}) == (
         None if known else AccessReason.UNKNOWN_READS
     )

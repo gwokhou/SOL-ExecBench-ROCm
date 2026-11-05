@@ -38,6 +38,10 @@ from solar.ir.semantic_values import (
     SemanticValueDecodeError,
     decode_semantic_value,
 )
+from solar.ir.topk_gather import (
+    TOPK_GATHER_TARGETS,
+    topk_gather_read_proved,
+)
 from solar.ir.triangular import TRIANGULAR_TARGETS, triangular_accesses
 from solar.precision import BYTES_PER_ELEMENT
 from solar.types import NodeDict
@@ -78,6 +82,8 @@ FULL_OPERAND_READS = frozenset(
         "log",
         "sqrt",
         "rsqrt",
+        "softmax",
+        "topk",
     }
 )
 
@@ -186,7 +192,10 @@ def _where_has_external_values(layer: NodeDict, access: AccessDocument) -> bool:
 
 
 def _blocking_reason(
-    layer: NodeDict, access: AccessDocument
+    layer: NodeDict,
+    access: AccessDocument,
+    layers: Mapping[str, NodeDict],
+    producer_of: Mapping[str, str],
 ) -> AccessReason | None:
     semantic = layer_operation(layer)
     target = str(semantic.get("target", ""))
@@ -198,6 +207,10 @@ def _blocking_reason(
     if target in COPY_TARGETS and target != "clone":
         return AccessReason.COPY
     if target in DYNAMIC_INDEX_TARGETS:
+        if target in TOPK_GATHER_TARGETS and topk_gather_read_proved(
+            layer, layers, access.tensors, producer_of
+        ):
+            return None
         return AccessReason.DYNAMIC_INDEX
     if target in STATIC_VIEW_TARGETS:
         reasons = {
@@ -302,6 +315,14 @@ def external_reads(
             AccessQuality.UNAVAILABLE, (AccessReason.MISSING_STORAGE,), budget
         )
     reads: dict[str, list[TensorAccess]] = defaultdict(list)
+    producer_of: dict[str, str] = {}
+    for layer_id, layer in layers.items():
+        for name in (layer.get("tensor_names") or {}).get("outputs") or []:
+            if name in producer_of:
+                raise ValueError(
+                    "external reads graph has multiple producers for a tensor"
+                )
+            producer_of[name] = layer_id
     reasons = {
         access.reasons.get(name, AccessReason.UNKNOWN_READS)
         for name in access.source_indices
@@ -314,7 +335,7 @@ def external_reads(
             if declared_outputs.intersection(names.get("outputs") or []):
                 reasons.add(AccessReason.ALIAS)
             continue
-        reason = _blocking_reason(layer, access)
+        reason = _blocking_reason(layer, access, layers, producer_of)
         if reason is not None:
             reasons.add(reason)
             continue
