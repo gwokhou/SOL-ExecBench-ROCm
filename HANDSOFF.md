@@ -106,7 +106,27 @@ L1 progress on the [roadmap](docs/internal/solar-evolution-roadmap-2026-11-05.md
 - **L1-a verified**: EROFS was specific to the external hardened controller
   (`--read-only` root). Host and repo-container default Triton caches are
   writable (probe evidence in `data/outputs/solar-l1-eroofs-verification-20261105/`).
-- **L1-d executed to a structural wall**: baseline workspace materialized
+### SOLAR L1 execution — 2026-11-05
+
+**L1 update (later this day): L1-d closed via the curated-denominator path.**
+The full-denominator canary wall stands (L3-c domain, unchanged), but the
+roadmap-sanctioned option (a) was executed with the existing readiness seam:
+`scripts/internal/solar/run_r16_curated_qualification.py` audits the frozen
+R16 denominator with R08 as a declared expected-rejection sentinel. Both IR
+paths pass the curated gate — 15 ready + 1 declared expected-rejection =
+16/16 terminal. R06 additionally holds formal
+`capacity_constrained_tile_aware_v1` bounds on both paths (the L1-c
+vocabulary in effect; external reads exact at 33792 B). R08's make_fx slot
+upgraded from the historical gradient-verification rejection to ready:
+graph extraction, IR conversion and conversion verification all genuinely
+passed on the integrated tree. Full-denominator qualify-canary/full remain
+INCOMPLETE and deferred to L3-c. Evidence:
+`data/outputs/solar-l1-release-20261105/r16-terminal-ledger.json`. The L1
+line is closed under its acceptance alternative (itemized terminal ledger +
+per-slot GPU evidence); full-corpus publication qualification is now an
+L3-c-gated follow-up, not an L1 deliverable.
+
+### SOLAR L1 execution (earlier) — 2026-11-05
   (git-revision bound), `qualify-static` gate passed; `qualify-canary` returns
   INCOMPLETE — 112 audited, 79 ready, 33 failed = 3 R08-expected rejections
   (consistent with the R16 ledger) + 20 native-registry coverage gaps (L3-c

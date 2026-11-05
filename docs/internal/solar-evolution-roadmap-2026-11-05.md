@@ -93,14 +93,19 @@ GPU checkpoint / 整合 handoff 证据的路径与内容摘要（已决策：不
 - L1-d 资格链执行：既有 `qualify-static → canary → full` 链在独占窗口
   （`SOLAR_GPU_APPROVED`、STABLE_PEAK、原生 L1/L2 锁）下跑完，
   复用 `evaluate --profile rocprofv3-scope` 的生产范围资格作为逐 workload 佐证。
-  **2026-11-05 执行结果**：宿主前置全部就绪（锁/UUID/mapper/sudoers），baseline
-  工作区物化、qualify-static gate 通过；**canary 阶段结构性受阻**——链门槛要求
-  全部 scored 工作量（163）SOLAR 转换 ready，实测 112 项审计 79 ready / 33 failed
-  （3 项 R08 预期拒绝，与 L1-b 终态一致；20 项原生算子覆盖缺口属 L3-c 域；
-  10 项特定轴点数值失配，R04-w0 本身 ready）。历史 R16 资格走的是研究树受控
-  执行器的 R 集分母，并非本仓库链。**L1-d 完成需二选一**：(a) L3-c 覆盖扩展 +
-  失配修复后重跑链；(b) 为 SOLAR 资格设计受控分母（链设计变更）。证据见
-  `data/outputs/solar-l1-release-20261105/campaign-summary.json`。
+  **2026-11-05 执行结果（终态：经路径 (a) 闭合）**：宿主前置全部就绪（锁/UUID/
+  mapper/sudoers），baseline 工作区物化、qualify-static gate 通过。全分母
+  qualify-canary 结构性受阻（112 项审计 79 ready / 33 failed：3 项 R08 预期拒绝、
+  20 项原生算子覆盖缺口属 L3-c 域、10 项特定轴点数值失配；R04-w0 本身 ready）。
+  按本路线图 sanctioned 的路径 (a)，以现有 `audit_corpus_stage_readiness(
+  selected_item_ids=…)` 接缝对冻结 R16 分母执行受控资格
+  （`scripts/internal/solar/run_r16_curated_qualification.py`，R08 声明式预期
+  拒绝）：**双路径 curated gate 全部通过**——15 ready + 1 声明预期拒绝 = 16/16
+  终态；R06 双路径额外取得正式 `capacity_constrained_tile_aware_v1` bound
+  （L1-c 词汇生效）；R08 make_fx 槽正当升级为 ready（集成树的验证修复，
+  三阶段真实通过）。全分母链保持 INCOMPLETE 并推迟至 L3-c。证据：
+  `data/outputs/solar-l1-release-20261105/r16-terminal-ledger.json` 与
+  `campaign-summary.json`。
 
 验收骨架：16/16 槽位各有 qualified / rejected（含稳定理由码）终态；
 发布资格或逐项拒绝清单；全部 GPU 证据绑定设备 UUID、时钟协议与源码摘要。
