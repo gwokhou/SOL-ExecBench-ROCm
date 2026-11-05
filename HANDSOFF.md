@@ -91,6 +91,40 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
+### SOLAR L1 execution — 2026-11-05
+
+L1 progress on the [roadmap](docs/internal/solar-evolution-roadmap-2026-11-05.md):
+
+- **L1-c closed** (`12859e3e` "Prove frozen top-k gather reads for external
+  reads"): new frozen vocabulary `solar/ir/topk_gather.py` proves a gather whose
+  index reduces to a top-k index output over an identically shaped operand adds
+  no external reads; `softmax`/`topk` joined full-operand reads. R06
+  (`aka-moe_topk_softmax-w0`) flipped from `unavailable [dynamic_index,
+  read_semantics_unproved]`/diagnostic to **exact (16640 elements / 33792 B,
+  oracle-matched) / roofline_eq1_v1 / all three views ready on both IR paths**.
+  Solar suite 1595 passed; F07 keeps its dynamic-index rejection.
+- **L1-a verified**: EROFS was specific to the external hardened controller
+  (`--read-only` root). Host and repo-container default Triton caches are
+  writable (probe evidence in `data/outputs/solar-l1-eroofs-verification-20261105/`).
+- **L1-d executed to a structural wall**: baseline workspace materialized
+  (git-revision bound), `qualify-static` gate passed; `qualify-canary` returns
+  INCOMPLETE — 112 audited, 79 ready, 33 failed = 3 R08-expected rejections
+  (consistent with the R16 ledger) + 20 native-registry coverage gaps (L3-c
+  domain) + 10 axis-point numerical mismatches (R04-w0 itself ready, matching
+  `validated_prior_ready`). The chain's full-scored-denominator readiness gate
+  cannot complete without L3-c coverage work or a curated SOLAR qualification
+  denominator. Campaign evidence:
+  `data/outputs/solar-l1-release-20261105/campaign-summary.json`.
+- Environment fix during the campaign: an orphaned, broken
+  `.venv/bin/amd-smi` console shim (amdsmi module not importable) shadowed
+  `/usr/bin/amd-smi` and failed `observe_clock_devices()`; renamed aside
+  (`environment-fix.json` in the campaign directory).
+
+R16 after L1-c: 12 complete + 2 R06 priceable-pending-rerun + 2 R08
+expected-rejection = 16 slots with terminal or decided paths. L1 is not fully
+closed; the remaining decision (coverage expansion vs curated denominator) is
+recorded in the roadmap L1-d entry.
+
 ### SOLAR evolution roadmap L0 — 2026-11-05
 
 The evolution line is designed and committed
