@@ -91,6 +91,49 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
+### SOLAR L3-a execution — 2026-11-05
+
+L3-a (静态 fake 取图试点) closed, with L4 item 1 (stage measurement report)
+delivered in the same campaign. Acceptance was pre-fixed before execution in
+[solar-l3a-fake-static-pilot-acceptance-2026-11-05.md](docs/internal/solar-l3a-fake-static-pilot-acceptance-2026-11-05.md);
+one dated erratum appended mid-campaign declaring R08/make_fx as a second
+expected failure (formal-bound extraction rejects unproved external reads —
+fail-closed policy; L1 evidence never claimed R08 priceable).
+
+- **Measurement (M gate passed, 16/16 slots)**: first per-stage
+  wall/peak-RSS/GPU-allocator report over the frozen R16 denominator × both
+  IR paths on gfx1200 (`data/outputs/solar-l3a-20261105/measurement/`).
+  Headline medians: `conversion_verification` dominates single-slot wall
+  (make_fx 1.55 s, torchview 1.10 s ≈ 2/3 of pipeline), `graph_extraction`
+  0.58/0.66 s, `ir_conversion` 0.03/0.05 s, `formal_analysis` 0.15/0.09 s,
+  publication ≤ 0.013 s. Worker process peak RSS ≈ 2.9 GB (torch import
+  ~1.0 s per isolated worker). Orojenesis mapper at R16 scale: 30 runs,
+  8.2 s total, sampled peak 27 MB — the mapper is not the bottleneck at
+  this denominator, so L4's thread-count question ranks below verification
+  batch cost.
+- **Pilot (D1–D4 all pass, adopt=true)**: new unregistered module
+  `src/solar/graph/make_fx_fake.py` (FakeTensorMode, concrete shapes,
+  reuses `trace_make_fx_reference`; default paths untouched, verified by an
+  automated `git status --porcelain -- src` structural check). All 8
+  make_fx R-slots: O1 semantic-projection equal AND O2 exact-document
+  equal AND O3 downstream aten conversion + real-replay verification
+  passed. Focused samples: mutation effects parity, scalar-constant
+  arguments parity, data-dependent branch rejected under fake
+  (`DataDependentOutputException` on `_local_scalar_dense`). O5: extraction
+  wall 11–196× faster (median ~100×); GPU allocator peak never higher
+  (R08 38→4 MB; unchanged slots are dominated by the real input tensors
+  the factory allocates — full GPU savings require factory-side fake
+  inputs, a production-reform consideration, not L3-a scope).
+- **Decision recorded**: adopt (D1 8/8, D2 3/3, D3 8/8+8/8, D4 structural
+  check). Wiring fake-static extraction into the production make_fx path is
+  a follow-up line with its own pre-fixed acceptance (fake-capable input
+  factory, torchview path untouched, EROFS/container preconditions); it
+  does not modify the closed L3-a pilot.
+- Tests: `tests/solar/test_make_fx_fake.py` +
+  `tests/scripts/test_l3a_stage_measurement.py`; solar suite unchanged at
+  1595 passed; ruff and `ty` clean. Campaign reproducible via
+  `scripts/internal/solar/run_l3a_stage_measurement.py --resume`.
+
 ### SOLAR L1 execution — 2026-11-05
 
 L1 progress on the [roadmap](docs/internal/solar-evolution-roadmap-2026-11-05.md):
