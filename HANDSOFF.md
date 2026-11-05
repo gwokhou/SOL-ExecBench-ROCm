@@ -91,6 +91,46 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
+### SOLAR L3-b execution — 2026-11-05
+
+L3-b (形状域契约，阶段 1 具体实例化) closed. Acceptance pre-fixed in
+[solar-l3b-shape-domain-acceptance-2026-11-05.md](docs/internal/solar-l3b-shape-domain-acceptance-2026-11-05.md);
+one authoring correction made **before** campaign execution (K range widened
+to [2,256] so the `K<=E` assumption is non-degenerate and the pre-fixed
+assumption-violation probe can exist — the original [2,8] made it vacuous).
+
+- **Own constraint AST**: new production package `src/solar/shapes/`
+  (`ShapeSymbol` range/divisibility/provenance, integer-affine `DimExpr`,
+  `TensorBinding`, `Assumption` ≤/==, `IntervalDim`, `ShapeDomain`) with
+  canonical serialization and `stable_identity` checksum; fully SOLAR-owned
+  (no upstream ShapesSpec/SymBool runtime dependency). Validation returns
+  only the pre-fixed reason codes; stage-1 tensor-shape binding solves
+  unit/affine dims and refuses to guess (`shape_mismatch`).
+- **R06 first real consumer**: frozen domain `r06-moe-topk-softmax-shape-v1`
+  (`T` ∈ [64,1024]%64, `E` ∈ [64,256]%64, `K` ∈ [2,256]%2, `K<=E`,
+  gating/bias/topk/route_scale/weights/ids bindings). All 4 workloads +
+  boundary-max + interior-non-corpus (T=128,E=192,K=6) validated; negative
+  probes out-of-range/divisibility/assumption rejected with exact codes.
+- **Structure certification**: R06 graphs at w0/w1/interior are
+  `structure_stable` — the single constant divergence across instances is
+  `topk.k` (8 vs 6), explained by the K symbol; the `shape_branch` sample
+  certifies `shape_branch_rejected`. Domain-wide reuse claims stay bounded
+  by this finite-instance evidence (per-instance validation ≠ whole-domain
+  proof, per spec).
+- **Instance provenance through existing seams**: R06 w0 analyzed (make_fx,
+  CPU, pinned mapper) with `analysis_metadata.shape_domain`
+  (domain_id + domain_sha256 + assignment + derived tensor shapes);
+  `solar-analysis.yaml` carries the block and `manifest.yaml` binds its
+  sha256. No production schema changed (metadata is the caller-authored
+  seam); ConversionRequest-level shape fields remain stage-2 work.
+- **Pricing separation invariance**: with-domain vs control analyses are
+  identical after removing the block (`invariance_diff: null`) — the shape
+  domain adds zero tensor accounting.
+- Evidence: `data/outputs/solar-l3b-20261105/` (`l3b-summary.json` gate all
+  green; campaign `scripts/internal/solar/run_l3b_shape_domain.py`).
+  Tests: `tests/solar/test_shapes_domain.py` (23, full vocabulary);
+  suite 1812 passed; ruff/ty clean.
+
 ### SOLAR L3-a execution — 2026-11-05
 
 L3-a (静态 fake 取图试点) closed, with L4 item 1 (stage measurement report)

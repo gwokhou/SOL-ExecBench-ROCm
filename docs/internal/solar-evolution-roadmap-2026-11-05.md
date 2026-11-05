@@ -149,6 +149,13 @@ Graph capture 与 IPC 在本线内保持显式拒绝。
   具体 shape 上实例化现有 IR，artifact 记录实例与来源域。
   验收词汇：共享/派生维度、合法边界、越界、整除、shape branch（拒绝）、
   nonzero（区间）、alias/mutation。R06 是首个真实消费者。
+  **2026-11-05 执行结果（终态：阶段 1 闭合）**：预固定验收规格
+  [solar-l3b-shape-domain-acceptance-2026-11-05.md](solar-l3b-shape-domain-acceptance-2026-11-05.md)。
+  `src/solar/shapes/` 自有约束 AST 落地；R06 冻结域全分母验证 + 负例精确
+  拒绝；结构认证 structure_stable（topk.k 由 K 符号解释）且 shape branch
+  正确拒绝；实例来源域经既有 `analysis_metadata` 通道写入 solar-analysis/
+  manifest，计价不变性成立。阶段 2（请求级形状域字段、符号化 Orojenesis）
+  未启动，另行立项。详见 HANDSOFF 2026-11-05 L3-b 条目。
 - L3-c 2.14 算子覆盖差分：从实际 corpus 出发（matmul/addmm/bmm、attention、
   normalization、reduction、view/alias、mutation、低精度转换、显式 backward），
   双固定路径比对精度/alias/mutation/梯度/资源计数；产出覆盖矩阵而非直接扩 allowlist。
