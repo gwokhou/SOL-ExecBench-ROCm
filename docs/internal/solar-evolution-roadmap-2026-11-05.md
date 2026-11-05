@@ -138,6 +138,12 @@ Graph capture 与 IPC 在本线内保持显式拒绝。
 - L3-a 静态 fake 取图试点：仅 `make_fx_aten` 路径，默认路径不动。先测
   输入生成/trace/转换/回放/Orojenesis 各 stage 耗时与峰值内存，再决定改造。
   验收：输入/输出元信息、mutation、常量、数据依赖拒绝路径、与真实回放对照。
+  **2026-11-05 执行结果（终态：闭合）**：预固定验收规格
+  [solar-l3a-fake-static-pilot-acceptance-2026-11-05.md](solar-l3a-fake-static-pilot-acceptance-2026-11-05.md)
+  （含一项日期勘误：R08/make_fx 声明为第二个预期失败）。测量 gate 16/16
+  通过（与 L4 第 1 项同一活动交付）；试点 D1–D4 全过、adopt=true（8/8 槽
+  O1+O2+O3 全绿，提取墙钟 11–196×，GPU 峰值不升）。生产改造为后续线，
+  另立验收。详见 HANDSOFF 2026-11-05 L3-a 条目。
 - L3-b 形状域契约：自有约束 AST（symbol、range、派生、整除、assumptions、
   source binding）；张量计算与形状/断言节点分离计价；第一阶段只在域验证后的
   具体 shape 上实例化现有 IR，artifact 记录实例与来源域。
