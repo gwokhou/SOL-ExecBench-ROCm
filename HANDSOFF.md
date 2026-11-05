@@ -91,6 +91,67 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
+### SOLAR evolution roadmap L0 — 2026-11-05
+
+The evolution line is designed and committed
+([roadmap](docs/internal/solar-evolution-roadmap-2026-11-05.md), `9efa3659`).
+This entry performs L0 state reconciliation; production code is untouched.
+
+Integration preimage verdict: the 176-path integration rehearsal landed as
+`f9d0d994`. Re-verified against the handoff's `candidate-manifest.json`
+(1,373 files): 157/176 integration paths are byte-identical today; all 19
+drifted paths are attributable to `cb41d916`/`fbc148b8`; of the 85
+preserved-main paths, 81 are unchanged and 4 changed via
+`97355a7a`/`e75daf3c`/`fbc148b8`; no planned path is missing. The
+"integration applied" claim is verified, no longer inferred.
+
+Main registrations since 2026-10-30: `f9d0d994` (integration landing),
+`cb41d916`, `fbc148b8`, `e75daf3c`, `89cf9c10`, then `24ef5850`, `97355a7a`
+(HIP event causality and controlled scope qualification), `44f8b6b1`,
+`b4e89ccc`, `9b48c89f`, `9efa3659`.
+
+External evidence registration (decision 2026-11-05: register path and
+digest only; do not copy files into this repository):
+
+| Artifact (canonical location) | sha256 |
+| --- | --- |
+| `~/Documents/Codex/2026-10-26/task/solar-integration-prep-20261029/INTEGRATION.md` | `0c63e7673d9f8c4e62c3099cb913fdc929f433eea21b242fbe4179796f716b39` |
+| `~/Documents/Codex/2026-10-26/task/solar-integration-prep-20261029/FINAL.md` | `7f3188ce13a4ac515c8763afb7383ab0a628b9bc26ae0d784fc552662a9ed5d8` |
+| `~/Documents/Codex/2026-10-26/task/solar-integration-prep-20261029/integration-plan.json` | `d8c536310b553c18ade2b2d344a5a53160ad71c6af47d7df4a3478afff990b00` |
+| `~/Documents/Codex/2026-10-26/task/solar-integration-prep-20261029/candidate-manifest.json` | `07c37b722b344cad05dfa808ec6bf708e247cad6568d9a999bfaedacfa88961a` |
+| `~/Documents/Codex/2026-10-26/task/solar-stages1-5/data/outputs/solar-resume-20261026/mapper-followup/gpu-proposal/CHECKPOINT-0528.md` | `fe065d8873fa4a0b13a643e94243701d143ae03c2c5898b4d8230b4d13c909b6` |
+| `~/Documents/Codex/2026-10-26/task/solar-stages1-5/data/outputs/solar-resume-20261026/mapper-followup/gpu-proposal/CHECKPOINT-0553.md` | `7bd325f1977f098838ad5bb2e57f96815ef0b1ec47a84780f76071f173ebdc40` |
+
+Earlier entries cite `data/outputs/solar-resume-20261026/...` relative to
+this repository; those files do not exist here. The external worktree paths
+above are the canonical locations.
+
+R-slot terminal ledger (source: the rehearsal's `ACCEPTANCE-LEDGER.json`,
+analysis source `9e8cc0e6…`, GPU readiness source `5d37dcc4…` via strict
+semantic-runtime-identity reuse):
+
+- R04 `torch2hip/dot_product_attention`, both IR paths:
+  `validated_prior_ready`, priceable, cache-aware. The 2026-10-26 container
+  blocker (read-only `/home/sol-execbench/.triton`, EROFS errno 30 during a
+  fresh extraction attempt) is not a slot blocker; readiness stands on strict
+  reuse of the 5d37 receipts. Any fresh GPU rerun of the qualification chain
+  in containers still needs the bounded tmpfs fix — an L1-d prerequisite,
+  not an R04 defect.
+- R06 `torch2flydsl/moe_topk_softmax`, both IR paths: ready, not priceable,
+  cache-aware unavailable, external reads `unavailable`. Decision 2026-11-05:
+  build the frozen top-k bounded-read proof vocabulary (roadmap L1-c);
+  fallback is explicit rejection with recorded reason.
+- R08 `instruction2triton/rmsnorm_bwd`: torchview path `expected_rejection`
+  at graph extraction; make_fx path `expected_rejection` at conversion
+  verification (gradient check). Terminal as legitimate boundary rejections,
+  retained in the 16-slot denominator; roadmap L1-b determination is closed
+  with no code change.
+
+R16 final: 12 complete + 2 ready-unpriced (R06) + 2 expected-rejection
+(R08) = 16. The GPU canary passed both paths (CHECKPOINT-0553, 2026-10-26
+05:53 UTC); the mapper-followup document's "not executed" narrative is
+superseded by a dated addendum there.
+
 ### SOLAR integration preparation — 2026-10-29
 
 The current scientific snapshot is `9e8cc0e615716fced80ca5998bfe7da17b028aa9943ebb9d76a845afa68f7876`.

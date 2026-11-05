@@ -30,7 +30,7 @@
 
 | 组 | 缺口 | 出处 |
 | --- | --- | --- |
-| A 正式资格 | R04 两个 cache-write 阻塞（Triton EROFS）、R06 两个动态读取未计价、R08 两个边界拒绝未判定终态；完整 corpus 发布资格未取得 | CHECKPOINT-0553、10-29 快照 |
+| A 正式资格 | R06 两个动态读取未计价、R08 两个边界拒绝（L0 已判终态：合法域外预期拒绝，保留于分母）；R04 已恢复（5d37 回执严格复用，L0 复核）；完整 corpus 发布资格未取得 | ACCEPTANCE-LEDGER（L0 登记）、10-29 快照 |
 | B 调度因果 | 完整跨 lane 调度目标未关闭：内存复制域依赖、默认 stream、Graph、后台线程、跨进程；一切 scope 资格固定 `schedule_complete=false` | hip-torch-scope / evaluate-hip-scope 验收 |
 | C 表达能力 | 动态形状（ShapesSpec → 自有形状域契约）、静态 fake 取图、2.14 算子覆盖差分 | 升级机会 P1 |
 | D 吞吐工程 | mapper CPU 配额（当前每 mapper 全核）、有界批处理；均要求先测各 stage 时间 | 升级机会 P2 |
@@ -76,11 +76,14 @@ GPU checkpoint / 整合 handoff 证据的路径与内容摘要（已决策：不
 
 目标：把 R 组 16 槽位推向终态并取得（或明确拒绝）完整 corpus 正式发布资格。
 
-- L1-a R04 EROFS 根因判定：区分环境（cache 目录只读/权限/沙箱）与代码；
-  已落 main 的 `e75daf3c`（禁用不合格 expandable segments）与 Triton cache
-  目录策略交叉核对。环境项修配置并留证据，代码项单独修复。
-- L1-b R08 终态判定：extraction / gradient-verification 边界拒绝是合法域外
-  （记录理由、从合格分母移出）还是支持域缺口（转 L3-c）。不允许为通过而放宽验证。
+- L1-a（L0 已改判）容器 EROFS 环境前置：R04 两槽位经 5d37 回执严格复用已是
+  ready/priceable/cache-aware 终态，EROFS（容器默认 `/home/sol-execbench/.triton`
+  只读，errno 30）不再是槽位阻塞；但它仍是 L1-d 在容器内新跑资格链的必要
+  前置——落实 CHECKPOINT-0553 建议的有界临时 tmpfs 并留证据。
+- L1-b（L0 已闭合）R08 终态：两路径均为 expected_rejection（torchview 卡
+  graph_extraction、make_fx 卡 conversion_verification 的梯度检查），按合法
+  域外预期拒绝保留在 16 槽分母内，无需代码变更；不因追求 16/16 通过而放宽
+  提取或梯度验证。
 - L1-c R06 动态读取计价：R06 是 `torch2flydsl/moe_topk_softmax`（E=256,K=8,T=64），
   阻塞点是路由与**数据依赖索引**的外部读取——属 external-reads/受限需求证明域
   （阶段 1/4 家族）的扩展，与 L3-b 形状域（符号维度范围）无关。已决策（2026-11-05）：
@@ -187,7 +190,7 @@ L5 独立硬件，随时可并行
 | 风险 | 影响 | 缓解 |
 | --- | --- | --- |
 | gfx1200 独占窗口不可得 | L1 全线停摆 | L3/L4/L2 规格不受阻；窗口按维护窗口协调（README 锁协议） |
-| R04 EROFS 根因在环境 | 误当代码缺陷修复 | L1-a 先判定后修复，保留失败证据 |
+| 容器 EROFS 在 L1-d 复现 | 资格链新跑失败被误判为代码回归 | 资格链运行前落实有界 tmpfs；失败时先对照 CHECKPOINT-0553 已知症状 |
 | SDK 回执上游不提供 | L2 M-a 起无法按首选路径验证 | 替代：受控执行器账本域扩展；Graph/IPC 维持拒绝 |
 | 形状域范围蔓延 | L3-b 吞噬多个周期 | 首批词汇冻结在升级机会文档所列；超出即另立任务 |
 | R06 证明域扩展蔓延 | 为单槽位过度建设动态索引词汇 | 已决策建设但词汇冻结在 top-k 路由类按 K 限界读取；无法覆盖则回退显式拒绝 |

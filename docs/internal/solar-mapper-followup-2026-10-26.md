@@ -96,3 +96,17 @@ mapper 文件名枚举在宿主部分系统/容器目录及固定镜像的两个
 未对这些受拒目录提权重读或改道访问。宽范围枚举输出曾截断，故不能声称完成
 全机工具盘点；这不影响另一个可读、独立工件已通过正式校验并实际完成四点
 验证的确定结果。GPU 是否可独占使用仍不能确认。
+
+## 2026-11-05 状态追加
+
+本文"GPU canary 与 R16 方案已生成但未执行"的叙述已被后续执行取代，历史值
+保持原样。GPU canary 两路径已通过（外部隔离树
+`~/Documents/Codex/2026-10-26/task/solar-stages1-5/` 下
+`data/outputs/solar-resume-20261026/mapper-followup/gpu-proposal/CHECKPOINT-0553.md`，
+sha256 `7bd325f1977f098838ad5bb2e57f96815ef0b1ec47a84780f76071f173ebdc40`）。
+最终 R16 逐槽位台账见
+`~/Documents/Codex/2026-10-26/task/solar-integration-prep-20261029/ACCEPTANCE-LEDGER.json`：
+12 完整 + 2（R06 ready 未计价）+ 2（R08 预期边界拒绝）。本仓库 `data/outputs/`
+不含上述目录，正文里的仓库相对路径以上述外部位置为规范指向。汇总登记见
+HANDSOFF 的 2026-11-05 L0 条目；演进后续按
+[路线图](solar-evolution-roadmap-2026-11-05.md)推进。
