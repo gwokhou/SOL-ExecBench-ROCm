@@ -223,3 +223,17 @@ def test_noncontiguous_reshape_input_copies_into_materialized_storage(
             assert layer_id not in maps.transparent_layers
             for name in layer["tensor_names"]["outputs"]:
                 assert maps.reasons[name] is AccessReason.MATERIALIZED
+
+
+def test_view_alias_comes_from_semantics_not_declaration(verified_graph):
+    # Batch-5: Tensor.view unconditionally returns a view, so an undeclared
+    # schema alias on a tracked contiguous input still resolves.
+    def reference(x):
+        return x.view(2, 8)
+
+    graph = verified_graph(reference, (torch.arange(16.0),))
+    maps = resolve_graph_accesses(graph["layers"])
+    for layer in graph["layers"].values():
+        if layer_operation(layer).get("target") == "view":
+            outputs = layer["tensor_names"]["outputs"]
+            assert all(name in maps.tensors for name in outputs)

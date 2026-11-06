@@ -91,6 +91,24 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
+### SOLAR external-reads batch 5 — 2026-11-06
+
+Batch 5 (make_fx view 未声明别名) closed, all gates green
+([spec](docs/internal/solar-l3e-batch5-acceptance-2026-11-06.md); evidence
+`batch5-*` under `data/outputs/solar-l3e-external-reads-20261106/`).
+
+- `Tensor.view`（含 `_unsafe_view` 规范化）的别名性来自语义而非 schema
+  声明——tracked 连续输入经 `reshape_access` 证明纯视图，未跟踪（内部）
+  输入按内部数据移动记 `MATERIALIZED`，非连续输入保守维持
+  `UNSUPPORTED_VIEW`（view 兼容性一般规则留待后续）。mingpt 的 transpose
+  blocker 是 `_unsafe_view` 继承，同根清除。
+- G3 exact 4/4（l3n44_mingpt make_fx w0–w3）；G4 4/4 analyzed with
+  formal totals；suite 1841 passed（+1 view 单元测试，无旧语义固定）。
+- **Line A cumulative: 128 → 31 rows**（69 rows hold formal bounds）.
+  Remaining: `<transparent_alias>` 42（界语义域）、conv2d 14（区域机器）、
+  索引化 loss 14（nll 5/cross_entropy 5/kl_div 4）、view 非连续分量
+  （混合行内，随批次清）。
+
 ### SOLAR external-reads batch 4 — 2026-11-06
 
 Batch 4 (layer_norm torchview de-opaque) closed with all gates green
