@@ -95,6 +95,12 @@ def main() -> int:
     )
     parser.add_argument("--timeout", type=float, default=900.0)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--floor",
+        type=int,
+        default=0,
+        help="minimum analyzed rows; 0 requires all rows to analyze",
+    )
     parser.add_argument("--item", help="single-slot worker mode item")
     parser.add_argument("--output", type=Path, help="single-slot output dir")
     args = parser.parse_args()
@@ -182,8 +188,8 @@ def main() -> int:
         "g4": {
             "analyzed": len(analyzed),
             "total": len(records),
-            "floor": G4_FLOOR,
-            "passed": len(analyzed) >= G4_FLOOR,
+            "floor": args.floor or len(records),
+            "passed": len(analyzed) >= (args.floor or len(records)),
             "misses": misses,
         },
     }

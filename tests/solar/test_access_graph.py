@@ -123,7 +123,7 @@ def test_different_inputs_are_not_merged_by_matching_shape(verified_graph):
         union_accesses(accesses)
 
 
-def test_copy_boundary_is_not_a_transparent_view(verified_graph):
+def test_clone_storage_is_fresh_and_not_transparent(verified_graph):
     def reference(x):
         return x.clone()[:2].sum()
 
@@ -132,8 +132,11 @@ def test_copy_boundary_is_not_a_transparent_view(verified_graph):
     for layer_id, layer in graph["layers"].items():
         if layer_operation(layer).get("target") == "clone":
             assert layer_id not in maps.transparent_layers
+            # Batch-2: clone copies into fresh storage; its output reason is
+            # MATERIALIZED so downstream views resolve instead of inheriting
+            # copy_boundary.
             assert all(
-                maps.reasons[name] is AccessReason.COPY
+                maps.reasons[name] is AccessReason.MATERIALIZED
                 for name in layer["tensor_names"]["outputs"]
             )
 
@@ -187,17 +190,36 @@ def test_nonunit_slice_retains_an_explicit_unavailable_reason(verified_graph):
         assert maps.reasons[name] is AccessReason.NONUNIT_STEP
 
 
-def test_conditional_reshape_alias_is_not_assumed_proven(verified_graph):
+def test_contiguous_reshape_input_proves_the_conditional_alias(verified_graph):
+    # Batch-2: a contiguous input proves the conditional alias as a view.
     def reference(x):
         return x.reshape(4, 4)
 
     graph = verified_graph(reference, (torch.arange(16.0),))
     maps = resolve_graph_accesses(graph["layers"])
+    for layer in graph["layers"].values():
+        if layer_operation(layer).get("target") in {"reshape", "view"}:
+            outputs = layer["tensor_names"]["outputs"]
+            assert all(name in maps.tensors for name in outputs)
+
+
+def test_noncontiguous_reshape_input_copies_into_materialized_storage(
+    verified_graph,
+    request,
+):
+    # Batch-2: a non-contiguous input forces a copy into fresh storage.
+    if "torchview" in request.node.callspec.id:
+        pytest.skip(
+            "torchview cannot convert the transposed-reshape composition"
+        )
+
+    def reference(x):
+        return x.t().reshape(8, 4)
+
+    graph = verified_graph(reference, (torch.arange(32.0).reshape(4, 8),))
+    maps = resolve_graph_accesses(graph["layers"])
     for layer_id, layer in graph["layers"].items():
-        effects = layer_operation(layer).get("effects") or {}
-        if any(
-            alias.get("conditional") for alias in effects.get("aliases") or []
-        ):
+        if layer_operation(layer).get("target") == "reshape":
             assert layer_id not in maps.transparent_layers
             for name in layer["tensor_names"]["outputs"]:
-                assert maps.reasons[name] is AccessReason.ALIAS
+                assert maps.reasons[name] is AccessReason.MATERIALIZED

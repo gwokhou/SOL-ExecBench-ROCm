@@ -103,6 +103,11 @@ FULL_OPERAND_READS = frozenset(
         "masked_fill",
         "expand",
         "repeat",
+        # Batch-2 vocabulary (spec: solar-l3e-batch2): stride-decidable
+        # conditional aliases; the copy branch reads its operand once and
+        # unions per base, so counting at the layer is sound.
+        "contiguous",
+        "reshape",
     }
 )
 
@@ -223,7 +228,7 @@ def _blocking_reason(
         effects.get(key) for key in ("mutates", "atomic", "opaque_library_call")
     ):
         return AccessReason.EFFECT
-    if target in COPY_TARGETS and target != "clone":
+    if target in COPY_TARGETS and target not in {"clone", "contiguous"}:
         return AccessReason.COPY
     if target in DYNAMIC_INDEX_TARGETS:
         if target in TOPK_GATHER_TARGETS and topk_gather_read_proved(
@@ -236,7 +241,11 @@ def _blocking_reason(
             access.reasons[name]
             for name in (layer.get("tensor_names") or {}).get("outputs") or []
         }
-        if reasons <= {AccessReason.MATERIALIZED}:
+        # Batch-2 spec: a resolved static logical remap reads exactly its
+        # tracked base (reads are attributed via base_id), so STATIC views
+        # pass like materialized ones; unsupported or dynamic reasons still
+        # block.
+        if reasons <= {AccessReason.MATERIALIZED, AccessReason.STATIC}:
             return None
         return next(iter(sorted(reasons)), AccessReason.UNSUPPORTED_VIEW)
     if semantic.get("kind") == "einsum":

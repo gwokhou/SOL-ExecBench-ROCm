@@ -91,6 +91,44 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
+### SOLAR external-reads batch 2 — 2026-11-06
+
+Batch 2 (contiguous/reshape 条件别名判定) closed with all gates green
+([spec](docs/internal/solar-l3e-batch2-acceptance-2026-11-06.md);
+evidence under `data/outputs/solar-l3e-external-reads-20261106/`,
+`batch2-*` files).
+
+- **Production semantics**: torch's conditional reshape/contiguous alias is
+  now decided statically from the tracked input's row-major strides —
+  contiguous inputs prove a pure view (`reshape_access`), any other tracked
+  input forces a copy whose output is recorded `MATERIALIZED` (fixing the
+  copy_boundary inheritance that blocked downstream views); an untracked
+  (internal) input is pure internal data movement (no external-read
+  question). Clone outputs are likewise `MATERIALIZED` instead of
+  `copy_boundary`. Analysis side: `contiguous`/`reshape` joined
+  `FULL_OPERAND_READS`, the COPY rejection no longer covers `contiguous`,
+  and resolved `STATIC` views pass like materialized ones (unsupported or
+  dynamic reasons still block).
+- **Gates**: G3 exact — 12/12 must-flip rows flipped, zero beyond-S2 flips,
+  4 partial rows (mingpt layer_norm/transpose) stay blocked; G4 — 12/12
+  flipped rows analyzed on CPU with formal totals; G1/G2 unit coverage for
+  both stride branches plus negatives; G5 — suite 1839 passed with the
+  pre-declared atomic updates (`test_copy_reads` 14 expectations,
+  `test_access_graph` 2 tests; one precise torchview skip for a
+  transposed-reshape composition it cannot convert).
+- **Cumulative**: external-reads gap now 128 → 50 rows (38 batch-1 + 12
+  batch-2 + 38 baseline-passing? — precisely: 50 rows still blocked).
+  Residual vocabulary: `<transparent_alias>` 42, `view` 20 (make_fx
+  schema-alias inheritance, separate root), `layer_norm` 18, `conv2d` 14,
+  `gelu`-effect 12, `batch_norm` 8, `nll_loss_forward` 5, `cross_entropy` 5.
+  Batch 3 (norm/conv/pool window reads) and the transparent-alias/output
+  aliasing domain remain open.
+- Two implementation notes: the first G3 pass missed because the
+  analysis-side STATIC_VIEW acceptance still excluded resolved STATIC
+  views, and mxfp8's reshapes sit on untracked internal inputs — both were
+  spec-internal completions (S2 stayed the fixed oracle; no thresholds
+  moved). Campaign `--floor` is now parameterized (0 = require all).
+
 ### SOLAR external-reads batch 1 — 2026-11-06
 
 The L3-c follow-up "external-reads 语义扩展" closed its **batch 1** with all
