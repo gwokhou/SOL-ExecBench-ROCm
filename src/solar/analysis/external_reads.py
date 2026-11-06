@@ -219,15 +219,55 @@ def _decode_window_sizes(
 ) -> tuple[int, ...] | None:
     """Normalize one scalar-or-per-dim window argument, or keep it unproved."""
     minimum = 1 if positive else 0
+    dims: tuple[int, ...] | None
     if type(value) is int:
-        dims: tuple[int, ...] | None = (value,) * len(spatial)
+        dims = (value,) * len(spatial)
     elif isinstance(value, (list, tuple)) and len(value) == len(spatial):
-        dims = tuple(value)
+        decoded: list[int] = []
+        for n in value:
+            if type(n) is not int:
+                return None
+            decoded.append(n)
+        dims = tuple(decoded)
     else:
         dims = None
-    if dims is None or not all(type(n) is int and n >= minimum for n in dims):
+    if dims is None:
+        return None
+    if not all(n >= minimum for n in dims):
         return None
     return dims
+
+
+def _windows_cover(
+    spatial: tuple[int, ...],
+    kernel: tuple[int, ...],
+    stride: tuple[int, ...],
+    padding: tuple[int, ...],
+    dilation: tuple[int, ...],
+) -> bool:
+    """Decide per-dim receptive-field coverage of the input (batch-7 math)."""
+    for size, k, s, p, d in zip(
+        spatial, kernel, stride, padding, dilation, strict=True
+    ):
+        extent = d * (k - 1) + 1
+        span = size + 2 * p - extent
+        if span < 0 or s > extent:
+            return False
+        windows = span // s + 1
+        if (windows - 1) * s - p + extent < size:
+            return False
+    return True
+
+
+def _spatial_input_dims(layer: NodeDict) -> tuple[int, ...] | None:
+    """Return the two trailing spatial sizes of a 4-D input, or None."""
+    shapes = (layer.get("tensor_shapes") or {}).get("inputs") or []
+    if not shapes or len(shapes[0]) != 4:
+        return None
+    spatial = (shapes[0][2], shapes[0][3])
+    if any(type(n) is not int or n <= 0 for n in spatial):
+        return None
+    return spatial
 
 
 def _pool_window_reads_cover_input(layer: NodeDict) -> bool:
@@ -237,11 +277,8 @@ def _pool_window_reads_cover_input(layer: NodeDict) -> bool:
     coverage suffices. ceil_mode stays unproved (torch's trailing-window drop
     rule is not modeled here).
     """
-    shapes = (layer.get("tensor_shapes") or {}).get("inputs") or []
-    if not shapes or len(shapes[0]) != 4:
-        return False
-    spatial = (shapes[0][2], shapes[0][3])
-    if any(type(n) is not int or n <= 0 for n in spatial):
+    spatial = _spatial_input_dims(layer)
+    if spatial is None:
         return False
     semantic = layer_operation(layer)
     attrs = operation_attributes(semantic)
@@ -279,17 +316,60 @@ def _pool_window_reads_cover_input(layer: NodeDict) -> bool:
         return False
     if ceil_mode is True:
         return False
-    for size, k, s, p, d in zip(
-        spatial, kernel, stride_dims, padding, dilation, strict=True
+    return _windows_cover(spatial, kernel, stride_dims, padding, dilation)
+
+
+def _conv2d_window_reads_cover_input(layer: NodeDict) -> bool:
+    """Prove full conv reads from the same window-coverage union (batch-8).
+
+    The kernel comes from the weight's spatial dims; groups only partition
+    input channels and keep the union intact. Transposed convolutions are a
+    scatter with a different read pattern and stay unproved.
+    """
+    spatial = _spatial_input_dims(layer)
+    if spatial is None:
+        return False
+    shapes = (layer.get("tensor_shapes") or {}).get("inputs") or []
+    weight_shape = shapes[1] if len(shapes) > 1 else None
+    if (
+        not isinstance(weight_shape, list)
+        or len(weight_shape) != 4
+        or any(type(n) is not int or n < 1 for n in weight_shape[2:])
     ):
-        extent = d * (k - 1) + 1
-        span = size + 2 * p - extent
-        if span < 0 or s > extent:
-            return False
-        windows = span // s + 1
-        if (windows - 1) * s - p + extent < size:
-            return False
-    return True
+        return False
+    kernel = tuple(weight_shape[2:])
+    semantic = layer_operation(layer)
+    attrs = operation_attributes(semantic)
+    args = operation_operands(semantic)
+
+    def argument(name: str, index: int, default: object) -> object:
+        return decode_semantic_value(
+            attrs.get(name, args[index] if index < len(args) else default),
+            (),
+            policy=EXTENDED_VALUE_POLICY,
+        )
+
+    try:
+        stride_dims = _decode_window_sizes(
+            argument("stride", 3, 1), spatial, positive=True
+        )
+        padding = _decode_window_sizes(
+            argument("padding", 4, 0), spatial, positive=False
+        )
+        dilation = _decode_window_sizes(
+            argument("dilation", 5, 1), spatial, positive=True
+        )
+        transposed = argument("transposed", 6, False)
+        output_padding = _decode_window_sizes(
+            argument("output_padding", 7, [0, 0]), spatial, positive=False
+        )
+    except SemanticValueDecodeError, TypeError, ValueError:
+        return False
+    if stride_dims is None or padding is None or dilation is None:
+        return False
+    if transposed is not False or output_padding != (0, 0):
+        return False
+    return _windows_cover(spatial, kernel, stride_dims, padding, dilation)
 
 
 def _nll_data_operand_external(
@@ -400,9 +480,17 @@ def _blocking_reason(
             return None
         return AccessReason.UNKNOWN_READS
     if target in {"addmm", "conv2d"}:
+        # Batch-8 spec: window coverage generalizes the 1x1 contraction
+        # special case; both prove the unique-element union read.
         return (
             None
-            if _full_contraction_reads(layer)
+            if (
+                _full_contraction_reads(layer)
+                or (
+                    target == "conv2d"
+                    and _conv2d_window_reads_cover_input(layer)
+                )
+            )
             else AccessReason.UNKNOWN_READS
         )
     if target == "nll_loss_forward":
