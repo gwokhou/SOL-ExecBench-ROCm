@@ -91,6 +91,29 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
+### SOLAR external-reads batch 4 — 2026-11-06
+
+Batch 4 (layer_norm torchview de-opaque) closed with all gates green
+([spec](docs/internal/solar-l3e-batch4-acceptance-2026-11-06.md); evidence
+`batch4-*` under `data/outputs/solar-l3e-external-reads-20261106/`).
+
+- torchview native registry moved `layer_norm` from opaque `_LIBRARY` to
+  reviewed `_NO_EFFECTS` (same class as batch-3 gelu; read vocabulary landed
+  in batch-3). G3 exact — 3/3 l1n40_layernorm torchview rows flipped, zero
+  beyond; G4 — 3/3 analyzed with formal totals; suite 1839 passed, no test
+  pinned the old opaque flag (atomic-update list empty).
+- Implementation note: one silent no-op replace (formatted-text drift) was
+  caught by asserting the pattern and re-verifying the registry lookup
+  before relaunching the campaign.
+- **Line A cumulative: 128 → 35 rows** (65 rows hold formal bounds from
+  batches 1–4). Remaining vocabulary: `<transparent_alias>` 42 (output
+  aliasing domain), make_fx `view`/`_unsafe_view` inheritance 20 + mingpt
+  transpose 4 (undeclared-alias view family — one root, batch-5 design:
+  torch `Tensor.view` is unconditionally a view, stride-decidable via the
+  batch-2 machinery), `conv2d` 14 (window coverage, region machinery),
+  `nll_loss` 5 / `cross_entropy` 5 / `kl_div` 4 (indexed-loss semantics),
+  `max_pool` 3.
+
 ### SOLAR external-reads batch 3 — 2026-11-06
 
 Batch 3 (norm 词汇补全 + gelu 复核) closed with all corrected gates green
