@@ -126,7 +126,12 @@ denominator is fully cleared
 - **Line A final state**: external-reads gap 128 → 0; 127 of 128 rows
   hold G4-verified formal bounds (batches 1–8), 1 row (l2n52-w4) holds
   the static bound with a recorded memory-bound replay miss. Full-run
-  suite gates: `tests/solar`+`tests/scripts` 1865 passed (batch-7 run).
+  suite gates: `tests/solar`+`tests/scripts` **1871 passed** at
+  `5cfdef71` (one G5 atomic update: the default-API unproved-conv refusal
+  test re-pinned to a stride-gap conv — the old padding-1 shape's windows
+  are covered and now prove their reads; the shared `_conv_request` gained
+  stride/padding parameters with the default shape unchanged for its
+  other two consumers).
 
 ### SOLAR external-reads batch 7 — 2026-11-06
 
