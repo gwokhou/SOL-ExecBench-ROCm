@@ -49,7 +49,10 @@ def blockers_for_call(
 
     Extraction plus conversion only (see _blockers for the memory rationale).
     """
-    from solar.analysis.external_reads import _blocking_reason
+    from solar.analysis.external_reads import (
+        _blocking_reason,
+        transparent_declared_output_aliases_external,
+    )
     from solar.graph.extraction import extract_operator_graph
     from solar.ir.access import AccessReason
     from solar.ir.contracts import layer_operation
@@ -86,8 +89,11 @@ def blockers_for_call(
     found = []
     for layer_id, layer in layers.items():
         if layer_id in access.transparent_layers:
-            outputs = (layer.get("tensor_names") or {}).get("outputs") or []
-            if declared.intersection(outputs):
+            # Mirrors the batch-6 production gate: internal-materialized
+            # declared-output aliases carry no external-read question.
+            if transparent_declared_output_aliases_external(
+                layer, declared, access
+            ):
                 found.append(("<transparent_alias>", "unproven_alias"))
             continue
         if layer_operation(layer).get("target") == "input":
