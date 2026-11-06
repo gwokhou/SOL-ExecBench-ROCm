@@ -468,7 +468,11 @@ def _compatibility_functional_specs() -> list[NativeOpSpec]:
             target,
             attributes=functional_attributes.get(target, ()),
             executor="functional",
-            effects=_NO_EFFECTS if target in {"relu", "elu"} else _LIBRARY,
+            # Batch-3 spec: gelu is a reviewed pure elementwise function,
+            # the same class as relu/elu; loss/indexed ops stay _LIBRARY.
+            effects=(
+                _NO_EFFECTS if target in {"relu", "elu", "gelu"} else _LIBRARY
+            ),
         )
         for target in sorted(functional)
     ]

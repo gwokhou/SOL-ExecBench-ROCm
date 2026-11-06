@@ -91,6 +91,32 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
+### SOLAR external-reads batch 3 — 2026-11-06
+
+Batch 3 (norm 词汇补全 + gelu 复核) closed with all corrected gates green
+([spec + S3 erratum 15→12](docs/internal/solar-l3e-batch3-acceptance-2026-11-06.md);
+evidence `batch3-*` under `data/outputs/solar-l3e-external-reads-20261106/`).
+
+- **Production changes**: `layer_norm`/`batch_norm`/`group_norm` joined
+  `FULL_OPERAND_READS` (normalization reads every tensor operand; zero
+  standalone flips expected and observed — family completion for mixed
+  rows). The torchview native registry moved **gelu** from the opaque
+  `_LIBRARY` effects to reviewed `_NO_EFFECTS` (same class as relu/elu);
+  kl_div/cross_entropy/nll_loss intentionally stay opaque (indexed-loss
+  semantics unproved).
+- **Gates**: G3 exact — 12/12 gelu rows flipped, zero beyond-S3; G4 —
+  12/12 analyzed on CPU with formal totals; suite 1839 passed (one
+  pre-declared atomic test update: batch-1's layer_norm negative became a
+  vocabulary positive, output-alias dimension excluded).
+- **Erratum**: frozen S3 count 15 included 3 l1n40_layernorm torchview rows
+  whose blocker target is layer_norm (opaque `_LIBRARY`), not gelu — the
+  spec's own definition yields 12. Those 3 rows are batch-4 candidates
+  (norm de-opaque), alongside conv2d window coverage (needs region
+  machinery), make_fx `view` inheritance ×20, and `<transparent_alias>` ×42.
+- **Cumulative**: external-reads gap 128 → **38 rows** (batch-1 38 +
+  batch-2 12 + batch-3 12 = 62 rows now hold formal bounds from this line;
+  plus the 38 alias rows and others remaining).
+
 ### SOLAR external-reads batch 2 — 2026-11-06
 
 Batch 2 (contiguous/reshape 条件别名判定) closed with all gates green
