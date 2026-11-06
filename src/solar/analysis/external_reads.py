@@ -112,7 +112,18 @@ FULL_OPERAND_READS = frozenset(
         "layer_norm",
         "batch_norm",
         "group_norm",
+        # Batch-7 spec: fused losses read both tensor operands exactly —
+        # cross_entropy's log_softmax stage already touches every input
+        # element and kl_div is elementwise-then-reduce.
+        "kl_div",
     }
+)
+
+# Batch-7 spec: pool targets whose full read is decidable from window
+# coverage (unique external reads are a set union; multiplicity is out of
+# scope at this layer).
+POOL_WINDOW_TARGETS = frozenset(
+    {"max_pool2d", "max_pool2d_with_indices", "avg_pool2d"}
 )
 
 
@@ -203,6 +214,127 @@ def _full_contraction_reads(layer: NodeDict) -> bool:
         return False
 
 
+def _decode_window_sizes(
+    value: object, spatial: tuple[int, ...], *, positive: bool
+) -> tuple[int, ...] | None:
+    """Normalize one scalar-or-per-dim window argument, or keep it unproved."""
+    minimum = 1 if positive else 0
+    if type(value) is int:
+        dims: tuple[int, ...] | None = (value,) * len(spatial)
+    elif isinstance(value, (list, tuple)) and len(value) == len(spatial):
+        dims = tuple(value)
+    else:
+        dims = None
+    if dims is None or not all(type(n) is int and n >= minimum for n in dims):
+        return None
+    return dims
+
+
+def _pool_window_reads_cover_input(layer: NodeDict) -> bool:
+    """Prove full pool reads when receptive fields cover every input element.
+
+    Batch-7 spec: external reads are a unique-element union, so window
+    coverage suffices. ceil_mode stays unproved (torch's trailing-window drop
+    rule is not modeled here).
+    """
+    shapes = (layer.get("tensor_shapes") or {}).get("inputs") or []
+    if not shapes or len(shapes[0]) != 4:
+        return False
+    spatial = (shapes[0][2], shapes[0][3])
+    if any(type(n) is not int or n <= 0 for n in spatial):
+        return False
+    semantic = layer_operation(layer)
+    attrs = operation_attributes(semantic)
+    args = operation_operands(semantic)
+
+    def argument(name: str, index: int, default: object) -> object:
+        return decode_semantic_value(
+            attrs.get(name, args[index] if index < len(args) else default),
+            (),
+            policy=EXTENDED_VALUE_POLICY,
+        )
+
+    try:
+        kernel = _decode_window_sizes(
+            argument("kernel_size", 1, None), spatial, positive=True
+        )
+        if kernel is None:
+            return False
+        stride = argument("stride", 2, None)
+        stride_dims = (
+            kernel
+            if stride is None
+            else _decode_window_sizes(stride, spatial, positive=True)
+        )
+        padding = _decode_window_sizes(
+            argument("padding", 3, 0), spatial, positive=False
+        )
+        dilation = _decode_window_sizes(
+            argument("dilation", 4, 1), spatial, positive=True
+        )
+        ceil_mode = argument("ceil_mode", 5, False)
+    except SemanticValueDecodeError, TypeError, ValueError:
+        return False
+    if stride_dims is None or padding is None or dilation is None:
+        return False
+    if ceil_mode is True:
+        return False
+    for size, k, s, p, d in zip(
+        spatial, kernel, stride_dims, padding, dilation, strict=True
+    ):
+        extent = d * (k - 1) + 1
+        span = size + 2 * p - extent
+        if span < 0 or s > extent:
+            return False
+        windows = span // s + 1
+        if (windows - 1) * s - p + extent < size:
+            return False
+    return True
+
+
+def _nll_data_operand_external(
+    layer: NodeDict, access: AccessDocument
+) -> bool | None:
+    """Decide the frozen nll shape, or keep the layer unproved.
+
+    Batch-7 spec: operands must be (data tensor, target tensor, non-tensor
+    …); every tensor operand except the target must be internal, otherwise
+    the gathered (subset) read stays unproved.
+    """
+    semantic = layer_operation(layer)
+    operands = operation_operands(semantic)
+    names = (layer.get("tensor_names") or {}).get("inputs") or []
+    if len(operands) < 2:
+        return None
+    tensor_slots = [
+        operand["tensor"]
+        for operand in operands
+        if isinstance(operand, Mapping) and "tensor" in operand
+    ]
+    if tensor_slots[:2] != [0, 1]:
+        return None
+    for index in tensor_slots:
+        if index == 1:
+            continue
+        if not 0 <= index < len(names):
+            return None
+        if names[index] in access.tensors:
+            return True
+    return False
+
+
+def _cross_entropy_has_extra_tensor_operand(layer: NodeDict) -> bool:
+    """A weight operand is a per-class gather and cannot claim a full read."""
+    operands = operation_operands(layer_operation(layer))
+    return (
+        sum(
+            isinstance(operand, Mapping) and "tensor" in operand
+            for operand in operands
+        )
+        > 2
+    )
+
+
 def _where_has_external_values(layer: NodeDict, access: AccessDocument) -> bool:
     """A conditional value branch cannot prove a full external value read."""
     names = (layer.get("tensor_names") or {}).get("inputs") or []
@@ -271,6 +403,25 @@ def _blocking_reason(
         return (
             None
             if _full_contraction_reads(layer)
+            else AccessReason.UNKNOWN_READS
+        )
+    if target == "nll_loss_forward":
+        # Batch-7 spec: the target operand is read fully; a gathered data (or
+        # weight) operand keeps the layer in the dynamic-index domain.
+        data_external = _nll_data_operand_external(layer, access)
+        if data_external is None:
+            return AccessReason.UNKNOWN_READS
+        return AccessReason.DYNAMIC_INDEX if data_external else None
+    if target == "cross_entropy":
+        # Batch-7 spec: the fused loss reads both tensor operands exactly;
+        # a weight operand is a per-class gather and stays unproved.
+        if _cross_entropy_has_extra_tensor_operand(layer):
+            return AccessReason.UNKNOWN_READS
+        return None
+    if target in POOL_WINDOW_TARGETS:
+        return (
+            None
+            if _pool_window_reads_cover_input(layer)
             else AccessReason.UNKNOWN_READS
         )
     if target == "where":

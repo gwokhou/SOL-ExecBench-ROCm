@@ -91,6 +91,39 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
+### SOLAR external-reads batch 7 — 2026-11-06
+
+Batch 7 (pool 窗口覆盖 + 融合/索引化 loss + torchview de-opaque) closed
+with all gates green
+([spec](docs/internal/solar-l3e-batch7-acceptance-2026-11-06.md); evidence
+`batch7-*` under `data/outputs/solar-l3e-external-reads-20261106/`).
+
+- Three frozen proof classes, no new access representation: (1) fused
+  losses read both tensor operands exactly (`cross_entropy` = log_softmax
+  full read ⊕ per-class subset gather ⊕ full target read; `kl_div`
+  elementwise-then-reduce) — a third tensor operand (weight) is a per-class
+  gather and stays rejected; (2) decomposed `nll_loss_forward` proves the
+  target full read and requires every non-target tensor operand internal
+  (corpus shape: log_softmax output); an external data operand stays
+  `dynamic_index`; (3) pool window coverage decides the unique-element
+  union read for `max_pool2d`/`max_pool2d_with_indices`/`avg_pool2d`
+  (per-dim receptive-field math; `ceil_mode=True` stays unproved).
+  torchview registry: `kl_div`/`cross_entropy`/`max_pool2d` de-opaqued in
+  the reviewed-pure class; `nll_loss` stays opaque.
+- Gates: G3 exact — 23/23 must-flip rows flipped (make_fx 11 + torchview
+  12), zero regressions, remaining blocked rows exactly the 14 conv2d
+  rows; G4 — 23/23 analyzed with totals; G1/G2 — 13 new unit tests
+  covering all three classes plus stride/tail/ceil-mode and
+  external-data/weight-operand negatives; G5 — `tests/solar`+
+  `tests/scripts` 1865 passed, ruff/ty clean.
+- Pre-declared atomic update: batch-1's `test_indexed_loss_still_blocks`
+  became `test_indexed_loss_external_data_still_blocks` — same test now
+  pins the still-true external-data negative (the original graph's
+  internal-data shape is batch-7's proven positive).
+- **Line A cumulative: 128 → 14 inventory-blocked rows** (91 rows hold
+  G4-verified formal bounds). Remaining: `conv2d` 14 (window coverage,
+  batch-8).
+
 ### SOLAR external-reads batch 6 — 2026-11-06
 
 Batch 6 (transparent_alias 内部物化输出别名) closed with all gates green

@@ -176,7 +176,8 @@ def _pooling_resampling_specs() -> list[NativeOpSpec]:
                 "return_indices",
             ),
             executor="functional",
-            effects=_LIBRARY,
+            # Batch-7 spec: reviewed pure; full reads are decided by the
+            # analysis-side window-coverage predicate.
         ),
         _spec(
             "avg_pool2d",
@@ -293,7 +294,8 @@ def _attention_loss_specs() -> list[NativeOpSpec]:
                 "label_smoothing",
             ),
             executor="functional",
-            effects=_LIBRARY,
+            # Batch-7 spec: reviewed pure; the analysis side proves exact
+            # full-operand reads and rejects a present weight tensor.
         ),
         _spec(
             "embedding_bag",
@@ -470,10 +472,11 @@ def _compatibility_functional_specs() -> list[NativeOpSpec]:
             executor="functional",
             # Batch-3/4 specs: gelu and layer_norm are reviewed pure
             # functions (elementwise and full-operand normalization);
-            # loss/indexed ops stay _LIBRARY.
+            # batch-7 adds kl_div (elementwise-then-reduce full reads).
+            # nll_loss stays _LIBRARY: its gathered subset read is unproved.
             effects=(
                 _NO_EFFECTS
-                if target in {"relu", "elu", "gelu", "layer_norm"}
+                if target in {"relu", "elu", "gelu", "layer_norm", "kl_div"}
                 else _LIBRARY
             ),
         )
