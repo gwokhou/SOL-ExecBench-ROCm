@@ -11,7 +11,7 @@ from graphlib import TopologicalSorter
 
 from solar.ir.access import AccessReason, TensorAccess, base_access
 from solar.ir.access_calls import STATIC_VIEW_TARGETS, derive_accesses
-from solar.ir.access_views import UnsupportedAccessError
+from solar.ir.access_views import UnsupportedAccessError, contiguous_strides
 from solar.ir.contracts import INPUT_KIND, layer_operation
 from solar.precision import normalize_dtype
 from solar.types import NodeDict
@@ -20,6 +20,11 @@ COPY_TARGETS = frozenset({"clone", "copy", "contiguous"})
 DYNAMIC_INDEX_TARGETS = frozenset(
     {"index_select", "gather", "embedding", "embedding_bag"}
 )
+
+
+def _row_major_contiguous(view: TensorAccess) -> bool:
+    """Decide static row-major contiguity from the tracked strides."""
+    return tuple(view.strides) == tuple(contiguous_strides(view.shape))
 
 
 @dataclass(slots=True)
@@ -107,15 +112,38 @@ def _view_maps(
             if name in maps.tensors
         )
         raise UnsupportedAccessError(AccessReason.EFFECT)
+    if target == "contiguous":
+        # Batch-2 spec: the conditional alias is decidable from strides; a
+        # row-major contiguous input makes contiguous a no-op alias, any
+        # other input forces a copy into fresh materialized storage.
+        source = maps.tensors.get(inputs[0]) if inputs else None
+        if source is not None and _row_major_contiguous(source):
+            return (source,)
+        raise UnsupportedAccessError(AccessReason.MATERIALIZED)
     if target in COPY_TARGETS:
-        raise UnsupportedAccessError(AccessReason.COPY)
+        # clone always copies into fresh storage: materialized, and its
+        # operand read is accounted at the clone layer (analysis side).
+        raise UnsupportedAccessError(
+            AccessReason.MATERIALIZED
+            if target == "clone"
+            else AccessReason.COPY
+        )
     if target in DYNAMIC_INDEX_TARGETS:
         raise UnsupportedAccessError(AccessReason.DYNAMIC_INDEX)
     if target not in STATIC_VIEW_TARGETS:
         raise UnsupportedAccessError(AccessReason.MATERIALIZED)
     aliases = effects.get("aliases") or []
     outputs = (layer.get("tensor_names") or {}).get("outputs") or []
-    if any(
+    source = maps.tensors.get(inputs[0]) if inputs else None
+    if target == "reshape":
+        # Batch-2 spec: row-major contiguity of the tracked input decides
+        # the conditional alias. Contiguous inputs prove a pure view
+        # (reshape_access); any other tracked input forces a copy into
+        # fresh materialized storage. An untracked (internal) input is
+        # pure internal data movement with no external-read question.
+        if source is None or not _row_major_contiguous(source):
+            raise UnsupportedAccessError(AccessReason.MATERIALIZED)
+    elif any(
         not any(
             a.get("input") == 0
             and a.get("output") == slot

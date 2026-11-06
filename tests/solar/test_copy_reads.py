@@ -1,4 +1,11 @@
-"""Fresh clone storage does not imply an unknown full operand read."""
+"""Copy-family read footprints under stride-decidable alias semantics.
+
+Batch-2 (spec solar-l3e-batch2): clone always materializes fresh storage
+(reason MATERIALIZED) while its operand read is accounted at the clone
+layer; contiguous on a row-major input is a no-op alias; views of copied
+storage inherit MATERIALIZED and resolve instead of inheriting
+copy_boundary. Mutations and copy_ keep their effect boundaries.
+"""
 
 from pathlib import Path
 
@@ -45,8 +52,8 @@ def _reference(case):
         ("clone", 32, None),
         ("slice-clone", 16, None),
         ("clone-sum", 32, None),
-        ("clone-slice", None, "copy_boundary"),
-        ("conditional-contiguous", None, "copy_boundary"),
+        ("clone-slice", 32, None),
+        ("conditional-contiguous", 32, None),
         ("clone-mutation", None, "effect_boundary"),
         ("copy-mutation", None, "effect_boundary"),
     ],
@@ -55,7 +62,8 @@ def test_copy_read_footprints_preserve_storage_and_effect_boundaries(
     tmp_path, path, case, elements, reason
 ):
     # make_fx removes the no-op contiguous call on this dense source.
-    # TorchView retains a conditional alias which must remain unproved.
+    # Torchview's conditional alias resolves via row-major strides
+    # (batch-2), so both paths are exact here.
     if case == "conditional-contiguous" and path is IRPath.MAKE_FX_ATEN:
         elements, reason = 32, None
     root = tmp_path / "conversion"
@@ -89,7 +97,7 @@ def test_copy_read_footprints_preserve_storage_and_effect_boundaries(
             assert layer_id not in access.transparent_layers
             assert all(
                 name not in access.tensors
-                and access.reasons[name] is AccessReason.COPY
+                and access.reasons[name] is AccessReason.MATERIALIZED
                 for name in layer["tensor_names"]["outputs"]
             )
     result = IRGraphAnalyzer(
