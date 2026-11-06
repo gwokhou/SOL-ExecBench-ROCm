@@ -89,9 +89,13 @@ def _conv_request(
     output: Path,
     *,
     require_orojenesis: bool = True,
+    stride: int = 1,
+    padding: int = 1,
 ) -> AnalysisRequest:
     def reference(value: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
-        return torch.nn.functional.conv2d(value, weight, padding=1)
+        return torch.nn.functional.conv2d(
+            value, weight, stride=stride, padding=padding
+        )
 
     def input_factory(seed: int) -> tuple[torch.Tensor, torch.Tensor]:
         value = torch.full((1, 2, 4, 4), float(seed % 5 + 1))
@@ -598,8 +602,16 @@ def test_incomplete_optional_orojenesis_evidence_falls_back_to_eq1(
 
 
 def test_default_api_refuses_unproved_convolution_read_footprint(tmp_path):
+    # Batch-8 atomic update (pre-declared clause in its spec): a covered
+    # window now proves the conv read union, so the unproved-read refusal
+    # pins a stride-gap conv whose receptive fields leave rows uncovered.
     result = api.analyze(
-        _conv_request(tmp_path / "result", require_orojenesis=False),
+        _conv_request(
+            tmp_path / "result",
+            require_orojenesis=False,
+            stride=3,
+            padding=0,
+        ),
     )
 
     assert isinstance(result, AnalysisFailure)
