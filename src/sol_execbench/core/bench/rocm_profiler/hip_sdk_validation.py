@@ -228,11 +228,21 @@ def event_key(row: SDKEvent) -> tuple[int, ...]:
     )
 
 
-def validate_events(ledger: HIPSDKLedger, capture: SDKCapture) -> None:
-    """No-op host waits remain unresolved; do not invent missing barriers."""
+def validate_events(
+    ledger: HIPSDKLedger, capture: SDKCapture, seal: SDKBoundary
+) -> None:
+    """No-op host waits remain unresolved; do not invent missing barriers.
+
+    The export channel outlives the explicit seal; only rows completing
+    before the seal are covered by the independent ledger.
+    """
     enqueues = [r for r in ledger.records if isinstance(r, SDKEventEnqueue)]
     complete = [r for r in ledger.records if isinstance(r, SDKEventComplete)]
-    exported = capture.buffer_records.hip_event
+    exported = [
+        r
+        for r in capture.buffer_records.hip_event
+        if r.end_timestamp < seal.timestamp
+    ]
     require_scope(
         len({r.corr for r in enqueues}) == len(enqueues)
         and len({r.corr for r in complete}) == len(complete)

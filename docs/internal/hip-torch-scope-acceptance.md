@@ -122,7 +122,8 @@ flowchart LR
 - 执行器与 SDK tool：[torch_scope_workload.py](../../scripts/internal/upgrade/torch_scope_workload.py)、
   [scope_collector.cpp](../../src/sol_execbench/core/bench/rocm_profiler/scope_collector.cpp)。
 - 生产检查入口：[qualify_torch_scope](../../src/sol_execbench/core/bench/rocm_profiler/hip_torch_scope.py)，
-  当前 artifact 为 `sol_execbench.hip_sdk_ledger.v1` / `sol_execbench.hip_torch_scope.v1`。
+  当前 artifact 为 `sol_execbench.hip_sdk_ledger.v2` / `sol_execbench.hip_torch_scope.v2`
+  （2026-11-06 L2 线升级后；本文当时的版本记录以 schema registry 为准）。
   普通 profile summary 不会因旁边存在该文件而自动提升权限。
 - [GEMM/复合采集及小矩阵负例](../../data/outputs/hip-torch-scope-20261011/attempt-20261011-223916/receipt.json)、
   [大矩阵 event 补采](../../data/outputs/hip-torch-scope-20261011/attempt-20261011-224341/receipt.json)、

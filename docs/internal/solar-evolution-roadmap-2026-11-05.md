@@ -31,7 +31,7 @@
 | 组 | 缺口 | 出处 |
 | --- | --- | --- |
 | A 正式资格 | R06 两个动态读取未计价、R08 两个边界拒绝（L0 已判终态：合法域外预期拒绝，保留于分母）；R04 已恢复（5d37 回执严格复用，L0 复核）；完整 corpus 发布资格未取得 | ACCEPTANCE-LEDGER（L0 登记）、10-29 快照 |
-| B 调度因果 | 完整跨 lane 调度目标未关闭：内存复制域依赖、默认 stream、Graph、后台线程、跨进程；一切 scope 资格固定 `schedule_complete=false` | hip-torch-scope / evaluate-hip-scope 验收 |
+| B 调度因果 | 受限域已闭合（2026-11-07，见 L2 执行结果）：复制域/默认 stream/事件边资格成立，`schedule_complete` 可资格；Graph、后台线程、跨进程维持拒绝；M-d 生产供数管道遗留 | L2 验收规格 + HANDSOFF 2026-11-07 |
 | C 表达能力 | 动态形状（ShapesSpec → 自有形状域契约）、静态 fake 取图、2.14 算子覆盖差分 | 升级机会 P1 |
 | D 吞吐工程 | mapper CPU 配额（当前每 mapper 全核）、有界批处理；均要求先测各 stage 时间 | 升级机会 P2 |
 | E 架构扩展 | gfx942/CDNA3 非正式适配需真机核验（counter 拼写、MFMA 探针、MI300X profile、内存类工作集） | HANDSOFF P1 |
@@ -114,6 +114,20 @@ GPU checkpoint / 整合 handoff 证据的路径与内容摘要（已决策：不
 
 目标：在受控执行器域内把"完整跨 lane 调度"从永久开放变为受限域可资格；
 性能模型获得已验证调度边（`schedule_evidence.py` 的 unverified 路径出现 verified 分支）。
+
+**2026-11-07 执行结果（终态：受限域闭合；M-d 生产供数管道遗留）**：预固定验收规格
+[solar-l2-schedule-causality-acceptance-2026-11-06.md](solar-l2-schedule-causality-acceptance-2026-11-06.md)。
+SDK 回执上游不可得判定成立，按 sanctioned 替代路径扩展受控执行器账本域：
+`hip_sdk_ledger` v2 新增引擎复制完成行与 launch/memcpy 原始 stream 句柄；
+`hip_torch_scope`/`hip_evaluate_scope` v2 携带 `copy_domain` 与
+`schedule` 资格，`schedule_complete` 在受控 eager 域（复制 lane 共观察绑定、
+事件边 verified、无默认流混布）首次可资格；GPU 分母六用例 × 3 = 18/18
+（15 个 `schedule_complete=true`，default_mix 三次正确拒绝），证据
+`data/outputs/solar-l2-schedule-20261106/`。`performance_schedule_evidence`
+v3 增加 `event_wait` 边与 `cross_lane_event_dependencies` 状态；
+`predict_hw` 消费 verified 边（无边时行为不变）。M-d 的生产供数管道
+（scope↔counter dispatch 标识桥、显式 opt-in）按规格 §7.4 登记遗留。
+Graph/IPC/跨进程维持拒绝。详见 HANDSOFF 2026-11-07 L2 条目。
 
 里程碑（顺序）：
 

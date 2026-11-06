@@ -13,7 +13,10 @@ from sol_execbench.core.bench.rocm_profiler.hip_scope_models import (
 )
 from sol_execbench.core.bench.rocm_profiler.hip_sdk_models import (
     HIPSDKBoundDispatch,
+    HIPSDKCopyDomain,
     HIPSDKEventLink,
+    HIPSDKScheduleQualification,
+    HIPSDKScheduleReason,
 )
 from sol_execbench.core.data.base_model import CurrentFrozenSchemaModel
 from sol_execbench.core.integrity.schema_versions import SchemaVersion
@@ -106,13 +109,24 @@ class EvaluateScopeResult(CurrentFrozenSchemaModel):
     implicit_dispatch_ids: list[int] = Field(default_factory=list)
     outside_dispatch_ids: list[int] = Field(default_factory=list)
     links: list[HIPSDKEventLink] = Field(default_factory=list)
+    copy_domain: HIPSDKCopyDomain = Field(
+        default_factory=lambda: HIPSDKCopyDomain(qualified=True)
+    )
+    schedule: HIPSDKScheduleQualification = Field(
+        default_factory=lambda: HIPSDKScheduleQualification(
+            schedule_complete=False,
+            default_stream_present=False,
+            lane_count=0,
+            reason_codes=(HIPSDKScheduleReason.CROSS_LANE_UNVERIFIED,),
+        )
+    )
     performance_authority: Literal[False] = False
-    schedule_complete: Literal[False] = False
+    schedule_complete: bool = False
     adversarial_attestation: Literal[False] = False
     limitations: tuple[str, ...] = (
         "single_process_single_submission_thread_eager_only",
         "shared_sdk_runtime_omissions_not_excluded",
         "candidate_process_receipt_is_not_independent_security_attestation",
-        "memory_and_other_dependency_domains_not_qualified",
+        "schedule_limited_to_audited_eager_copy_and_event_domains",
         "not_timing_or_optimization_authority",
     )

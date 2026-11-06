@@ -146,6 +146,7 @@ class Rocprofv3ProfileRequest:
     working_directory: Path | None = None
     executable: str = ROCPROFV3_EXECUTABLE
     include_hip_runtime: bool = True
+    include_memory_copy: bool = False
     output_format: str = "rocpd"
     timeout_seconds: int | None = None
 

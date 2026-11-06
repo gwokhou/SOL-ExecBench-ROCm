@@ -570,7 +570,15 @@ class DispatchScheduleEdge(BaseModelWithDocstrings):
 
     predecessor_dispatch_id: str = Field(min_length=1)
     successor_dispatch_id: str = Field(min_length=1)
-    reason: Literal["same_lane"]
+    reason: Literal["same_lane", "event_wait"]
+
+
+class CrossLaneEventDependencies(StrEnum):
+    """Verification state of cross-lane relations inside the evidence."""
+
+    VERIFIED = "verified"
+    UNVERIFIED = "unverified"
+    ABSENT = "absent"
 
 
 class PerformanceScheduleEvidence(CurrentSchemaModel):
@@ -590,6 +598,9 @@ class PerformanceScheduleEvidence(CurrentSchemaModel):
     marker_contained: bool
     dispatch_ids: list[str] = Field(min_length=1)
     edges: list[DispatchScheduleEdge] = Field(default_factory=list)
+    cross_lane_event_dependencies: CrossLaneEventDependencies = (
+        CrossLaneEventDependencies.UNVERIFIED
+    )
     reason_codes: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -609,6 +620,13 @@ class PerformanceScheduleEvidence(CurrentSchemaModel):
             not scope or self.reason_codes
         ):
             raise ValueError("available schedule requires verified scope")
+        if self.status is DiagnosticSidecarStatus.AVAILABLE and (
+            self.cross_lane_event_dependencies
+            is CrossLaneEventDependencies.UNVERIFIED
+        ):
+            raise ValueError(
+                "available schedule requires settled cross-lane state"
+            )
         if self.status is not DiagnosticSidecarStatus.AVAILABLE and not (
             self.reason_codes
         ):
