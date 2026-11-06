@@ -143,6 +143,14 @@ def _view_maps(
         # pure internal data movement with no external-read question.
         if source is None or not _row_major_contiguous(source):
             raise UnsupportedAccessError(AccessReason.MATERIALIZED)
+    elif target == "view":
+        # Batch-5 spec: Tensor.view unconditionally returns a view, so the
+        # alias comes from semantics, not schema declaration. An untracked
+        # (internal) input is pure internal data movement; a tracked
+        # non-contiguous input falls through to reshape_access, which
+        # keeps the conservative UNSUPPORTED_VIEW under-approximation.
+        if source is None:
+            raise UnsupportedAccessError(AccessReason.MATERIALIZED)
     elif any(
         not any(
             a.get("input") == 0
