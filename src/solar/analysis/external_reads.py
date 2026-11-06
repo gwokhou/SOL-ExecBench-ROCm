@@ -296,6 +296,31 @@ def _blocking_reason(
     return None
 
 
+def transparent_declared_output_aliases_external(
+    layer: NodeDict, declared_outputs: set[str], access: AccessDocument
+) -> bool:
+    """Decide whether a transparent layer's declared output may alias external storage.
+
+    Batch-6 spec: the alias is internal, and provably free of external-storage
+    visibility, only when every tensor input is untracked with reason
+    MATERIALIZED (graph-owned fresh storage). A tracked input is a view of an
+    external base, and any other untracked reason leaves the storage owner
+    unproved, so both keep the alias unproved.
+    """
+    names = layer.get("tensor_names") or {}
+    if not declared_outputs.intersection(names.get("outputs") or []):
+        return False
+    inputs = names.get("inputs") or []
+    return not (
+        inputs
+        and all(
+            name not in access.tensors
+            and access.reasons.get(name) is AccessReason.MATERIALIZED
+            for name in inputs
+        )
+    )
+
+
 def _union_reads(
     reads: Mapping[str, list[TensorAccess]], budget: AccessBudget
 ) -> ExternalReads:
@@ -364,7 +389,12 @@ def external_reads(
         layer = layers[layer_id]
         names = layer.get("tensor_names") or {}
         if layer_id in access.transparent_layers:
-            if declared_outputs.intersection(names.get("outputs") or []):
+            # Batch-6 spec: an internal-materialized declared output alias has
+            # no external-storage visibility; only external-reaching or
+            # unproved-storage chains keep the alias unproved.
+            if transparent_declared_output_aliases_external(
+                layer, declared_outputs, access
+            ):
                 reasons.add(AccessReason.ALIAS)
             continue
         reason = _blocking_reason(layer, access, layers, producer_of)

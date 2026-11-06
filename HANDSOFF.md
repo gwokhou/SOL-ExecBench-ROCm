@@ -91,6 +91,42 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
+### SOLAR external-reads batch 6 — 2026-11-06
+
+Batch 6 (transparent_alias 内部物化输出别名) closed with all gates green
+([spec](docs/internal/solar-l3e-batch6-acceptance-2026-11-06.md); evidence
+`batch6-*` under `data/outputs/solar-l3e-external-reads-20261106/`).
+
+- Pre-spec recon overturned the batch-2 characterization: all 42
+  `<transparent_alias>` entries (38 rows) are `identity`/`detach`/`view`
+  hops over **untracked internal-materialized** inputs — declared outputs
+  aliasing graph-owned fresh storage, not external storage. Frozen gate
+  (`transparent_declared_output_aliases_external`): a transparent declared
+  output passes only when every tensor input is untracked with reason
+  `MATERIALIZED`; a tracked input (external-reaching view chain) or any
+  other untracked reason keeps `unproven_alias`. The inventory diagnostic
+  mirrors the same predicate.
+- Gates: G3 exact — 22/22 must-flip rows flipped (rmsnorm_bwd w0–w3,
+  dynamic_mxfp8_quant w0–w7, gpumode_positionwise_ffn w0–w3,
+  l1n40_layernorm w0–w2, l2n37_groupnorm_fused w0–w2, all make_fx), zero
+  regressions, and the 16 mixed rows lost the transparent component with
+  pool/loss/conv components unchanged; G4 — 22/22 analyzed with totals
+  (zero-total norm/mxfp8 families match the batches 1–4 precedent); G1/G2
+  12 new unit tests plus preserved negatives (external detach/view still
+  alias); G5 — in-scope suites green, ruff/ty clean.
+- **Line A cumulative: 128 → 37 inventory-blocked rows** (69 rows from
+  batches 1–5 plus these 22 hold G4-verified formal bounds). Remaining
+  vocabulary: `conv2d` 14 (window coverage), indexed/fused loss 14
+  (`nll_loss_forward` 5 make_fx, `cross_entropy` 5 + `kl_div` 4 torchview
+  effect_boundary), pools 9 (`max_pool2d_with_indices` 3 + `avg_pool2d` 3
+  make_fx, `max_pool2d` 3 torchview effect_boundary).
+- G5 environment note (recorded, not adjudicated): the full-suite run needs
+  `GPU_LOCK_DIR`/`GPU_LOCK_UUID` exported or collection dies in
+  `configured_gpu_locks`; its 15 failures are all outside this line — 13 in
+  the concurrent L2 WIP modules (hip_sdk/hip_causality working-tree edits),
+  1 pre-existing from the L3-a commit (`l3a_measure.py` CUDA docstring
+  residue), 1 load-flaky test passing solo.
+
 ### SOLAR external-reads batch 5 — 2026-11-06
 
 Batch 5 (make_fx view 未声明别名) closed, all gates green
