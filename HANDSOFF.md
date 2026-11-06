@@ -91,6 +91,43 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
+### SOLAR external-reads batch 8 (线A 收官) — 2026-11-06
+
+Batch 8 (conv2d 窗口覆盖泛化) closed Line A: the 128-row inventory
+denominator is fully cleared
+([spec](docs/internal/solar-l3e-batch8-acceptance-2026-11-06.md); evidence
+`batch8-*` under `data/outputs/solar-l3e-external-reads-20261106/`).
+
+- The batch-7 per-dim receptive-field coverage predicate was extracted as
+  the shared `_windows_cover` and generalized to `conv2d` (batch-8 spec):
+  kernel from the weight's spatial dims, stride/padding/dilation decoded
+  from conv positionals, groups allowed (channel partitioning preserves
+  the union), transposed/output_padding kept unproved, and the 1×1
+  contraction special case retained via OR. External conv reads are a
+  unique-element union, so coverage decides the read exactly.
+- Gates: G3 exact — 14/14 must-flip rows flipped (l1n63_conv2d w0–w2,
+  l1n82_conv_depthwise w0–w2 groups=8, l2n17_instancenorm_fused w0–w2,
+  l2n52_conv_activation_batchnorm w0–w4, all make_fx), zero regressions,
+  **128-row denominator now fully blocked-free**; G1/G2 — 6 new unit
+  tests (covered dense/depthwise/tail-exact; stride-gap, transposed and
+  the batch-1 strided negative unchanged); G5 — all external-reads and
+  access suites green, ruff clean, `ty` diagnostics outside this line
+  (5 pre-existing in r16/shapes-domain tests and the concurrent L2 WIP).
+- **G4 honest miss (pre-declared clause)**: 13/14 analyzed with totals;
+  `l2n52...-w4` (B=64,H=W=128) is memory-bound — its explicit-unfold
+  verification replay needs a ~23.6 GB intermediate (64×576×126×126 fp32)
+  and was kernel-OOM-killed at 26 GB anon RSS on the 29 GB host
+  (`batch8-g4-summary.json` carries the three-piece evidence). The
+  static predicate is shape-parametric and identical to the completed
+  w0–w3 siblings; the miss is the end-to-end replay confirmation only,
+  recorded without any relaxation. Safety note for future conv G4 runs
+  on this host: run conv-heavy slots under a cgroup MemoryMax guard
+  (per the batch-1 method note); never bare.
+- **Line A final state**: external-reads gap 128 → 0; 127 of 128 rows
+  hold G4-verified formal bounds (batches 1–8), 1 row (l2n52-w4) holds
+  the static bound with a recorded memory-bound replay miss. Full-run
+  suite gates: `tests/solar`+`tests/scripts` 1865 passed (batch-7 run).
+
 ### SOLAR external-reads batch 7 — 2026-11-06
 
 Batch 7 (pool 窗口覆盖 + 融合/索引化 loss + torchview de-opaque) closed
