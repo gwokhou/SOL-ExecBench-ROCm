@@ -112,8 +112,8 @@ def test_strided_conv2d_still_blocks(tmp_path: Path) -> None:
     assert ("conv2d", "read_semantics_unproved") in blockers
 
 
-def test_layer_norm_still_blocks(tmp_path: Path) -> None:
-    """Normalization reads stay batch-3 territory and must still block (G2)."""
+def test_layer_norm_reads_all_operands(tmp_path: Path) -> None:
+    """Batch-3 spec: normalization reads every operand and no longer blocks."""
     inputs = (torch.randn(4, 16),)
 
     def reference(x):
@@ -122,7 +122,9 @@ def test_layer_norm_still_blocks(tmp_path: Path) -> None:
     blockers = blockers_for_call(
         reference, inputs, IRPath.MAKE_FX_ATEN, tmp_path, "layer_norm"
     )
-    assert ("layer_norm", "read_semantics_unproved") in blockers
+    # The declared-output alias remains batch-2+ domain; the norm read
+    # semantics itself no longer blocks.
+    assert ("layer_norm", "read_semantics_unproved") not in blockers
 
 
 def test_indexed_loss_still_blocks(tmp_path: Path) -> None:

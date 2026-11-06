@@ -108,6 +108,10 @@ FULL_OPERAND_READS = frozenset(
         # unions per base, so counting at the layer is sound.
         "contiguous",
         "reshape",
+        # Batch-3 spec: normalization reads every tensor operand fully.
+        "layer_norm",
+        "batch_norm",
+        "group_norm",
     }
 )
 
