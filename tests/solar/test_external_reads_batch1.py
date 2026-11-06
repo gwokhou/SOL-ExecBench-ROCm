@@ -127,8 +127,8 @@ def test_layer_norm_reads_all_operands(tmp_path: Path) -> None:
     assert ("layer_norm", "read_semantics_unproved") not in blockers
 
 
-def test_indexed_loss_still_blocks(tmp_path: Path) -> None:
-    """nll_loss reads via labels and must stay unproved in batch 1 (G2)."""
+def test_indexed_loss_external_data_still_blocks(tmp_path: Path) -> None:
+    """An external gathered nll operand stays dynamic-index (G2, batch 7)."""
     generator = torch.Generator(device="cpu").manual_seed(11)
     inputs = (
         torch.randn(6, 5, generator=generator),
@@ -136,13 +136,13 @@ def test_indexed_loss_still_blocks(tmp_path: Path) -> None:
     )
 
     def reference(logits, targets):
-        return torch.nn.functional.nll_loss(
-            torch.log_softmax(logits, dim=-1), targets
-        )
+        # Batch-7 atomic update (pre-declared in its spec): batch 1 pinned
+        # the decomposed loss as unproved; batch 7 proves the internal-data
+        # shape (see test_external_reads_batch7) and this test keeps the
+        # still-true negative — a gathered external data operand.
+        return torch.nn.functional.nll_loss(logits, targets)
 
     blockers = blockers_for_call(
         reference, inputs, IRPath.MAKE_FX_ATEN, tmp_path, "nll_loss"
     )
-    targets = {entry[0] for entry in blockers}
-    assert "nll_loss_forward" in targets or "log_softmax" not in targets
-    assert blockers, "indexed loss must not pass in batch 1"
+    assert ("nll_loss_forward", "dynamic_index") in blockers
