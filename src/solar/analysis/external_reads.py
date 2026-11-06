@@ -84,6 +84,25 @@ FULL_OPERAND_READS = frozenset(
         "rsqrt",
         "softmax",
         "topk",
+        # Batch-1 vocabulary (spec:
+        # solar-l3e-external-reads-acceptance): mechanically identical
+        # full-operand reads, plus expand/repeat whose external reads equal
+        # the operand's unique elements.
+        "cat",
+        "pow",
+        "sin",
+        "cos",
+        "log2",
+        "floor",
+        "exp2",
+        "log_softmax",
+        "softplus",
+        "leaky_relu",
+        "bitwise_and",
+        "xlogy",
+        "masked_fill",
+        "expand",
+        "repeat",
     }
 )
 
