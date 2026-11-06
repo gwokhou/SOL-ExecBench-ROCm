@@ -159,6 +159,13 @@ Graph capture 与 IPC 在本线内保持显式拒绝。
 - L3-c 2.14 算子覆盖差分：从实际 corpus 出发（matmul/addmm/bmm、attention、
   normalization、reduction、view/alias、mutation、低精度转换、显式 backward），
   双固定路径比对精度/alias/mutation/梯度/资源计数；产出覆盖矩阵而非直接扩 allowlist。
+  **2026-11-06 执行结果（终态：闭合）**：预固定验收规格
+  [solar-l3c-coverage-matrix-acceptance-2026-11-06.md](solar-l3c-coverage-matrix-acceptance-2026-11-06.md)。
+  326 行全量矩阵 + canary 对账 0 漂移 + 家族 7/8（mutation 诚实为零）。
+  头条：make_fx 就绪覆盖 163/163 严格优于 torchview 121/163；形式边界层
+  128 行 external-reads 未证明（normalization 家族主导）；conv 家族在
+  torchview 侧撞 mapper 7200s 生产预算（5/5）。可执行缺口清单已产出；
+  全分母资格链仍为 L1 延迟项，现被矩阵解锁。详见 HANDSOFF 2026-11-06 条目。
 - L3-d 新前端（阶段 6，默认延后）：Affine Loop IR／LLM 修复／JAX 前端
   （stage0 C11 归 P3、"由实际覆盖缺口驱动"）。触发条件是 L3-c 覆盖矩阵指出
   两条现有路径的系统性缺口；[论文演进记录](solar-paper-evolution-2026-10-19.md)

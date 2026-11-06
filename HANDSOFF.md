@@ -91,6 +91,47 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
+### SOLAR L3-c execution — 2026-11-06
+
+L3-c (2.14 算子覆盖差分) closed: the full-corpus dual-path coverage matrix is
+delivered with pre-fixed gates all green
+([spec](docs/internal/solar-l3c-coverage-matrix-acceptance-2026-11-06.md);
+evidence `data/outputs/solar-l3c-20261106/`). No allowlist or registry was
+modified.
+
+- **Denominator & gates**: 163 scored workloads × 2 paths = 326 rows; gate
+  passed with zero failures; L1-canary reconciliation exact (112 items,
+  0 drift on status/stage/reason — HEAD `7e069bd2` reproduces the canary
+  wall); 7/8 roadmap families present, `mutation` honestly absent (no
+  corpus workload carries schema mutation effects).
+- **Headline differential**: `make_fx_aten` covers readiness **163/163**;
+  `torchview_extended_einsum` covers 121/163 (audit gaps: 14
+  `native_operation_unsupported` + 10 `native_attribute_unsupported` +
+  14 `gradient_verification_failed` + 4 `graph_extraction_failed`). The
+  aten path strictly dominates corpus readiness coverage.
+- **Formal-bound layer (new datum beyond L1)**: of ready slots, make_fx
+  87/163 and torchview 64/121 produce formal bounds; 128 rows fail with
+  `external reads are unproved` (families: normalization 47, convolution
+  16, low_precision 16, …). Conv family on torchview additionally hits the
+  pinned mapper's 7200 s budget (5/5 `l2n52` slots → `toolchain_unavailable`
+  after full searches, ~43 CPU-hours each) — conv+batchnorm analysis
+  throughput on this host is infeasible within production bounds.
+- **Dual-path totals**: 64 slots analyzed on both paths; 51/64 totals
+  equal; 13 differ, all routing/quant/silu families, differing only in
+  `num_layers` granularity (aten decomposition vs einsum view; flops/macs
+  agree at 0) — recorded, not adjudicated (spec §6).
+- **Actionable gap list** (the matrix product, `canary-wall-attribution.json`):
+  torchview conversion coverage 24 items (op+attribute), torchview gradient
+  verification 14, extraction 4, both-path external-reads semantics 128,
+  conv mapper budget 5. Full-denominator qualification chain remains the
+  L1-deferred follow-up, now unblocked by this matrix.
+- Campaign: `scripts/internal/solar/run_l3c_coverage_matrix.py` (audit via
+  production `audit_corpus_stage_readiness`, analysis via production
+  `analyze_workload`, resume-able; slow-slot mapper timeouts resolved by
+  the production runner's own 7200 s bound). Tests: 10 new
+  (`tests/scripts/test_l3c_coverage_matrix.py`); suite 1822 passed;
+  ruff/ty clean.
+
 ### SOLAR L3-b execution — 2026-11-05
 
 L3-b (形状域契约，阶段 1 具体实例化) closed. Acceptance pre-fixed in
