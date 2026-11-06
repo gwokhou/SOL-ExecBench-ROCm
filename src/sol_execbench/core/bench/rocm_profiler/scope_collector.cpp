@@ -59,6 +59,30 @@ void dispatch_callback(rocprofiler_callback_tracing_record_t record,
     finish_row();
 }
 
+// Raw hipStream_t argument of the frozen streamed core set (memcpys and
+// launches). Zero is the legacy default stream, stored verbatim without any
+// sync inference; SDK stream ordinals never carry default-stream meaning.
+bool streamed_argument(const char* name,
+                       rocprofiler_callback_tracing_hip_api_data_t* data,
+                       uintptr_t& stream) {
+    if(!std::strcmp(name, "hipMemcpyAsync"))
+        stream = reinterpret_cast<uintptr_t>(data->args.hipMemcpyAsync.stream);
+    else if(!std::strcmp(name, "hipMemcpyWithStream"))
+        stream = reinterpret_cast<uintptr_t>(data->args.hipMemcpyWithStream.stream);
+    else if(!std::strcmp(name, "hipMemcpy2DAsync"))
+        stream = reinterpret_cast<uintptr_t>(data->args.hipMemcpy2DAsync.stream);
+    else if(!std::strcmp(name, "hipMemcpy3DAsync"))
+        stream = reinterpret_cast<uintptr_t>(data->args.hipMemcpy3DAsync.stream);
+    else if(!std::strcmp(name, "hipLaunchKernel"))
+        stream = reinterpret_cast<uintptr_t>(data->args.hipLaunchKernel.stream);
+    else if(!std::strcmp(name, "hipModuleLaunchKernel"))
+        stream = reinterpret_cast<uintptr_t>(data->args.hipModuleLaunchKernel.stream);
+    else if(!std::strcmp(name, "hipExtModuleLaunchKernel"))
+        stream = reinterpret_cast<uintptr_t>(data->args.hipExtModuleLaunchKernel.stream);
+    else return false;
+    return true;
+}
+
 void api_callback(rocprofiler_callback_tracing_record_t record,
                   rocprofiler_user_data_t*, void*) {
     if(record.phase != ROCPROFILER_CALLBACK_PHASE_EXIT) return;
@@ -66,11 +90,15 @@ void api_callback(rocprofiler_callback_tracing_record_t record,
     check(rocprofiler_query_callback_tracing_kind_operation_name(record.kind, record.operation, &name, nullptr));
     if(!name || std::strchr(name, '"')) std::abort();
     auto* data = static_cast<rocprofiler_callback_tracing_hip_api_data_t*>(record.payload);
+    uintptr_t stream = 0;
+    const bool streamed = streamed_argument(name, data, stream);
     std::lock_guard<std::mutex> lock(mutex);
     prefix("api");
     std::fprintf(output, ",\"scope\":%lu,\"tid\":%lu,\"corr\":%lu,\"name\":\"%s\",\"result\":%lu",
                  submission_scope(record.thread_id), record.thread_id,
                  record.correlation_id.internal, name, data->retval.uint64_t_retval);
+    if(streamed)
+        std::fprintf(output, ",\"stream\":%lu", static_cast<unsigned long>(stream));
     finish_row();
 }
 
@@ -113,6 +141,13 @@ void buffered(rocprofiler_context_id_t, rocprofiler_buffer_id_t,
                          r->thread_id, r->correlation_id.internal, r->operation,
                          r->hip_event_handle, r->agent_id.handle, r->queue_id.handle,
                          r->source_queue_id.handle, r->start_timestamp, r->end_timestamp);
+        } else if(h->kind == ROCPROFILER_BUFFER_TRACING_MEMORY_COPY) {
+            auto* r = static_cast<rocprofiler_buffer_tracing_memory_copy_record_t*>(h->payload);
+            prefix("memcpy");
+            std::fprintf(output, ",\"tid\":%lu,\"corr\":%lu,\"operation\":%u,\"src_agent\":%lu,\"dst_agent\":%lu,\"bytes\":%lu,\"start\":%lu,\"end\":%lu",
+                         r->thread_id, r->correlation_id.internal, unsigned(r->operation),
+                         r->src_agent_id.handle, r->dst_agent_id.handle,
+                         r->bytes, r->start_timestamp, r->end_timestamp);
         } else std::abort();
         finish_row();
     }
@@ -144,8 +179,10 @@ int initialize(rocprofiler_client_finalize_t, void*) {
           ROCPROFILER_CALLBACK_TRACING_HIP_EVENT, nullptr, 0, event_callback, nullptr));
     check(rocprofiler_configure_buffer_tracing_service(context,
           ROCPROFILER_BUFFER_TRACING_KERNEL_DISPATCH, nullptr, 0, buffer));
+        check(rocprofiler_configure_buffer_tracing_service(context,
+              ROCPROFILER_BUFFER_TRACING_HIP_EVENT, nullptr, 0, buffer));
     check(rocprofiler_configure_buffer_tracing_service(context,
-          ROCPROFILER_BUFFER_TRACING_HIP_EVENT, nullptr, 0, buffer));
+          ROCPROFILER_BUFFER_TRACING_MEMORY_COPY, nullptr, 0, buffer));
     check(rocprofiler_start_context(context));
     return 0;
 }

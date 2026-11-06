@@ -127,5 +127,7 @@ SDK/runtime，不能排除共同漏报；候选进程 receipt 和可写证据不
 [driver](../../src/sol_execbench/driver/scope_replay.py)、
 [资格检查](../../src/sol_execbench/core/bench/rocm_profiler/evaluate_scope.py)。
 当前生产 artifact 家族为 `sol_execbench.hip_evaluate_intent.v1`、
-`sol_execbench.hip_evaluate_receipt.v1`、`sol_execbench.hip_evaluate_scope.v1`；
-复用 `sol_execbench.hip_sdk_ledger.v1`，不改写先前受控探针的证据。
+`sol_execbench.hip_evaluate_receipt.v1`、`sol_execbench.hip_evaluate_scope.v2`；
+复用 `sol_execbench.hip_sdk_ledger.v2`，不改写先前受控探针的证据。
+（2026-11-06 L2 线升级：scope/ledger 家族升当前版本并加入复制域与调度完整性，
+本文当时记录的旧版本串以 schema registry 为准，不再逐字保留。）

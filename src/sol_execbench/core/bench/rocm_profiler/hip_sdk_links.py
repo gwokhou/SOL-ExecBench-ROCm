@@ -1,5 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Event links from a qualified SDK enqueue ledger, including implicit kernels."""
+"""Event links from a qualified SDK enqueue ledger, including engine copies."""
+
+from collections.abc import Sequence
+from typing import NamedTuple
 
 from sol_execbench.core.bench.rocm_profiler.hip_causality_json import (
     SDKCapture,
@@ -18,6 +21,7 @@ from sol_execbench.core.bench.rocm_profiler.hip_scope_models import (
 )
 from sol_execbench.core.bench.rocm_profiler.hip_sdk_models import (
     SDKAPI,
+    HIPSDKEngineCopy,
     HIPSDKEventLink,
     HIPSDKLedger,
     SDKEnqueue,
@@ -29,7 +33,10 @@ from sol_execbench.core.bench.rocm_profiler.hip_sdk_validation import (
 
 
 def sdk_event_links(
-    ledger: HIPSDKLedger, capture: SDKCapture, enqueues: list[SDKEnqueue]
+    ledger: HIPSDKLedger,
+    capture: SDKCapture,
+    enqueues: list[SDKEnqueue],
+    copies: Sequence[HIPSDKEngineCopy] = (),
 ) -> list[HIPSDKEventLink]:
     """Support one record generation per event; ambiguity stays unqualified."""
     apis = {
@@ -104,7 +111,7 @@ def sdk_event_links(
             and record.queue != wait.queue,
             HIPScopeReason.CAUSALITY,
         )
-        links.append(_link(record, wait, enqueues))
+        links.append(_link(record, wait, enqueues, copies))
     return links
 
 
@@ -112,22 +119,71 @@ def _link(
     record: SDKEventEnqueue,
     wait: SDKEventEnqueue,
     enqueues: list[SDKEnqueue],
+    copies: Sequence[HIPSDKEngineCopy],
 ) -> HIPSDKEventLink:
-    producer = [
-        r
-        for r in enqueues
-        if r.scope == 1 and r.queue == record.queue and r.seq < record.seq
-    ]
-    consumer = [
-        r
-        for r in enqueues
-        if r.scope == 1 and r.queue == wait.queue and r.seq > wait.seq
-    ]
-    require_scope(bool(producer and consumer), HIPScopeReason.CAUSALITY)
+    producer = _endpoint(
+        record.queue,
+        [r for r in enqueues if r.scope == 1 and r.seq < record.seq],
+        [
+            c
+            for c in copies
+            if c.queue_id is not None and c.submission_seq < record.seq
+        ],
+        last=True,
+    )
+    consumer = _endpoint(
+        wait.queue,
+        [r for r in enqueues if r.scope == 1 and r.seq > wait.seq],
+        [
+            c
+            for c in copies
+            if c.queue_id is not None and c.submission_seq > wait.seq
+        ],
+        last=False,
+    )
+    require_scope(
+        producer is not None and consumer is not None, HIPScopeReason.CAUSALITY
+    )
+    if producer is None or consumer is None:
+        raise HIPScopeError(HIPScopeReason.CAUSALITY)
     return HIPSDKEventLink(
-        predecessor_dispatch_id=producer[-1].dispatch,
-        successor_dispatch_id=consumer[0].dispatch,
+        predecessor_dispatch_id=producer.dispatch,
+        successor_dispatch_id=consumer.dispatch,
+        predecessor_copy_correlation_id=producer.copy_corr,
+        successor_copy_correlation_id=consumer.copy_corr,
         record_correlation_id=record.corr,
         wait_correlation_id=wait.corr,
         event_handle=wait.event,
     )
+
+
+class _Submission(NamedTuple):
+    """One ordered submission: a kernel dispatch or a lane-bound engine copy."""
+
+    seq: int
+    queue: int
+    dispatch: int | None
+    copy_corr: int | None
+
+
+def _endpoint(
+    queue: int,
+    enqueues: list[SDKEnqueue],
+    copies: Sequence[HIPSDKEngineCopy],
+    *,
+    last: bool,
+) -> _Submission | None:
+    """Pick the adjacent same-queue submission without timestamp ordering."""
+    submissions = [
+        _Submission(r.seq, r.queue, r.dispatch, None)
+        for r in enqueues
+        if r.queue == queue
+    ] + [
+        _Submission(c.submission_seq, queue, None, c.correlation_id)
+        for c in copies
+        if c.queue_id == queue
+    ]
+    if not submissions:
+        return None
+    key = max if last else min
+    return key(submissions, key=lambda submission: submission.seq)

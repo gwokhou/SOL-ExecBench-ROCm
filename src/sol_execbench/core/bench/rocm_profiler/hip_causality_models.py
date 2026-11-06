@@ -17,6 +17,21 @@ EVENT_SYNC_API = "hipEventSynchronize"
 LAUNCH_APIS = frozenset(
     {"hipLaunchKernel", "hipModuleLaunchKernel", "hipExtModuleLaunchKernel"}
 )
+MEMCPY_APIS = frozenset(
+    {
+        "hipMemcpyAsync",
+        "hipMemcpyWithStream",
+        "hipMemcpy2DAsync",
+        "hipMemcpy3DAsync",
+    }
+)
+MEMCPY_DIRECTIONS = frozenset(
+    {
+        "MEMORY_COPY_HOST_TO_DEVICE",
+        "MEMORY_COPY_DEVICE_TO_HOST",
+        "MEMORY_COPY_DEVICE_TO_DEVICE",
+    }
+)
 
 
 class HIPLinkReason(StrEnum):

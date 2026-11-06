@@ -56,6 +56,7 @@ def build_rocprofv3_profile_command(
     output_file: str,
     executable: str = ROCPROFV3_EXECUTABLE,
     include_hip_runtime: bool = True,
+    include_memory_copy: bool = False,
     output_format: str = "rocpd",
 ) -> list[str]:
     """Build a `rocprofv3` command for optional diagnostic artifacts."""
@@ -78,6 +79,8 @@ def build_rocprofv3_profile_command(
     ]
     if include_hip_runtime:
         command.insert(2, "--hip-runtime-trace")
+    if include_memory_copy:
+        command.insert(2, "--memory-copy-trace")
     return [*command, "--", *application_command]
 
 

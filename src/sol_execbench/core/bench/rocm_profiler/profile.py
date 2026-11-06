@@ -83,6 +83,7 @@ def collect_rocprofv3_profile(
         output_file=request.output_file,
         executable=request.executable,
         include_hip_runtime=request.include_hip_runtime,
+        include_memory_copy=request.include_memory_copy,
         output_format=request.output_format,
     )
     if not rocprofv3_available:

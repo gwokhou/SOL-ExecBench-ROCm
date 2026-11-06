@@ -70,12 +70,13 @@ work is independent. An explicitly successful `hipEventSynchronize` for the same
 event can establish completion before rerecording; an event observation timestamp
 alone is not an exact completion fence. See the [acceptance criteria and evidence boundary](../internal/hip-event-causality-acceptance.md).
 
-The performance model's `sol_execbench.performance_schedule_evidence.v2`
-retains only verified same-lane precedence. Timestamp order across lanes does
-not establish a dependency. Multi-lane predictions return
-`cross_lane_event_dependencies_unverified` until event generations and dispatch
-scope are verified; receiving observations or conditional diagnostic links does not remove that
-restriction.
+The performance model's `sol_execbench.performance_schedule_evidence.v3`
+retains only verified precedence: same-lane order, plus cross-lane
+`event_wait` edges when an independently qualified scope schedule supplied
+verified event links. Timestamp order across lanes still does not establish a
+dependency. Multi-lane predictions without that qualification return
+`cross_lane_event_dependencies_unverified`; receiving observations or
+conditional diagnostic links does not remove that restriction.
 
 Schedule identity and lane checks include every observed dispatch, even a helper
 whose counters are excluded from the hardware estimate. Filtering such a helper
@@ -203,19 +204,28 @@ cover every dependency domain or enable cross-stream prediction. See the
 [scope acceptance report](../internal/hip-trace-scope-acceptance.md) for the exact
 conditions, measured coverage, and remaining boundary.
 
-The separate `sol_execbench.hip_torch_scope.v1` qualification extends this to an
-audited eager PyTorch executor. A `sol_execbench.hip_sdk_ledger.v1` collector
+The separate `sol_execbench.hip_torch_scope.v2` qualification extends this to an
+audited eager PyTorch executor. A `sol_execbench.hip_sdk_ledger.v2` collector
 records SDK enqueue callbacks and LOSSLESS buffered completions, requires zero
 drops and explicit stop/flush, and checks the entire exported dispatch set.
 Internal memory helper kernels are retained, including reported stream zero.
 Workload membership comes from executor boundaries and submission order.
+Engine copies are a qualified dependency domain: the collector records
+`memory_copy` completions and the raw stream argument of the frozen async
+memcpy core set; qualification requires ledger/export/API three-way agreement
+and a co-observed stream-to-queue lane binding. Within this restricted domain
+`schedule_complete` may be true — never when a legacy default stream mixes
+with other lanes, when a copy lane is unresolved, or when an event wait stays
+unresolved. Graph capture, IPC, cross-process work and background-thread
+submissions remain rejected, and `performance_authority=false` always.
 
 This opt-in path covers a single process/GPU/submission thread and one record
 generation per event in scope. No-op waits without a GPU barrier remain
 unqualified. Callback and buffer channels share the SDK/runtime; common omissions
 are not excluded. The ordinary summary remains partial, and neither the separate
 artifact nor its proximity on disk authorizes timing, cross-stream prediction,
-or synchronization removal. See [PyTorch scope acceptance](../internal/hip-torch-scope-acceptance.md).
+or synchronization removal. See [PyTorch scope acceptance](../internal/hip-torch-scope-acceptance.md)
+and the [schedule-causality acceptance](../internal/solar-l2-schedule-causality-acceptance-2026-11-06.md).
 
 
 The production `evaluate --profile rocprofv3-scope --trace-output TRACE.jsonl`
@@ -224,8 +234,8 @@ identity from workload content, candidate source, executor, and physical GPU.
 It requires a single `ROCR_VISIBLE_DEVICES` UUID and a verified STABLE_PEAK
 window, and writes `sol_execbench.hip_evaluate_intent.v1`,
 `sol_execbench.hip_evaluate_receipt.v1`, and
-`sol_execbench.hip_evaluate_scope.v1` artifacts (reusing the
-`sol_execbench.hip_sdk_ledger.v1` collector) under `TRACE.jsonl.hip-scope/<run>/`
+`sol_execbench.hip_evaluate_scope.v2` artifacts (reusing the
+`sol_execbench.hip_sdk_ledger.v2` collector) under `TRACE.jsonl.hip-scope/<run>/`
 without reusing canonical timing samples. When any workload lacks evidence or is
 unsupported, its qualification result is `rejected` and the CLI fails, while the
 completed canonical trace is preserved. `all_passed` and `scope_qualified`

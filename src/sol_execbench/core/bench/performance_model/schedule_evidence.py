@@ -11,6 +11,7 @@ from itertools import pairwise
 
 from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarStatus
 from sol_execbench.core.bench.performance_model.models import (
+    CrossLaneEventDependencies,
     DispatchEvidence,
     DispatchScheduleEdge,
     PerformanceScheduleEvidence,
@@ -21,8 +22,14 @@ def build_schedule_evidence(
     dispatches: Sequence[DispatchEvidence],
     *,
     scope_verified: bool,
+    event_links: Sequence[tuple[str, str]] = (),
+    cross_lane_verified: bool = False,
 ) -> PerformanceScheduleEvidence | None:
-    """Build lane dependencies; cross-lane timestamps are observations only."""
+    """Build lane dependencies; cross-lane timestamps are observations only.
+
+    Verified cross-lane edges come only from an independently qualified scope
+    schedule; temporal adjacency never becomes a dependency.
+    """
     if not dispatches:
         return None
     reasons: list[str] = []
@@ -37,7 +44,7 @@ def build_schedule_evidence(
     ):
         reasons.append("dispatch_lane_identity_unverified")
     concurrent = len({dispatch_lane(item) for item in dispatches}) > 1
-    if concurrent:
+    if concurrent and not cross_lane_verified:
         reasons.append("cross_lane_event_dependencies_unverified")
     if order_reason := _lane_order_reason(dispatches):
         reasons.append(order_reason)
@@ -51,7 +58,31 @@ def build_schedule_evidence(
         for successor, parents in predecessors.items()
         for predecessor in sorted(parents)
     ]
+    if scope_verified and concurrent and cross_lane_verified:
+        known = {item.dispatch_id for item in dispatches}
+        if any(
+            predecessor not in known or successor not in known
+            for predecessor, successor in event_links
+        ):
+            raise ValueError("verified event link references unknown dispatch")
+        edges.extend(
+            DispatchScheduleEdge(
+                predecessor_dispatch_id=predecessor,
+                successor_dispatch_id=successor,
+                reason="event_wait",
+            )
+            for predecessor, successor in event_links
+        )
     reasons = list(dict.fromkeys(reasons))
+    cross_lane = (
+        (
+            CrossLaneEventDependencies.VERIFIED
+            if cross_lane_verified and scope_verified
+            else CrossLaneEventDependencies.UNVERIFIED
+        )
+        if concurrent
+        else CrossLaneEventDependencies.ABSENT
+    )
     return PerformanceScheduleEvidence(
         status=(
             DiagnosticSidecarStatus.PARTIAL
@@ -65,6 +96,7 @@ def build_schedule_evidence(
         marker_contained=scope_verified,
         dispatch_ids=[item.dispatch_id for item in dispatches],
         edges=edges if scope_verified else [],
+        cross_lane_event_dependencies=cross_lane,
         reason_codes=reasons,
     )
 

@@ -521,6 +521,90 @@ def test_hardware_prediction_rejects_timestamp_only_cross_lane_schedule(
     assert prediction.reason_codes == [expected]
 
 
+def test_verified_event_edges_serialize_cross_lane_lanes(timed_dispatch):
+    first = timed_dispatch.model_copy(
+        update={"queue_id": None, "stream_id": "0"}
+    )
+    second = first.model_copy(
+        update={
+            "dispatch_id": "2",
+            "stream_id": "1",
+            "iteration_ordinal": 1,
+            "start_timestamp_ns": 10,
+            "end_timestamp_ns": 20,
+        }
+    )
+    serial = predict_hw(
+        _semantic(),
+        [],
+        [first, second],
+        _calibration(),
+        cross_lane_verified=True,
+        event_edges=[("1", "2")],
+    )
+    parallel = predict_hw(
+        _semantic(),
+        [],
+        [first, second],
+        _calibration(),
+        cross_lane_verified=True,
+    )
+    assert serial.predicted_time_ms is not None
+    assert parallel.predicted_time_ms is not None
+    assert "cross_lane_event_dependencies_unverified" not in serial.reason_codes
+    assert serial.predicted_time_ms > parallel.predicted_time_ms
+
+
+def test_unknown_verified_edge_endpoint_fails_closed(timed_dispatch):
+    first = timed_dispatch.model_copy(
+        update={"queue_id": None, "stream_id": "0"}
+    )
+    second = first.model_copy(
+        update={
+            "dispatch_id": "2",
+            "stream_id": "1",
+            "iteration_ordinal": 1,
+            "start_timestamp_ns": 10,
+            "end_timestamp_ns": 20,
+        }
+    )
+    prediction = predict_hw(
+        _semantic(),
+        [],
+        [first, second],
+        _calibration(),
+        cross_lane_verified=True,
+        event_edges=[("1", "missing")],
+    )
+    assert prediction.status is DiagnosticSidecarStatus.UNAVAILABLE
+    assert prediction.reason_codes == [
+        "cross_lane_event_dependencies_unverified"
+    ]
+
+
+def test_single_lane_prediction_is_unchanged_by_verified_flag(timed_dispatch):
+    second = timed_dispatch.model_copy(
+        update={
+            "dispatch_id": "2",
+            "iteration_ordinal": 1,
+            "start_timestamp_ns": 10,
+            "end_timestamp_ns": 20,
+        }
+    )
+    baseline = predict_hw(
+        _semantic(), [], [timed_dispatch, second], _calibration()
+    )
+    flagged = predict_hw(
+        _semantic(),
+        [],
+        [timed_dispatch, second],
+        _calibration(),
+        cross_lane_verified=True,
+    )
+    assert baseline.predicted_time_ms == flagged.predicted_time_ms
+    assert baseline.reason_codes == flagged.reason_codes
+
+
 @pytest.mark.parametrize(
     ("updates", "reason"),
     [

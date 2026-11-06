@@ -42,6 +42,7 @@ class HIPScopeReason(StrEnum):
     BARRIER = "hip_scope_barrier_mismatch"
     FENCE = "hip_scope_completion_fence_missing"
     CAUSALITY = "hip_scope_causality_unresolved"
+    COPY = "copy_channel_mismatch"
 
 
 class HIPScopeLimitation(StrEnum):

@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Validate the ROCprofiler JSON fields required for host-order correlation."""
 
+from typing import Protocol
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from sol_execbench.core.bench.rocm_profiler.hip_causality import HIPCausalTrace
@@ -79,6 +81,20 @@ class _Dispatch(_Activity):
     graph_node_id: int = 0
 
 
+class SDKCopyRecord(_SDKModel):
+    """Engine copy completion; the SDK record carries no queue or stream."""
+
+    kind: int = Field(ge=0)
+    operation: int = Field(ge=0)
+    thread_id: int = Field(ge=0)
+    correlation_id: _Correlation
+    start_timestamp: int = Field(ge=0)
+    end_timestamp: int = Field(ge=0)
+    src_agent_id: _Handle
+    dst_agent_id: _Handle
+    bytes: int = Field(ge=0)
+
+
 class _Records(_SDKModel):
     hip_api: list[_Call] = Field(
         default_factory=list, max_length=MAX_SDK_API_RECORDS
@@ -87,6 +103,9 @@ class _Records(_SDKModel):
         default_factory=list, max_length=MAX_CAUSAL_RECORDS
     )
     kernel_dispatch: list[_Dispatch] = Field(
+        default_factory=list, max_length=MAX_CAUSAL_RECORDS
+    )
+    memory_copy: list[SDKCopyRecord] = Field(
         default_factory=list, max_length=MAX_CAUSAL_RECORDS
     )
 
@@ -107,6 +126,13 @@ class _Strings(_SDKModel):
     buffer_records: list[_Kind]
 
 
+class _HasDomainKey(Protocol):
+    """Structural key into the per-kind operation-name tables."""
+
+    kind: int
+    operation: int
+
+
 class SDKCapture(_SDKModel):
     """Validated source capture; unrelated SDK fields are not interpreted."""
 
@@ -114,7 +140,7 @@ class SDKCapture(_SDKModel):
     strings: _Strings
     buffer_records: _Records
 
-    def operation(self, item: _Activity, kind: str) -> str:
+    def operation(self, item: _HasDomainKey, kind: str) -> str:
         """Resolve operation names without hard-coded SDK enum ordinals."""
         table = self.strings.buffer_records[item.kind]
         if table.kind != kind:

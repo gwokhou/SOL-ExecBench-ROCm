@@ -27,9 +27,18 @@ from sol_execbench.core.bench.rocm_profiler.hip_sdk_coverage import (
     validate_lifetime,
 )
 from sol_execbench.core.bench.rocm_profiler.hip_sdk_links import sdk_event_links
+from sol_execbench.core.bench.rocm_profiler.hip_sdk_memcpy import (
+    memcpy_copy_domain,
+)
 from sol_execbench.core.bench.rocm_profiler.hip_sdk_models import (
     MAX_TORCH_SCOPE_BYTES,
+    SDKAPI,
+    HIPSDKCopyDomain,
+    HIPSDKEngineCopy,
     HIPSDKLedger,
+)
+from sol_execbench.core.bench.rocm_profiler.hip_sdk_schedule import (
+    sdk_schedule_qualification,
 )
 from sol_execbench.core.bench.rocm_profiler.hip_sdk_validation import (
     require_scope,
@@ -111,10 +120,16 @@ def qualify_evaluate_scope(
         begin, end, seal = validate_boundaries(ledger, capture)
         validate_apis(ledger, capture, seal)
         enqueues = validate_dispatches(ledger, capture, agents[0])
-        validate_events(ledger, capture)
+        validate_events(ledger, capture, seal)
         validate_lifetime(capture, ledger, begin, end, seal)
-        dispatches, implicit = bind_dispatches(capture, view, enqueues)
-        links = sdk_event_links(ledger, capture, enqueues)
+        copy_domain = memcpy_copy_domain(ledger, capture, begin, end)
+        dispatches, implicit = bind_dispatches(
+            capture, view, enqueues, ledger_apis=_ledger_apis(ledger)
+        )
+        links = sdk_event_links(
+            ledger, capture, enqueues, _lane_bound(copy_domain)
+        )
+        schedule = sdk_schedule_qualification(dispatches, copy_domain)
         return EvaluateScopeResult(
             intent=expected,
             status=EvaluateScopeStatus.QUALIFIED,
@@ -123,8 +138,25 @@ def qualify_evaluate_scope(
             implicit_dispatch_ids=implicit,
             links=links,
             outside_dispatch_ids=[r.dispatch for r in enqueues if r.scope == 0],
+            copy_domain=copy_domain,
+            schedule=schedule,
+            schedule_complete=schedule.schedule_complete,
         )
     except HIPScopeError:
         raise
     except (OSError, ValueError, KeyError, IndexError) as error:
         raise HIPScopeError(HIPScopeReason.INVALID) from error
+
+
+def _ledger_apis(ledger: HIPSDKLedger) -> dict[int, SDKAPI]:
+    """Ledger API rows keyed by correlation for stream-handle lookups."""
+    return {r.corr: r for r in ledger.records if isinstance(r, SDKAPI)}
+
+
+def _lane_bound(copy_domain: HIPSDKCopyDomain) -> list[HIPSDKEngineCopy]:
+    """Only lane-bound in-scope copies may serve as event link endpoints."""
+    return [
+        copy
+        for copy in copy_domain.copies
+        if copy.in_scope and copy.queue_id is not None
+    ]

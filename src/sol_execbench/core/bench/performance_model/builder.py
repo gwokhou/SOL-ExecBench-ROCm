@@ -165,6 +165,8 @@ class _WorkloadDiagnosticInputs:
     inference: DiagnosticInferenceProfile | None
     identity_reasons: list[str]
     extra_reasons: list[str]
+    cross_lane_verified: bool = False
+    event_edges: tuple[tuple[str, str], ...] = ()
 
 
 def build_performance_diagnostic(
@@ -1033,6 +1035,8 @@ def _workload_diagnostic(
         calibration=inputs.calibration,
         identity_reasons=inputs.identity_reasons,
         extra_reasons=inputs.extra_reasons,
+        cross_lane_verified=inputs.cross_lane_verified,
+        event_edges=inputs.event_edges,
     )
     hw = apply_conformal_interval(
         hw,
@@ -1070,6 +1074,8 @@ def _workload_diagnostic(
         schedule=build_schedule_evidence(
             inputs.dispatches,
             scope_verified=_schedule_scope_verified(inputs.extra_reasons),
+            event_links=inputs.event_edges,
+            cross_lane_verified=inputs.cross_lane_verified,
         ),
         t_pred_ir=ir,
         t_pred_hw=hw,
@@ -1117,6 +1123,8 @@ def _workload_predictions(
     calibration: DiagnosticCalibrationProfile | None,
     identity_reasons: list[str],
     extra_reasons: list[str],
+    cross_lane_verified: bool = False,
+    event_edges: tuple[tuple[str, str], ...] = (),
 ) -> tuple[PerformancePrediction, PerformancePrediction]:
     if calibration is None:
         reasons = ["calibration_profile_missing"]
@@ -1139,6 +1147,8 @@ def _workload_predictions(
             identity_reason_codes=identity_reasons,
             evidence_reason_codes=extra_reasons,
             access_patterns=access_patterns,
+            cross_lane_verified=cross_lane_verified,
+            event_edges=event_edges,
         ),
     )
 

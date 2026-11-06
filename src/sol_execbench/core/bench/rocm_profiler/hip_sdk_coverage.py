@@ -13,6 +13,7 @@ from sol_execbench.core.bench.rocm_profiler.hip_scope_models import (
     HIPScopeReason,
 )
 from sol_execbench.core.bench.rocm_profiler.hip_sdk_models import (
+    SDKAPI,
     HIPSDKBoundDispatch,
     HIPSDKLedger,
     SDKBoundary,
@@ -69,7 +70,9 @@ def validate_lifetime(
                 HIPScopeReason.FENCE,
             )
     # Host calls after seal are retained in the original trace but not covered
-    # by the independent API ledger. Only audited interpreter teardown is allowed.
+    # by the independent API ledger. Only audited interpreter teardown is
+    # allowed: releases, queries and event-pool management that submit no
+    # kernel and no engine copy.
     allowed = frozenset(
         {
             "hipModuleUnload",
@@ -77,6 +80,9 @@ def validate_lifetime(
             "hipEventDestroy",
             "hipStreamDestroy",
             "hipGetDevice",
+            "hipEventCreateWithFlags",
+            "hipStreamIsCapturing",
+            "hipEventRecordWithFlags",
         }
     )
     require_scope(
@@ -93,8 +99,15 @@ def bind_dispatches(
     capture: SDKCapture,
     view: HIPScopeCaptureView,
     enqueues: list[SDKEnqueue],
+    *,
+    ledger_apis: dict[int, SDKAPI] | None = None,
 ) -> tuple[list[HIPSDKBoundDispatch], list[int]]:
-    """Bind all in-scope enqueues, including library-internal helpers."""
+    """Bind all in-scope enqueues, including library-internal helpers.
+
+    The raw stream handle comes from the audited ledger API row (launches
+    and memcpys of the frozen streamed set); the export argument string is
+    the cross-check fallback.
+    """
     symbols = {s.kernel_id: s.kernel_name for s in view.kernel_symbols}
     require_scope(
         len(symbols) == len(view.kernel_symbols), HIPScopeReason.DISPATCH
@@ -115,6 +128,7 @@ def bind_dispatches(
         if row.scope == 0:
             continue
         dispatch = raw[row.dispatch]
+        stream_handle = _stream_handle(row.corr, ledger_apis or {}, capture)
         bound.append(
             HIPSDKBoundDispatch(
                 dispatch_id=row.dispatch,
@@ -123,8 +137,32 @@ def bind_dispatches(
                 agent_id=row.agent,
                 queue_id=row.queue,
                 stream_id=dispatch.stream_id.handle,
+                stream_handle=stream_handle,
             )
         )
         if capture.operation(call, "HIP_RUNTIME_API_EXT") not in LAUNCH_APIS:
             implicit.append(row.dispatch)
     return bound, implicit
+
+
+def _stream_handle(
+    corr: int,
+    ledger_apis: dict[int, SDKAPI],
+    capture: SDKCapture,
+) -> int | None:
+    """Raw hipStream_t of the submission; None when no channel records it."""
+    api = ledger_apis.get(corr)
+    if api is not None and api.stream is not None:
+        return api.stream
+    row = next(
+        (
+            r
+            for r in capture.buffer_records.hip_api
+            if r.correlation_id.internal == corr
+        ),
+        None,
+    )
+    if row is None:
+        return None
+    argument = next((a.value for a in row.args if a.name == "stream"), None)
+    return int(argument, 0) if argument is not None else None

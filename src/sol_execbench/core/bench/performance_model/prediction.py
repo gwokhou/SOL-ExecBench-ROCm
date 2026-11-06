@@ -166,6 +166,8 @@ def predict_hw(
     identity_reason_codes: Sequence[str] = (),
     evidence_reason_codes: Sequence[str] = (),
     access_patterns: Sequence[AccessPatternSummary] = (),
+    cross_lane_verified: bool = False,
+    event_edges: Sequence[tuple[str, str]] = (),
 ) -> PerformancePrediction:
     """Predict candidate dispatch runtime without measured duration."""
     if identity_reason_codes:
@@ -178,7 +180,15 @@ def predict_hw(
     valid = [dispatch for dispatch in dispatches if dispatch.valid]
     if not valid:
         return _unavailable(PredictionKind.HW, ["no_valid_dispatch_evidence"])
-    if concurrency_reason := _concurrency_reason(dispatches):
+    known = {dispatch.dispatch_id for dispatch in valid}
+    if cross_lane_verified and any(
+        predecessor not in known or successor not in known
+        for predecessor, successor in event_edges
+    ):
+        cross_lane_verified = False
+    if concurrency_reason := _concurrency_reason(
+        dispatches, cross_lane_verified=cross_lane_verified
+    ):
         return _unavailable(PredictionKind.HW, [concurrency_reason])
     static_by_symbol = {
         key: item
@@ -200,7 +210,12 @@ def predict_hw(
         return _unavailable(PredictionKind.HW, error.reasons)
     components = [component for group in groups for component in group]
     try:
-        predicted = _schedule_estimate(valid, groups, calibration)
+        predicted = _schedule_estimate(
+            valid,
+            groups,
+            calibration,
+            event_edges if cross_lane_verified else (),
+        )
     except _PredictionUnavailableError as error:
         return _unavailable(PredictionKind.HW, error.reasons)
     reasons = _hardware_reason_codes(
@@ -1492,6 +1507,8 @@ def _has_overlap(dispatches: Sequence[DispatchEvidence]) -> bool:
 
 def _concurrency_reason(
     dispatches: Sequence[DispatchEvidence],
+    *,
+    cross_lane_verified: bool = False,
 ) -> str | None:
     if identity_reason := dispatch_identity_reason(dispatches):
         return identity_reason
@@ -1514,7 +1531,7 @@ def _concurrency_reason(
         for dispatch in dispatches
     ):
         return "dispatch_schedule_topology_unverified"
-    if len(identities) != 1:
+    if len(identities) != 1 and not cross_lane_verified:
         return "cross_lane_event_dependencies_unverified"
     return None
 
@@ -1523,11 +1540,13 @@ def _schedule_estimate(
     dispatches: Sequence[DispatchEvidence],
     groups: Sequence[Sequence[PredictionComponent]],
     calibration: DiagnosticCalibrationProfile,
+    event_edges: Sequence[tuple[str, str]] = (),
 ) -> tuple[float, float, float]:
     estimates = [_combine_components(group) for group in groups]
     if (
         not _has_overlap(dispatches)
         and len({dispatch_lane(dispatch) for dispatch in dispatches}) == 1
+        and not event_edges
     ):
         return tuple(sum(values) for values in zip(*estimates, strict=True))
     ordered = sorted(
@@ -1540,6 +1559,10 @@ def _schedule_estimate(
         ),
     )
     predecessors = schedule_predecessor_indices(dispatches)
+    if event_edges:
+        predecessors = _with_event_predecessors(
+            dispatches, predecessors, event_edges
+        )
     adjusted = [
         _overlap_adjusted_estimate(
             index,
@@ -1569,6 +1592,31 @@ def _schedule_estimate(
         max(finish[1] for finish in finishes.values()),
         max(finish[2] for finish in finishes.values()),
     )
+
+
+def _with_event_predecessors(
+    dispatches: Sequence[DispatchEvidence],
+    predecessors: dict[int, set[int]],
+    event_edges: Sequence[tuple[str, str]],
+) -> dict[int, set[int]]:
+    """Verified event edges serialize lanes; timestamps stay observations."""
+    index = {
+        dispatch.dispatch_id: position
+        for position, dispatch in enumerate(dispatches)
+    }
+    if any(
+        predecessor not in index or successor not in index
+        for predecessor, successor in event_edges
+    ):
+        raise _PredictionUnavailableError(
+            "cross_lane_event_dependencies_unverified"
+        )
+    merged = {
+        position: set(parents) for position, parents in predecessors.items()
+    }
+    for predecessor, successor in event_edges:
+        merged[index[successor]].add(index[predecessor])
+    return merged
 
 
 def _overlap_adjusted_estimate(

@@ -139,6 +139,10 @@ def evidence(tmp_path):
                 "corr": corr,
                 "name": APIS[op],
                 "result": 0,
+                # Streamed launches and memcpys record the raw hipStream_t;
+                # the consumer launch stays on the legacy default stream.
+                **({"stream": 4660} if corr in (2, 3) else {}),
+                **({"stream": 0} if corr == 6 else {}),
             }
         )
         if corr == 1:
@@ -447,6 +451,143 @@ def test_implicit_helper_can_be_the_actual_event_predecessor(
     assert result.links[0].predecessor_dispatch_id == 3
 
 
+def test_default_stream_mixing_blocks_schedule_completeness(tmp_path, evidence):
+    capture, ledger, receipt, expected, paths = copy.deepcopy(evidence)
+    result = qualify(tmp_path, (capture, ledger, receipt, expected, paths))
+    assert not result.schedule_complete
+    assert result.schedule.default_stream_present
+    assert result.schedule.lane_count == 3
+    assert "default_stream_implicit_sync_not_inferred" in map(
+        str, result.schedule.reason_codes
+    )
+    assert result.copy_domain.qualified
+
+
+def test_explicit_streams_only_schedule_completes(tmp_path, evidence):
+    capture, ledger, receipt, expected, paths = copy.deepcopy(evidence)
+    next(
+        r
+        for r in capture["buffer_records"]["kernel_dispatch"]
+        if r["correlation_id"]["internal"] == 2
+    )["stream_id"]["handle"] = 9
+    # Move the consumer launch off the legacy default stream as well.
+    next(
+        r
+        for r in ledger["records"]
+        if r["kind"] == "api" and r.get("corr") == 6
+    )["stream"] = 4661
+    result = qualify(tmp_path, (capture, ledger, receipt, expected, paths))
+    assert result.schedule_complete
+    assert not result.schedule.reason_codes
+    assert not result.performance_authority
+    assert [
+        (r.predecessor_dispatch_id, r.successor_dispatch_id)
+        for r in result.links
+    ] == [(3, 6)]
+
+
+def _insert_engine_copy(capture, ledger):
+    """Add one in-scope D2D engine copy on queue 9 just before the record."""
+    ledger["records"].append(
+        {
+            "kind": "api",
+            "scope": 1,
+            "tid": 7,
+            "corr": 12,
+            "name": "hipMemcpyAsync",
+            "result": 0,
+            "stream": 153,
+        }
+    )
+    ledger["records"].append(
+        {
+            "kind": "memcpy",
+            "tid": 7,
+            "corr": 12,
+            "operation": 4,
+            "src_agent": 9,
+            "dst_agent": 9,
+            "bytes": 4096,
+            "start": 455,
+            "end": 470,
+        }
+    )
+    capture["strings"]["buffer_records"].append(
+        {
+            "kind": "MEMORY_COPY",
+            "operations": [
+                "MEMORY_COPY_NONE",
+                "MEMORY_COPY_HOST_TO_HOST",
+                "MEMORY_COPY_HOST_TO_DEVICE",
+                "MEMORY_COPY_DEVICE_TO_HOST",
+                "MEMORY_COPY_DEVICE_TO_DEVICE",
+            ],
+        }
+    )
+    capture["buffer_records"]["hip_api"].append(
+        {
+            "kind": 0,
+            "operation": 1,
+            "correlation_id": {"internal": 12},
+            "stream_id": {"handle": 9},
+            "thread_id": 7,
+            "start_timestamp": 451,
+            "end_timestamp": 452,
+            "args": [{"name": "stream", "value": "0x99"}],
+            "retval": {"uint64_t_retval": 0},
+        }
+    )
+    capture["buffer_records"]["memory_copy"] = [
+        {
+            "kind": 3,
+            "operation": 4,
+            "correlation_id": {"internal": 12},
+            "thread_id": 7,
+            "start_timestamp": 455,
+            "end_timestamp": 470,
+            "src_agent_id": {"handle": 9},
+            "dst_agent_id": {"handle": 9},
+            "bytes": 4096,
+        }
+    ]
+
+
+def test_engine_copy_is_the_actual_event_predecessor(tmp_path, evidence):
+    capture, ledger, receipt, expected, paths = copy.deepcopy(evidence)
+    capture["buffer_records"]["memory_copy"] = []
+    _insert_engine_copy(capture, ledger)
+    rows = ledger["records"]
+    copy_api = next(
+        r for r in rows if r.get("corr") == 12 and r["kind"] == "api"
+    )
+    record_row = next(
+        r for r in rows if r["kind"] == "event_enqueue" and r["corr"] == 4
+    )
+    rows.remove(copy_api)
+    rows.insert(
+        rows.index(
+            next(r for r in rows if r["kind"] == "api" and r["corr"] == 3)
+        )
+        + 1,
+        copy_api,
+    )
+    memcpy_row = next(r for r in rows if r["kind"] == "memcpy")
+    rows.remove(memcpy_row)
+    rows.insert(rows.index(copy_api) + 1, memcpy_row)
+    for index, row in enumerate(rows, 1):
+        row["seq"] = index
+    ledger["row_count"] = len(rows)
+    assert record_row["seq"] > copy_api["seq"]
+    result = qualify(tmp_path, (capture, ledger, receipt, expected, paths))
+    assert result.copy_domain.qualified
+    assert result.copy_domain.copies[0].queue_id == 9
+    link = result.links[0]
+    assert link.predecessor_copy_correlation_id == 12
+    assert link.predecessor_dispatch_id is None
+    assert link.successor_dispatch_id == 6
+    assert not result.schedule_complete
+
+
 def test_no_event_workload_has_coverage_without_invented_links(
     tmp_path, evidence
 ):
@@ -537,6 +678,11 @@ def test_production_qualifies_implicit_dispatches(
     assert len(result.links) == 1
     assert not result.schedule_complete and not result.performance_authority
     assert not result.adversarial_attestation
+    assert result.copy_domain.qualified
+    assert "default_stream_implicit_sync_not_inferred" in map(
+        str, result.schedule.reason_codes
+    )
+    assert result.schedule_complete == result.schedule.schedule_complete
 
 
 @pytest.mark.parametrize(

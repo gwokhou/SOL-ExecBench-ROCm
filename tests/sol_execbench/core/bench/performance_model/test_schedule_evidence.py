@@ -121,3 +121,56 @@ def test_unknown_lane_cannot_publish_a_dependency():
     assert evidence.edges == []
     assert "dispatch_lane_identity_unverified" in evidence.reason_codes
     assert schedule_predecessor_indices(records) == {0: set(), 1: set()}
+
+
+def test_verified_event_links_publish_cross_lane_edges():
+    records = [dispatch("a", "0", 0), dispatch("b", "1", 5)]
+    evidence = build_schedule_evidence(
+        records,
+        scope_verified=True,
+        event_links=[("a", "b")],
+        cross_lane_verified=True,
+    )
+    assert evidence is not None
+    assert evidence.status is DiagnosticSidecarStatus.AVAILABLE
+    assert not evidence.reason_codes
+    assert evidence.cross_lane_event_dependencies == "verified"
+    assert [
+        (edge.predecessor_dispatch_id, edge.successor_dispatch_id, edge.reason)
+        for edge in evidence.edges
+    ] == [("a", "b", "event_wait")]
+
+
+def test_verified_link_with_unknown_endpoint_is_rejected():
+    records = [dispatch("a", "0", 0), dispatch("b", "1", 5)]
+    with pytest.raises(ValueError, match="unknown dispatch"):
+        build_schedule_evidence(
+            records,
+            scope_verified=True,
+            event_links=[("a", "unknown")],
+            cross_lane_verified=True,
+        )
+
+
+def test_verified_links_still_require_scope_verification():
+    records = [dispatch("a", "0", 0), dispatch("b", "1", 5)]
+    evidence = build_schedule_evidence(
+        records,
+        scope_verified=False,
+        event_links=[("a", "b")],
+        cross_lane_verified=True,
+    )
+    assert evidence is not None
+    assert evidence.status is DiagnosticSidecarStatus.PARTIAL
+    assert evidence.edges == []
+    assert evidence.cross_lane_event_dependencies == "unverified"
+    assert "controlled_replay_scope_unverified" in evidence.reason_codes
+
+
+def test_single_lane_evidence_records_absent_cross_lane_state():
+    evidence = build_schedule_evidence(
+        [dispatch("a", "0", 0), dispatch("b", "0", 5)], scope_verified=True
+    )
+    assert evidence is not None
+    assert evidence.status is DiagnosticSidecarStatus.AVAILABLE
+    assert evidence.cross_lane_event_dependencies == "absent"

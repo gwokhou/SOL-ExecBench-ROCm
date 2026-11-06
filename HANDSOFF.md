@@ -91,6 +91,71 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
+### SOLAR L2 schedule-causality execution (线B 受限域闭合) — 2026-11-07
+
+Line B (调度因果, roadmap L2) closed its restricted-domain objective: within
+the audited eager executor scope, `schedule_complete` is qualified for the
+first time, with the copy dependency domain and cross-lane event edges
+verified ([spec](docs/internal/solar-l2-schedule-causality-acceptance-2026-11-06.md);
+evidence `data/outputs/solar-l2-schedule-20261106/`, GPU-a30fa29c1cca1511,
+ROCm 10.1 / Torch 2.14).
+
+- **Ledger v2** (`sol_execbench.hip_sdk_ledger.v2`): the collector now
+  records structured engine-copy completions (`memcpy` rows: corr, direction,
+  bytes, GPU timestamps, agents — the SDK record carries no queue) and the
+  raw `hipStream_t` argument of the frozen streamed set (4 async memcpys +
+  3 launch APIs; handle zero is the legacy default stream, SDK ordinals
+  never carry default-stream meaning). rocprofv3 export gained
+  `--memory-copy-trace` via the opt-in `include_memory_copy` request field,
+  enabling a real three-channel (ledger/export/API) copy check on device.
+- **Copy domain** (`hip_sdk_memcpy.py`): whole-capture multiset bijection;
+  chunked large copies share one correlation and must sum to the host
+  `sizeBytes`; lane binding is co-observed (stream ordinal → queue from
+  kernels on the same stream); H2D/D2H/D2D only, frozen vocabulary, honest
+  reason codes (`copy_api_unsupported`, `copy_direction_unsupported`,
+  `copy_queue_unresolved`, `copy_stream_conflict`,
+  `default_stream_implicit_sync_not_inferred`).
+- **Scope artifacts v2** (`hip_torch_scope.v2` / `hip_evaluate_scope.v2`):
+  carry `copy_domain` + `schedule` qualification; `schedule_complete` flips
+  to true only with every in-scope copy lane-bound, all event links
+  verified, and no default-stream lane mixing; `performance_authority` and
+  `adversarial_attestation` stay literally false; teardown allow-list gained
+  the pinned-copy path's zero-dispatch event-pool calls.
+- **Schedule evidence v3** (`performance_schedule_evidence.v3`): new
+  `event_wait` edge reason and an explicit
+  `cross_lane_event_dependencies` state (verified/unverified/absent);
+  `build_schedule_evidence` publishes cross-lane edges only from an
+  independently qualified scope (temporal adjacency is still never causal);
+  `predict_hw` consumes verified edges to serialize inter-lane critical
+  paths and is bit-identical when none are supplied. **M-d production feed
+  pipeline is recorded as follow-up work** (scope↔counter dispatch-identity
+  bridge + explicit opt-in; spec §7.4) — not silently folded into this
+  closure.
+- **GPU denominator 18/18** (six cases × 3 processes, all under the
+  STABLE_PEAK host guard): the three 2026-10-11 regression cases keep their
+  baselines; `copy_lane` (pinned H2D + D2H engine copies lane-bound),
+  `copy_event` (engine copy is the verified event-link predecessor —
+  `predecessor_copy_correlation_id` set, dispatch endpoint None),
+  `default_mix` (correctly rejected 3/3 with
+  `default_stream_implicit_sync_not_inferred`). 15/18 runs hold
+  `schedule_complete=true`; copy domain qualified on every run.
+- **Mechanism facts recorded** (spec §7.3): chunked large copies (one corr,
+  multiple completion records), the dual stream-identity spaces (ordinal vs
+  handle; torch explicit streams can take ordinal 0), the WAIT-barrier race
+  window (4096³ fp32 matmul ≈ 0.5 ms on RX 9060 XT — producer work must
+  exceed the host submission gap for an observable barrier), and the
+  pinned-path teardown surface.
+- Tests: 33 new (memcpy domain 19, torch-scope schedule/copy semantics 5,
+  schedule-evidence v3 branch 5, prediction verified-edge 4); affected
+  bench/cli/driver suites 1537 passed. Ruff/format/`ty` clean on every
+  touched path; repo schema check clean for the `sol_execbench` families.
+  Pre-existing reds outside this line unchanged (gpu-admission fixture
+  file, residue-audit l3a strings, solar_bridge `scripts.internal` import
+  errors, SOLAR readability baseline, solar-internal schema strings).
+- Roadmap §0 B-group row and the L2 section were updated to the closed
+  state; scope-causality acceptance docs and the user sidecar doc were
+  re-versioned atomically.
+
 ### SOLAR external-reads batch 8 (线A 收官) — 2026-11-06
 
 Batch 8 (conv2d 窗口覆盖泛化) closed Line A: the 128-row inventory
