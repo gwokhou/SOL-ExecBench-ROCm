@@ -91,6 +91,39 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
+### SOLAR external-reads batch 1 — 2026-11-06
+
+The L3-c follow-up "external-reads 语义扩展" closed its **batch 1** with all
+corrected gates green
+([spec + dated erratum](docs/internal/solar-l3e-external-reads-acceptance-2026-11-06.md);
+evidence `data/outputs/solar-l3e-external-reads-20261106/`).
+
+- **Production change**: `FULL_OPERAND_READS` extended by the frozen
+  15-target batch-1 vocabulary (elementwise math + `cat` + `expand`/`repeat`)
+  — mechanically identical proof, no control-flow or schema changes; no
+  existing test pinned the old semantics (atomic-update list empty).
+- **Gap reduction**: of the 128 unproved-external-reads rows, **38 now
+  obtain formal bounds** (verified by full CPU analyses with totals;
+  three-way set equality: corrected S1 == re-inventory zero-blocker set ==
+  G4 analyzed set, all 38 row-identical). 82 rows remain blocked with an
+  exact residual vocabulary: `view` 36, `reshape` 24, `layer_norm` 18,
+  `conv2d` 14, `contiguous` 12, `gelu`-effect 12, `alias/detach` 16,
+  `batch_norm` 8, `nll_loss_forward` 5 (+torchview effect-boundary).
+- **Erratum (dated, prior-evidence)**: the inventory diagnostic under-modeled
+  the production transparent-layer ALIAS path; corrected model adds
+  `<transparent_alias>` markers. Original S1=46 corrected to **38**; the 8
+  `dynamic_mxfp8_quant` rows fail `unproven_alias` (batch-2 domain,
+  fail-closed untouched).
+- **Method notes**: the campaign inventory runs extraction+conversion only
+  (verification replay omitted — CPU conv replay via explicit unfold can
+  exceed host memory, twice kernel-OOM at 27 GB before this fix; per-slot
+  subprocess isolation retained; RLIMIT_AS rejected: it caps VA, breaking
+  torch imports). G4 workers also fixed two record-assembly bugs (success
+  path lacks `reason_code`; parent overwrite condition inverted).
+- Tests: 16 new (`tests/solar/test_external_reads_batch1.py`); suite 1838
+  passed; ruff/ty clean. Batches 2 (view/copy alias semantics) and 3
+  (norm/conv/pool window reads) remain, each with residual counts above.
+
 ### SOLAR L3-c execution — 2026-11-06
 
 L3-c (2.14 算子覆盖差分) closed: the full-corpus dual-path coverage matrix is
