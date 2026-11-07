@@ -195,6 +195,14 @@ Graph capture 与 IPC 在本线内保持显式拒绝。
 边界：两条固定路径与"不自动回退"政策不变；不把上游 `repr(SymBool)` 当可执行协议。
 
 ### L4 吞吐工程线（按测量推进，不预设方案）
+**2026-11-07 执行结果（终态：闭合）**：预固定验收规格
+[solar-l4-throughput-acceptance-2026-11-07.md](solar-l4-throughput-acceptance-2026-11-07.md)。
+第 2 项：全核默认经测量判必要（conv mapper 全核仍撞 7200s 预算），
+新增 `SOLAR_OROJENESIS_MAPPER_THREADS` 运维覆盖；第 3 项：四路径审计
+落表，qualification `--jobs` 接入共享 `validate_formal_job_count`
+（原仅 >0 校验）；第 4 项：生产路径无 `Executor.map` 调用点（盘点
+闭合），全部提交点按构造有界，解释器并行以源码事实测试钉桩拒绝。
+详见 HANDSOFF 2026-11-07 L4 条目。
 
 现状修正：mapper 并发上限框架**已存在**——`solar_bridge/resource_policy.py` 的
 `formal_mapper_job_limit`（可见逻辑核÷单 mapper 线程数）已被

@@ -31,6 +31,7 @@ OROJENESIS_TRUSTED_MAPPER_SHA256: frozenset[str] = frozenset(
 )
 OROJENESIS_PROVENANCE_FILENAME = "orojenesis-provenance.json"
 OROJENESIS_FALLBACK_MAPPER_THREADS = 1
+MAPPER_THREADS_ENV = "SOLAR_OROJENESIS_MAPPER_THREADS"
 
 MULTI_EINSUM_SOLVER = "NVlabs/Orojenesis tiled-fusion"
 MULTI_EINSUM_COMPOSITION = "linear_matmul_compatible_tiles_sum_capacity_v1"
@@ -67,11 +68,34 @@ def orojenesis_mapper_thread_count(
     *,
     cpu_ids: frozenset[int] | None = None,
 ) -> int:
-    """Use all process-visible logical CPUs, with a conservative fallback."""
+    """Use all process-visible logical CPUs, with a conservative fallback.
+
+    The full-core default is measurement-backed (L4 spec): conv-family
+    mapper searches exhaust the 7200 s budget even at full core, so fewer
+    threads only time out sooner; ordinary slots finish sub-second either
+    way. An operator may pin the demand explicitly via
+    ``SOLAR_OROJENESIS_MAPPER_THREADS`` (positive integer); absent or
+    malformed values fall back to this default untouched.
+    """
+    configured = _configured_mapper_threads()
+    if configured is not None:
+        return configured
     return (
         available_logical_cpu_count(cpu_ids=cpu_ids)
         or OROJENESIS_FALLBACK_MAPPER_THREADS
     )
+
+
+def _configured_mapper_threads() -> int | None:
+    """Return the explicit thread override, or None for the default."""
+    raw = os.environ.get(MAPPER_THREADS_ENV, "")
+    if not raw:
+        return None
+    try:
+        value = int(raw)
+    except ValueError:
+        return None
+    return value if value > 0 else None
 
 
 def _process_cpu_ids() -> frozenset[int]:

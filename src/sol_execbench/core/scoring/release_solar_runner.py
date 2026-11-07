@@ -34,9 +34,9 @@ from sol_execbench.core.solar_bridge.models import (
     normalize_ir_path,
 )
 from sol_execbench.core.solar_bridge.resource_policy import (
-    available_formal_mapper_logical_cpu_count,
     formal_mapper_job_limit,
     formal_mapper_thread_count,
+    validate_formal_job_count,
 )
 from sol_execbench.core.solar_bridge.runner import run_solar_worker
 
@@ -141,33 +141,7 @@ def build_release_solar_manifests(
 
 
 def _validate_release_jobs(jobs: int) -> None:
-    if jobs <= 0:
-        raise ValueError("SOLAR release jobs must be positive")
-    if jobs == 1:
-        return
-    logical_cpus = available_formal_mapper_logical_cpu_count()
-    if logical_cpus is None:
-        raise ValueError(
-            "SOLAR release cannot safely run jobs above 1 because available "
-            "logical CPUs could not be detected",
-        )
-    mapper_threads = formal_mapper_thread_count()
-    maximum, remaining_cpus = _safe_release_jobs_limit(
-        logical_cpus,
-        mapper_threads=mapper_threads,
-    )
-    if jobs > maximum:
-        remainder = (
-            f", leaving {remaining_cpus} logical CPUs outside complete "
-            "mapper slots"
-            if remaining_cpus
-            else ""
-        )
-        raise ValueError(
-            f"SOLAR release jobs {jobs} exceed the safe limit {maximum}: "
-            f"{logical_cpus} available logical CPUs / "
-            f"{mapper_threads} mapper threads per workload{remainder}",
-        )
+    validate_formal_job_count(jobs, caller="SOLAR release")
 
 
 def _safe_release_jobs_limit(

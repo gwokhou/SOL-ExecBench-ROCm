@@ -268,10 +268,10 @@ def peak_rss_kb() -> int:
 
 
 class GpuPeakMonitor:
-    """Reset and read the CUDA caching-allocator peak on one device."""
+    """Reset and read the accelerator caching-allocator peak (torch.cuda API)."""
 
     def __init__(self, device: str) -> None:
-        """Enable allocator tracking only for CUDA-family devices."""
+        """Enable allocator tracking only for accelerator-family devices."""
         self.enabled = device.split(":", 1)[0] in {"cuda", "hip"}
 
     def reset(self) -> None:

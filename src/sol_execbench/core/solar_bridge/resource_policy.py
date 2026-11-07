@@ -33,8 +33,45 @@ def formal_mapper_job_limit(
     return max(1, complete_slots), remaining_cpus
 
 
+def validate_formal_job_count(jobs: int, *, caller: str) -> None:
+    """Reject job counts the visible CPU budget cannot safely carry.
+
+    L4 spec: one shared bound for every SOLAR batch path (release runner
+    and qualification CLI alike). jobs=1 always passes; jobs above the
+    complete-slot mapper limit fails with the measured budget reason.
+    """
+    if jobs <= 0:
+        raise ValueError(f"{caller} jobs must be positive")
+    if jobs == 1:
+        return
+    logical_cpus = available_formal_mapper_logical_cpu_count()
+    if logical_cpus is None:
+        raise ValueError(
+            f"{caller} cannot safely run jobs above 1 because available "
+            "logical CPUs could not be detected",
+        )
+    mapper_threads = formal_mapper_thread_count()
+    maximum, remaining_cpus = formal_mapper_job_limit(
+        logical_cpus,
+        mapper_threads=mapper_threads,
+    )
+    if jobs > maximum:
+        remainder = (
+            f", leaving {remaining_cpus} logical CPUs outside complete "
+            "mapper slots"
+            if remaining_cpus
+            else ""
+        )
+        raise ValueError(
+            f"{caller} jobs {jobs} exceed the safe limit {maximum}: "
+            f"{logical_cpus} available logical CPUs / "
+            f"{mapper_threads} mapper threads per workload{remainder}",
+        )
+
+
 __all__ = [
     "available_formal_mapper_logical_cpu_count",
     "formal_mapper_job_limit",
     "formal_mapper_thread_count",
+    "validate_formal_job_count",
 ]
