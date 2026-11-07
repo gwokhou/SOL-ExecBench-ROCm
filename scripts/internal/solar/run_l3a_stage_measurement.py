@@ -257,10 +257,9 @@ def _production_src_untouched() -> bool:
         check=False,
     )
     lines = [line for line in result.stdout.splitlines() if line.strip()]
-    allowed = str(Path("src") / "solar" / "graph" / "make_fx_fake.py")
-    return result.returncode == 0 and all(
-        line.split()[-1] == allowed for line in lines
-    )
+    # LineB: the pilot module was adopted into the production backend and
+    # deleted; src/ must now be completely untouched.
+    return result.returncode == 0 and not lines
 
 
 def _identity(args: argparse.Namespace) -> dict[str, Any]:
