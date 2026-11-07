@@ -91,6 +91,34 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
+### SOLAR fake-static backend adoption (线B) — 2026-11-07
+
+The L3-a adopt decision landed: the production make_fx backend now traces
+under FakeTensorMode with the workload's concrete shapes
+([spec + erratum](docs/internal/solar-lineb-fake-production-acceptance-2026-11-07.md);
+evidence `data/outputs/solar-lineb-fake-20261107/`; merged `8be1e62a`/`e0345df7`).
+
+- **B1 full-corpus equality**: 163/163 scored workloads produce
+  byte-identical `operator_graph.yaml` versus the pristine real backend
+  (dual-tree campaign; real side = main at `39329249`, fake side via
+  PYTHONPATH worktree shadow). First pass 159/163; the 4 `rope_thd_fwd_bf16`
+  slots convert a tensor-derived scalar and fake metadata cannot propagate.
+- **Declared real fallback**: `DataDependentOutputException`/
+  `DynamicOutputShapeException` retry on the incumbent real-tensor trace —
+  pre-adoption behavior, not a verification bypass; the 4 slots' graphs are
+  byte-identical to real (B1 rerun). nonzero-style ops keep their
+  pre-adoption extraction capability through the same fallback.
+- **B3 GPU validation**: 3/3 representative slots (R06 dynamic index, R04
+  attention, l2n52 conv) ready on cuda:0 with the fake backend.
+- Pilot module `make_fx_fake.py` deleted (production owns the path);
+  importers atomically updated. Suite 1870 passed on main after merge;
+  ruff/ty clean. Benefit (L3-a): extraction wall 11–196× faster,
+  verification replay still real by design.
+- Execution notes: `_RELEASE_SOURCE_PATHS` covers `scripts` — the lineC
+  chain window froze the main tree, so lineB developed in a git worktree
+  and merged after `09b8c55e`; a second venv exceeded disk quota, solved
+  with a PYTHONPATH shadow over the main venv.
+
 ### SOLAR full-denominator qualification chain — 2026-11-07
 
 The L1-deferred full-denominator qualification chain closed on the
