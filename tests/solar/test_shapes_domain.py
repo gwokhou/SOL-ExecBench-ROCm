@@ -127,6 +127,7 @@ def test_nonzero_interval_validates_observed_count() -> None:
         {"value": tuple(value.shape), "y": tuple(observed.shape)},
     )
     assert verdict.validated, verdict.detail
+    assert verdict.assignment is not None
     assert 0 <= verdict.assignment["nnz"] <= 128
 
 
