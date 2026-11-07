@@ -20,7 +20,6 @@ from scripts.internal.solar.l3a_measure import (
 from scripts.internal.solar.l3a_samples import FOCUSED_SAMPLES
 from solar.artifacts import sha256_file
 from solar.graph.extraction import extract_operator_graph
-from solar.graph.make_fx_fake import extract_operator_graph_fake_static
 from solar.ir.contracts import IRPath
 
 
@@ -47,12 +46,15 @@ def _trace_one(
             extraction_kind=IRPath.MAKE_FX_ATEN.extraction_kind,
         )
     else:
-        artifact = extract_operator_graph_fake_static(
+        # LineB: production adopted fake-static tracing; the historical
+        # pilot's fake variant is the production backend itself.
+        artifact = extract_operator_graph(
             reference,
             inputs,
             device=device,
             output_dir=output / "fake",
             name=name,
+            extraction_kind=IRPath.MAKE_FX_ATEN.extraction_kind,
         )
     row = {
         "wall_seconds": time.perf_counter() - start,
