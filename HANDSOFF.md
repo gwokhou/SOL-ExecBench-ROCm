@@ -116,11 +116,15 @@ The M-d scope-archive bridge landed with its opt-in plumbing
 - **M4 (open)**: real dual collection. The counter mirror runner is
   landed (`scripts/internal/upgrade/md_feed_counter_runner.py`, same
   dispatch sequence as the L2 case). Two rocprofv3 invocation forms were
-  attempted: `-i <txt>` hits a wrapper parser bug (`inp_args[0]`
-  IndexError), `--pmc ... --` runs but the app exits rc=1 before CSV
-  output — next step is capturing the app-side traceback inside the
-  session (likely env/GPU visibility under the profiler session) and
-  re-running the bridge against both real artifacts.
+  attempted; root cause captured: the CLI wrapper's preload crashes the
+  app with `LLVM ERROR: support is already registered for analysis:
+  PointerFlowAnalysisResult` (profiler LLVM vs torch LLVM in one process;
+  plus a harmless gfx1036 secondary-agent counter warning). The correct
+  M4 vehicle is the production **in-process SDK session** — i.e. run the
+  mirror case under the `evaluate --profile rocprofv3-counter` machinery
+  (same collection seam as the standing counter evidence) and then bridge
+  against the real scope capture; the `-i <txt>` wrapper form additionally
+  hits an `inp_args[0]` parser bug and is not usable on this host.
 
 
 ### SOLAR L4 throughput closure — 2026-11-07
