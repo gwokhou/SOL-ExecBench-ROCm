@@ -10,6 +10,9 @@ import pytest
 
 from sol_execbench.core.dataset.aka_contract import AKACorpusRole
 from sol_execbench.core.scoring import release_solar_runner
+from sol_execbench.core.solar_bridge import (
+    resource_policy,
+)
 from sol_execbench.core.solar_bridge.models import (
     SolarAnalysisOutcome,
     SolarAnalysisStatus,
@@ -69,12 +72,12 @@ def _patch_release_inputs(
     corpus: SimpleNamespace,
 ) -> None:
     monkeypatch.setattr(
-        release_solar_runner,
+        resource_policy,
         "available_formal_mapper_logical_cpu_count",
         lambda: 64,
     )
     monkeypatch.setattr(
-        release_solar_runner,
+        resource_policy,
         "formal_mapper_thread_count",
         lambda: 32,
     )
@@ -340,12 +343,12 @@ def test_release_rejects_jobs_above_mapper_cpu_budget(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        release_solar_runner,
+        resource_policy,
         "available_formal_mapper_logical_cpu_count",
         lambda: 64,
     )
     monkeypatch.setattr(
-        release_solar_runner,
+        resource_policy,
         "formal_mapper_thread_count",
         lambda: 32,
     )
@@ -399,12 +402,12 @@ def test_jobs_limit_reports_nondivisible_cpu_remainder(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        release_solar_runner,
+        resource_policy,
         "available_formal_mapper_logical_cpu_count",
         lambda: 80,
     )
     monkeypatch.setattr(
-        release_solar_runner,
+        resource_policy,
         "formal_mapper_thread_count",
         lambda: 32,
     )
@@ -421,7 +424,7 @@ def test_parallel_release_fails_closed_without_cpu_detection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        release_solar_runner,
+        resource_policy,
         "available_formal_mapper_logical_cpu_count",
         lambda: None,
     )

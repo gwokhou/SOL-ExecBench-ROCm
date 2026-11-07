@@ -49,6 +49,9 @@ from sol_execbench.core.solar_bridge.models import (
     IRPath,
     normalize_ir_path,
 )
+from sol_execbench.core.solar_bridge.resource_policy import (
+    validate_formal_job_count,
+)
 from sol_execbench.core.solar_bridge.workload_context import (
     workload_verification_policy,
 )
@@ -145,8 +148,7 @@ def _context(
 ) -> _SolarQualificationContext:
     if timeout_seconds <= 0:
         raise ValueError("qualification timeout must be positive")
-    if jobs <= 0:
-        raise ValueError("qualification jobs must be positive")
+    validate_formal_job_count(jobs, caller="SOLAR qualification")
     root = workspace.resolve()
     corpus = AKACorpusManifest.load(corpus_manifest_path)
     plan = load_execution_plan(

@@ -91,6 +91,45 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
+### SOLAR L4 throughput closure — 2026-11-07
+
+L4's remaining three items closed measurement-first
+([spec](docs/internal/solar-l4-throughput-acceptance-2026-11-07.md);
+evidence `data/outputs/solar-l4-throughput-20261107/`).
+
+- **L4-2 mapper threads**: full-core default kept — justified by existing
+  data (L3-c: conv-family mappers exhaust the 7200 s budget even at full
+  core, so fewer threads only time out sooner; L3-a: ordinary slots are
+  sub-second regardless). New operator override
+  `SOLAR_OROJENESIS_MAPPER_THREADS` (positive integer; absent/malformed
+  values fall back to the default untouched); identity bindings
+  (`scan_execution_identity`) reflect the configured value naturally.
+- **L4-3 concurrency audit**: four production paths tabulated — release
+  runner (sliding-window ≤ jobs, bounded by the shared validator), scan
+  (identity-bound single worker), compare-paths (serial), qualification
+  CLI (serial audits; jobs is a config/identity parameter). Fixed the one
+  real gap: qualification `--jobs` only checked >0 while the runner
+  enforced the CPU budget — `validate_formal_job_count` now lives in
+  `resource_policy` and both paths consume it (runner behavior unchanged;
+  tests migrated their patch target).
+- **L4-4 bounded queues**: no production `Executor.map` call sites exist
+  (rg evidence in the audit artifact), so `buffersize=` has no target;
+  every submission point is bounded by construction (table in
+  `audit.json`). Interpreter-parallel extraction stays rejected — the
+  torchview recorder patches torch globals, pinned by a source-fact test
+  (`test_l4_throughput.py`).
+- Gates: T1 thread probes (default/override/malformed) pass; T2 shared
+  bound passes on both paths; T3 audit complete. Suites: solar+scripts
+  1870 passed; targeted execbench batches 527 passed with one
+  **environmental** failure (`test_frozen_cross_project_structure_cases`
+  reads an out-of-repo `contract-reference/schema-cases.json` absent on
+  this host; test unchanged since October). One residue fix: L3-a
+  `l3a_measure.py` docstrings reworded to clear the CUDA/NVIDIA residue
+  audit. Full `tests/sol_execbench` requires `GPU_LOCK_DIR`/`UUID` at
+  collection (host lock env), and combined heavy suites can trip the
+  documented xdist memory cap — run in batches.
+
+
 ### SOLAR fake-static backend adoption (线B) — 2026-11-07
 
 The L3-a adopt decision landed: the production make_fx backend now traces
