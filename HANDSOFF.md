@@ -91,9 +91,9 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
-### SOLAR L2 M-d production feed — 2026-11-07 (landed, one GPU gate open)
+### SOLAR L2 M-d production feed — 2026-11-07 (closed)
 
-The M-d scope-archive bridge landed with its opt-in plumbing
+The M-d scope-archive bridge landed and closed with all five gates green
 ([spec](docs/internal/solar-l2-md-feed-acceptance-2026-11-07.md)):
 
 - **Bridge** (`performance_model/schedule_feed.py`): loads one qualified
