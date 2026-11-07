@@ -227,12 +227,12 @@ def _cases() -> list[tuple[str, Callable[..., Any], tuple[torch.Tensor, ...]]]:
             lambda x: torch.fft.fft(x, n=8, dim=-1, norm="ortho"),
             (matrix,),
         ),
+        ("nonzero", lambda x: torch.nonzero(x, as_tuple=False), (matrix,)),
         (
             "vector_norm",
             lambda x: torch.linalg.vector_norm(x, ord=2, dim=-1, keepdim=True),
             (matrix,),
         ),
-        ("nonzero", lambda x: torch.nonzero(x, as_tuple=False), (matrix,)),
         (
             "conv_transpose2d",
             lambda x, w: functional.conv_transpose2d(
