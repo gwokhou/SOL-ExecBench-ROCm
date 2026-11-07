@@ -93,7 +93,13 @@ GPU checkpoint / 整合 handoff 证据的路径与内容摘要（已决策：不
 - L1-d 资格链执行：既有 `qualify-static → canary → full` 链在独占窗口
   （`SOLAR_GPU_APPROVED`、STABLE_PEAK、原生 L1/L2 锁）下跑完，
   复用 `evaluate --profile rocprofv3-scope` 的生产范围资格作为逐 workload 佐证。
-  **2026-11-05 执行结果（终态：经路径 (a) 闭合）**：宿主前置全部就绪（锁/UUID/
+  **2026-11-07 追记：全分母链闭合（make_fx 分母）**——L1-d 延迟的全分母
+qualify-canary/full 已在重建于 HEAD 的 workspace 上经生产 CLI 三级链
+（static 163 → canary 112/112 ready → full **163/163 ready**）完成，
+证据 `data/outputs/solar-qualification-mfx-20261107/`；torchview 分母链
+仍开放（42 就绪缺口，见 L3-c 矩阵），不构成本闭合前置。详见 HANDSOFF
+2026-11-07 资格链条目。
+**2026-11-05 执行结果（终态：经路径 (a) 闭合）**：宿主前置全部就绪（锁/UUID/
   mapper/sudoers），baseline 工作区物化、qualify-static gate 通过。全分母
   qualify-canary 结构性受阻（112 项审计 79 ready / 33 failed：3 项 R08 预期拒绝、
   20 项原生算子覆盖缺口属 L3-c 域、10 项特定轴点数值失配；R04-w0 本身 ready）。

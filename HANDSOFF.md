@@ -91,6 +91,33 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
+### SOLAR full-denominator qualification chain — 2026-11-07
+
+The L1-deferred full-denominator qualification chain closed on the
+make_fx_aten denominator
+([spec](docs/internal/solar-linec-qualification-acceptance-2026-11-07.md);
+evidence `data/outputs/solar-qualification-mfx-20261107/`).
+
+- **Chain**: `qualify-static → qualify-canary → qualify-full` via the
+  production CLI on a workspace rebuilt at HEAD (`39329249`; the L1
+  workspace pinned `12859e3e` and was correctly refused — fail-closed
+  revision binding). Gates hash-chained: static 163 items → canary 112
+  (risk-first) → full 163.
+- **Results**: static pass; canary readiness **112/112 ready**; full
+  readiness **163/163 ready** — the L1-era canary wall (33 torchview
+  failures) does not exist on the make_fx denominator. Identity
+  parameters must match across stages (first canary attempt failed
+  `identity drift: static` on a timeout-parameter mismatch — rerun with
+  matched `--timeout 3600`).
+- **Meaning**: with make_fx readiness at 163/163 and Line A's
+  external-reads denominator cleared, the corpus publication
+  qualification is achieved for the make_fx path under the chain's own
+  semantics; the torchview denominator chain remains open (42 readiness
+  gaps, L3-c matrix) and is not required for this closure.
+- Roadmap L1-d deferred item is now settled: full-denominator chain
+  complete (make_fx), recorded against the frozen corpus
+  sha `24cee562…`, pinned mapper `18591892…`, gfx1200 device.
+
 ### SOLAR L2 schedule-causality execution (线B 受限域闭合) — 2026-11-07
 
 Line B (调度因果, roadmap L2) closed its restricted-domain objective: within
