@@ -13,6 +13,7 @@ from sol_execbench.core.solar_bridge.formal_device import (
     FORMAL_ARCHITECTURE,
     device_execution_policy,
     require_formal_device,
+    solar_architecture_for_configuration,
 )
 from sol_execbench.core.solar_bridge.invocation import invoke_solar
 from sol_execbench.core.solar_bridge.models import (
@@ -41,20 +42,6 @@ def formal_architecture_profile_hash(
     from solar.api import architecture_profile_sha256
 
     return architecture_profile_sha256(architecture)
-
-
-_ARCHITECTURE_BY_GFX_TARGET = {
-    "gfx1200": FORMAL_ARCHITECTURE,
-    "gfx942": "MI300X",
-}
-
-
-def _architecture_for_gfx_target(gfx_target: str) -> str:
-    """Return the packaged SOLAR profile name for one gfx target."""
-    architecture = _ARCHITECTURE_BY_GFX_TARGET.get(gfx_target)
-    if architecture is None:
-        raise ValueError(f"unsupported_solar_architecture:{gfx_target}")
-    return architecture
 
 
 def analyze_workload(
@@ -102,14 +89,15 @@ def analyze_workload_diagnostic(
 
     Unlike :func:`analyze_workload`, this path never requires the formal
     gfx1200 device identity, selects the per-architecture profile from the
-    detected gfx target, skips the verified-audit and Orojenesis gates, and
+    detected device configuration, skips the verified-audit and Orojenesis gates, and
     returns a roofline bound even when the result is not publication-eligible.
     Results are engineering/inexact, never a formal SOLAR bound.
     """
     with native_gpu_execution(
         device, timeout_seconds=device_stage_lock_timeout_seconds
     ):
-        gfx_target = detect_rocm_device(device).gfx_target
+        hardware = detect_rocm_device(device).hardware_configuration
+        architecture = solar_architecture_for_configuration(hardware)
         context = load_solar_workload_context(
             problem_dir, workload_uuid, device
         )
@@ -119,7 +107,7 @@ def analyze_workload_diagnostic(
         device=device,
         orojenesis_home=orojenesis_home,
         ir_path=normalize_ir_path(ir_path),
-        architecture=_architecture_for_gfx_target(gfx_target),
+        architecture=architecture,
         formal=False,
         device_stage_lock_path=device_stage_lock_path,
         device_stage_lock_timeout_seconds=device_stage_lock_timeout_seconds,

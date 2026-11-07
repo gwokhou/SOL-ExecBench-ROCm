@@ -10,6 +10,9 @@ from typing import Annotated, Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
+from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
+    DiagnosticArtifactSchema,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticEvidencePurpose,
 )
@@ -23,9 +26,6 @@ from sol_execbench.core.integrity import (
     sha256_file,
     stable_json_checksum,
     validate_relative_artifact_path,
-)
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
 )
 
 MINIMUM_CASES_PER_FAMILY = 20
@@ -103,11 +103,13 @@ class DiagnosticValidationCorpus(CurrentSchemaModel):
     """Frozen development or held-out cases for every admitted family."""
 
     model_config = _CONFIG
-    current_schema_version = SchemaVersion.DIAGNOSTIC_VALIDATION_CORPUS
-
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_VALIDATION_CORPUS] = (
-        SchemaVersion.DIAGNOSTIC_VALIDATION_CORPUS
+    current_schema_version = (
+        DiagnosticArtifactSchema.DIAGNOSTIC_VALIDATION_CORPUS
     )
+
+    schema_version: Literal[
+        DiagnosticArtifactSchema.DIAGNOSTIC_VALIDATION_CORPUS
+    ] = DiagnosticArtifactSchema.DIAGNOSTIC_VALIDATION_CORPUS
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     role: Literal["development", "held_out"]
     cases: list[DiagnosticValidationCase] = Field(

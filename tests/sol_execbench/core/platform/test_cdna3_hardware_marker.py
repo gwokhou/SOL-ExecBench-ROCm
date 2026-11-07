@@ -6,6 +6,9 @@
 from __future__ import annotations
 
 import importlib
+import subprocess
+import sys
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -13,6 +16,42 @@ import pytest
 
 def _test_conftest() -> Any:
     return importlib.import_module("conftest")
+
+
+def test_deselected_hardware_tests_do_not_probe_gpu(tmp_path: Path) -> None:
+    source = Path(_test_conftest().__file__).read_text()
+    (tmp_path / "conftest.py").write_text(
+        source
+        + "\n\ndef _rocm_gpu_info():\n"
+        + '    raise AssertionError("CPU selection must not probe GPU")\n'
+    )
+    (tmp_path / "pytest.ini").write_text(
+        "[pytest]\nmarkers =\n    requires_rocm: needs a ROCm GPU\n"
+    )
+    (tmp_path / "test_selection.py").write_text(
+        "import pytest\n\ndef test_cpu():\n    pass\n"
+        "\n@pytest.mark.requires_rocm\ndef test_gpu():\n"
+        '    raise AssertionError("hardware test must be deselected")\n'
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-n",
+            "0",
+            "-q",
+            "-m",
+            "not requires_rocm",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout[-4000:] + result.stderr[-4000:]
+    assert "1 passed, 1 deselected" in result.stdout
 
 
 def _skip_reasons(item: Any) -> list[str]:

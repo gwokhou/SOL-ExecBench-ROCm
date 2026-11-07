@@ -10,6 +10,10 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
+from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
+    DiagnosticArtifactSchema,
+    DiagnosticSourceTransitionArtifactKind,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticEvidencePurpose,
 )
@@ -23,7 +27,6 @@ from sol_execbench.core.data.base_model import (
     NonEmptyString,
 )
 from sol_execbench.core.integrity import SHA256Digest
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 _REUSABLE_ARTIFACT_PATHS = (
     "calibration/cal.audit.json",
@@ -117,11 +120,17 @@ class QualificationTimeoutTransition(FrozenArtifactModel):
 class DiagnosticSourceTransitionAttestation(CurrentFrozenSchemaModel):
     """Exact diff plus semantic proofs for reusing unaffected evidence."""
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_SOURCE_TRANSITION
-
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_SOURCE_TRANSITION] = (
-        SchemaVersion.DIAGNOSTIC_SOURCE_TRANSITION
+    current_schema_version = (
+        DiagnosticArtifactSchema.DIAGNOSTIC_SOURCE_TRANSITION
     )
+    current_artifact_kind = DiagnosticSourceTransitionArtifactKind.ATTESTATION
+
+    schema_version: Literal[
+        DiagnosticArtifactSchema.DIAGNOSTIC_SOURCE_TRANSITION
+    ] = DiagnosticArtifactSchema.DIAGNOSTIC_SOURCE_TRANSITION
+    artifact_kind: Literal[
+        DiagnosticSourceTransitionArtifactKind.ATTESTATION
+    ] = DiagnosticSourceTransitionArtifactKind.ATTESTATION
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     base_source_revision: str = Field(pattern=r"^[0-9a-f]{40}$")
     comparison_artifact_source_revision: str = Field(pattern=r"^[0-9a-f]{40}$")
@@ -206,11 +215,19 @@ class DevelopmentCaseRebind(FrozenArtifactModel):
 class DiagnosticDevelopmentCaseRebindReceipt(CurrentFrozenSchemaModel):
     """Immutable receipt for verified, non-overwriting raw-case rebinding."""
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_DEVELOPMENT_CASE_REBIND
+    current_schema_version = (
+        DiagnosticArtifactSchema.DIAGNOSTIC_SOURCE_TRANSITION
+    )
+    current_artifact_kind = (
+        DiagnosticSourceTransitionArtifactKind.REBIND_RECEIPT
+    )
 
     schema_version: Literal[
-        SchemaVersion.DIAGNOSTIC_DEVELOPMENT_CASE_REBIND
-    ] = SchemaVersion.DIAGNOSTIC_DEVELOPMENT_CASE_REBIND
+        DiagnosticArtifactSchema.DIAGNOSTIC_SOURCE_TRANSITION
+    ] = DiagnosticArtifactSchema.DIAGNOSTIC_SOURCE_TRANSITION
+    artifact_kind: Literal[
+        DiagnosticSourceTransitionArtifactKind.REBIND_RECEIPT
+    ] = DiagnosticSourceTransitionArtifactKind.REBIND_RECEIPT
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     transition_attestation_sha256: SHA256Digest
     base_source_revision: str = Field(pattern=r"^[0-9a-f]{40}$")

@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -38,7 +39,9 @@ from sol_execbench.core.integrity import (
     stable_json_checksum,
     verify_artifact_file,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.platform.rdna4_validation import (
+    HardwareValidationBinding,
+)
 from sol_execbench.core.scoring.release_builders import artifact_reference
 from sol_execbench.core.scoring.release_models import (
     ArtifactReference,
@@ -52,6 +55,10 @@ from sol_execbench.core.scoring.release_verifier import (
     OfficialScoreResult,
     verify_and_score_release,
 )
+from sol_execbench.core.scoring.schema_versions import (
+    ReleaseArtifactSchema,
+    ReleasePackageArtifactKind,
+)
 from sol_execbench.core.solar_bridge.models import SolarRequestManifest
 
 # Fixed archive root name so the produced archive is byte-identical across hosts
@@ -63,33 +70,42 @@ _BUNDLE_FILENAME = "release-bundle.json"
 class ScoreReleaseArchive(CurrentFrozenSchemaModel):
     """One deterministic zstd archive of a verified score release."""
 
-    current_schema_version = SchemaVersion.RELEASE_ARCHIVE
+    current_schema_version = ReleaseArtifactSchema.RELEASE_PACKAGE
+    current_artifact_kind = ReleasePackageArtifactKind.ARCHIVE
 
-    schema_version: Literal[SchemaVersion.RELEASE_ARCHIVE] = (
-        SchemaVersion.RELEASE_ARCHIVE
+    schema_version: Literal[ReleaseArtifactSchema.RELEASE_PACKAGE] = (
+        ReleaseArtifactSchema.RELEASE_PACKAGE
+    )
+    artifact_kind: Literal[ReleasePackageArtifactKind.ARCHIVE] = (
+        ReleasePackageArtifactKind.ARCHIVE
     )
     name: str = Field(min_length=1)
     sha256: SHA256Digest
     size_bytes: int = Field(ge=0)
     algorithm: Literal["zstd"] = "zstd"
     bundle_sha256: SHA256Digest
-    source_revision: str = Field(min_length=1)
+    source_revision: str = Field(pattern=r"^[0-9a-f]{40}$")
 
 
 class ScoreReleaseAttestation(CurrentFrozenSchemaModel):
     """Release object binding a verified score-release bundle to its archive."""
 
-    current_schema_version = SchemaVersion.RELEASE_ATTESTATION
+    current_schema_version = ReleaseArtifactSchema.RELEASE_PACKAGE
+    current_artifact_kind = ReleasePackageArtifactKind.ATTESTATION
 
-    schema_version: Literal[SchemaVersion.RELEASE_ATTESTATION] = (
-        SchemaVersion.RELEASE_ATTESTATION
+    schema_version: Literal[ReleaseArtifactSchema.RELEASE_PACKAGE] = (
+        ReleaseArtifactSchema.RELEASE_PACKAGE
+    )
+    artifact_kind: Literal[ReleasePackageArtifactKind.ATTESTATION] = (
+        ReleasePackageArtifactKind.ATTESTATION
     )
     release_id: SHA256Digest
     bundle_sha256: SHA256Digest
     archive: ScoreReleaseArchive
     inventory_sha256: SHA256Digest
     uncompressed_size_bytes: int = Field(ge=0)
-    source_revision: str = Field(min_length=1)
+    source_revision: str = Field(pattern=r"^[0-9a-f]{40}$")
+    hardware_validation: HardwareValidationBinding
     official_score: float = Field(ge=0, le=1)
     scored_workloads: int = Field(ge=1)
     baseline_id: str = Field(min_length=1)
@@ -108,6 +124,10 @@ class TarRunner(Protocol):
 
 
 def _system_tar(argv: list[str], *, cwd: Path | None = None) -> None:
+    if sys.platform != "linux":
+        raise RuntimeError(
+            "official score release packaging requires Linux and GNU tar",
+        )
     completed = subprocess.run(
         argv,
         cwd=cwd,
@@ -250,6 +270,7 @@ def package_score_release(
     archive_output: Path,
     attestation_output: Path,
     source_revision: str,
+    hardware_validation: HardwareValidationBinding,
     tar_runner: TarRunner = _system_tar,
 ) -> ScoreReleaseAttestation:
     """Package one verified release bundle into a deterministic release object.
@@ -259,6 +280,8 @@ def package_score_release(
     is the repository-authoritative corpus manifest whose ``authored_root``
     resolves to the on-disk problem definitions and workloads.
     """
+    if hardware_validation.source_revision != source_revision:
+        raise ValueError("hardware validation source revision mismatch")
     bundle = bundle_path.resolve()
     if not bundle.is_file():
         raise ValueError(f"release bundle is not a regular file: {bundle}")
@@ -276,18 +299,34 @@ def package_score_release(
         tar_runner=tar_runner,
     )
 
+    attestation = _build_score_release_attestation(
+        bundle=bundle,
+        archive_output=archive_output,
+        inventory=inventory,
+        result=result,
+        source_revision=source_revision,
+        hardware_validation=hardware_validation,
+    )
+    atomic_write_json_value(
+        attestation_output,
+        attestation.model_dump(mode="json"),
+    )
+    return attestation
+
+
+def _build_score_release_attestation(
+    *,
+    bundle: Path,
+    archive_output: Path,
+    inventory: tuple[ArtifactReference, ...],
+    result: OfficialScoreResult,
+    source_revision: str,
+    hardware_validation: HardwareValidationBinding,
+) -> ScoreReleaseAttestation:
     bundle_sha256 = sha256_file(bundle)
     archive_sha256 = sha256_file(archive_output)
-    archive_size = archive_output.stat().st_size
     inventory_sha256 = stable_json_checksum(
-        [
-            {
-                "path": item.path,
-                "sha256": item.sha256,
-                "size_bytes": item.size_bytes,
-            }
-            for item in inventory
-        ],
+        [item.model_dump(mode="json") for item in inventory],
     )
     release_id = stable_json_checksum(
         {
@@ -295,32 +334,31 @@ def package_score_release(
             "bundle_sha256": bundle_sha256,
             "archive_sha256": archive_sha256,
             "source_revision": source_revision,
+            "hardware_validation_receipt_sha256": (
+                hardware_validation.receipt_sha256
+            ),
         },
     )
-    attestation = ScoreReleaseAttestation(
+    return ScoreReleaseAttestation(
         release_id=release_id,
         bundle_sha256=bundle_sha256,
         archive=ScoreReleaseArchive(
             name=archive_output.name,
             sha256=archive_sha256,
-            size_bytes=archive_size,
+            size_bytes=archive_output.stat().st_size,
             bundle_sha256=bundle_sha256,
             source_revision=source_revision,
         ),
         inventory_sha256=inventory_sha256,
         uncompressed_size_bytes=sum(item.size_bytes for item in inventory),
         source_revision=source_revision,
+        hardware_validation=hardware_validation,
         official_score=result.suite.score,
         scored_workloads=result.suite.scored_workloads,
         baseline_id=result.baseline_id,
         candidate_id=result.candidate_id,
         created_at=datetime.now(UTC).isoformat(),
     )
-    atomic_write_json_value(
-        attestation_output,
-        attestation.model_dump(mode="json"),
-    )
-    return attestation
 
 
 def _archive_score_inventory(

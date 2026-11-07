@@ -117,10 +117,12 @@ def test_chain_queries_device_once_per_gpu_stage_and_reuses(qualified, capsys):
     assert events.count("acquire") == events.count("cleanup") == 3
     before = list(events)
     assert module.main(["qualify-full", *common, "--check-only"]) == 0
-    assert events[len(before) :] and set(events[len(before) :]) == {"verify"}
+    assert events[len(before) :]
+    assert set(events[len(before) :]) == {"verify"}
     output = capsys.readouterr()
     assert '"device_readback_performed": false' in output.out
-    assert '"cpu_prepare"' in output.err and '"cpu_finalize"' in output.err
+    assert '"cpu_prepare"' in output.err
+    assert '"cpu_finalize"' in output.err
 
 
 @pytest.mark.parametrize(
@@ -145,7 +147,8 @@ def test_stale_chain_rejected_before_lease(qualified, tmp_path, drift):
     events.clear()
     with pytest.raises(ValueError, match="drift"):
         module.main(["qualify-full", *common])
-    assert "acquire" not in events and "sample" not in events
+    assert "acquire" not in events
+    assert "sample" not in events
 
 
 def test_device_mismatch_and_cancellation_keep_cleanup(
@@ -157,7 +160,8 @@ def test_device_mismatch_and_cancellation_keep_cleanup(
     legacy["_device_identity"] = lambda: {"gfx_target": "gfx9999"}
     with pytest.raises(RuntimeError, match="visible GPU"):
         module.main(["qualify-canary", *common])
-    assert events[-1] == "cleanup" and "sample" not in events
+    assert events[-1] == "cleanup"
+    assert "sample" not in events
     legacy["_device_identity"] = original_device
 
     def cancel(*_args, **_kwargs):
@@ -201,7 +205,11 @@ def test_formal_compiles_before_lease_and_preserves_cleanup(
         (
             {
                 "source": "a.hip",
-                "tuning": producer.TuningSpec("unroll", "UNROLL", (1, 2, 4)),
+                "tuning": producer.TuningSpec(
+                    parameter="unroll",
+                    compiler_macro="UNROLL",
+                    candidates=(1, 2, 4),
+                ),
             },
             {"source": "b.hip"},
         ),
@@ -269,7 +277,10 @@ def test_prepared_binary_drift_is_rejected(load_script, tmp_path):
     binary = tmp_path / "probe.bin"
     binary.write_bytes(b"before")
     prepared = module.CalibrationPreparation(
-        "hipcc", {}, {binary: module.sha256_file(binary)}, {}
+        hipcc="hipcc",
+        binaries={},
+        binary_hashes={binary: module.sha256_file(binary)},
+        spec_evidence={},
     )
     binary.write_bytes(b"after")
     with pytest.raises(ValueError, match="prepared calibration binary drift"):
@@ -346,14 +357,18 @@ def test_precompilation_preserves_counterbalanced_tuning(
     load_script, monkeypatch, tmp_path
 ):
     module = load_script(PRODUCER)
-    tuning = module.TuningSpec("unroll", "UNROLL", (1, 2, 4))
+    tuning = module.TuningSpec(
+        parameter="unroll", compiler_macro="UNROLL", candidates=(1, 2, 4)
+    )
     binaries = {value: tmp_path / str(value) for value in tuning.candidates}
     order = []
 
     def sample(binary, batch, **_kwargs):
         value = int(binary.name)
         order.append((batch, value))
-        return module.SampleBatch(batch, (float(value),) * 7)
+        return module.SampleBatch(
+            process_batch=batch, samples=(float(value),) * 7
+        )
 
     def candidate(_tuning, value, _binary, _batches):
         return {

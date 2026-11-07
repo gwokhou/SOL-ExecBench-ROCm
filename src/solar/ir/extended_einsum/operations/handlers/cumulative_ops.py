@@ -30,14 +30,13 @@ For example, cumsum on input of size N returns output of size N:
 """
 
 import string
-from typing import Any
 
 from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOp,
     EinsumOperand,
     EinsumOpHandler,
 )
-from solar.types import TensorShape, TensorShapes
+from solar.types import DynamicValue, TensorShape, TensorShapes
 
 
 class CumulativeHandler(EinsumOpHandler):
@@ -67,7 +66,7 @@ class CumulativeHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for cumulative operation.
 
@@ -130,8 +129,8 @@ class CumulativeHandler(EinsumOpHandler):
         output_labels = labels.copy()
 
         operands = [
-            EinsumOperand("Input", input_labels, is_output=False),
-            EinsumOperand("Output", output_labels, is_output=True),
+            EinsumOperand(name="Input", dims=input_labels, is_output=False),
+            EinsumOperand(name="Output", dims=output_labels, is_output=True),
         ]
 
         equation = f"{''.join(input_labels)}->{''.join(output_labels)}"

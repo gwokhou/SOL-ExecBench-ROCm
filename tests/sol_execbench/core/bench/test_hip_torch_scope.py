@@ -18,11 +18,13 @@ from sol_execbench.core.bench.rocm_profiler.hip_sdk_models import (
 from sol_execbench.core.bench.rocm_profiler.hip_torch_scope import (
     qualify_torch_scope,
 )
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
 from sol_execbench.core.bench.rocm_profiler.scope_sources import (
     scope_runtime_digests,
 )
 from sol_execbench.core.integrity.checksums import sha256_file
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 APIS = [
     "hipDeviceSynchronize",
@@ -203,7 +205,7 @@ def evidence(tmp_path):
         },
     }
     ledger = {
-        "schema_version": SchemaVersion.HIP_SDK_LEDGER,
+        "schema_version": ProfilerArtifactSchema.HIP_SDK_LEDGER,
         "run_id": expected.run_id,
         "pid": 42,
         "records": rows,
@@ -259,7 +261,8 @@ def test_implicit_dispatch_is_bound_and_event_endpoints_remain_exact(
         (r.predecessor_dispatch_id, r.successor_dispatch_id)
         for r in result.links
     ] == [(3, 6)]
-    assert not result.performance_authority and not result.schedule_complete
+    assert not result.performance_authority
+    assert not result.schedule_complete
     assert HIPTorchScope.model_validate_json(result.model_dump_json()) == result
 
 
@@ -676,7 +679,8 @@ def test_production_qualifies_implicit_dispatches(
     assert result.status == "qualified"
     assert result.implicit_dispatch_ids == [2]
     assert len(result.links) == 1
-    assert not result.schedule_complete and not result.performance_authority
+    assert not result.schedule_complete
+    assert not result.performance_authority
     assert not result.adversarial_attestation
     assert result.copy_domain.qualified
     assert "default_stream_implicit_sync_not_inferred" in map(

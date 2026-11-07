@@ -3,7 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.control_plane_schema_versions import (
+    ExecutionControlSchema,
+)
 from sol_execbench.core.solar_bridge import analyzer
 from sol_execbench.core.solar_bridge.models import (
     SolarReadinessStatus,
@@ -35,7 +37,7 @@ def test_cpu_readiness_wraps_native_result_in_worker_contract(
 
     assert outcome.ready, outcome.message
     assert outcome.ir_path is ir_path
-    assert outcome.schema_version == SchemaVersion.SOLAR_WORKER_IPC
+    assert outcome.schema_version == ExecutionControlSchema.SOLAR_WORKER_IPC
     assert SolarStageAuditOutcome.from_dict(outcome.to_dict()) == outcome
     assert outcome.output_dir is not None
     for artifact in outcome.artifacts:

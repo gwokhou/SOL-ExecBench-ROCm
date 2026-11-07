@@ -92,7 +92,7 @@ _PreparedCase = tuple[
 ]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _CallableInputFactory:
     factory: Callable[[int], Sequence[Any]]
 
@@ -535,7 +535,7 @@ def verify_callable_conversion(
     cases = verification_cases({}, policy)
     results = _run_cases(
         reference,
-        _CallableInputFactory(input_factory),
+        _CallableInputFactory(factory=input_factory),
         graph,
         backend,
         cases,
@@ -717,41 +717,7 @@ def _validated_recorded_tolerance(
     tolerance: Mapping[str, Any],
     required: TolerancePolicy,
 ) -> TolerancePolicy:
-    recorded = VerificationPolicy(
-        atol=float(tolerance.get("atol", math.inf)),
-        rtol=float(tolerance.get("rtol", math.inf)),
-        required_matched_ratio=float(
-            tolerance.get("required_matched_ratio", -1.0),
-        ),
-        max_error_cap=(
-            float(tolerance["max_error_cap"])
-            if tolerance.get("max_error_cap") is not None
-            else None
-        ),
-        allow_negative_inf=bool(
-            tolerance.get("allow_negative_inf", False),
-        ),
-        preserved_input_indices=tuple(
-            int(index)
-            for index in tolerance.get("preserved_input_indices") or ()
-        ),
-        verify_gradients=bool(tolerance.get("verify_gradients", True)),
-        gradient_input_indices=(
-            tuple(int(index) for index in tolerance["gradient_input_indices"])
-            if tolerance.get("gradient_input_indices") is not None
-            else None
-        ),
-        gradient_atol=(
-            float(tolerance["gradient_atol"])
-            if tolerance.get("gradient_atol") is not None
-            else None
-        ),
-        gradient_rtol=(
-            float(tolerance["gradient_rtol"])
-            if tolerance.get("gradient_rtol") is not None
-            else None
-        ),
-    )
+    recorded = _recorded_tolerance(tolerance)
     cap_is_weaker = required.max_error_cap is not None and (
         recorded.max_error_cap is None
         or recorded.max_error_cap > required.max_error_cap
@@ -764,29 +730,37 @@ def _validated_recorded_tolerance(
         or recorded.rtol > required.rtol
         or recorded.required_matched_ratio < required.required_matched_ratio
         or cap_is_weaker
-        or recorded.allow_negative_inf
-        and not required.allow_negative_inf
-        or isinstance(required, VerificationPolicy)
-        and recorded.preserved_input_indices
-        != tuple(required.preserved_input_indices)
-        or isinstance(required, VerificationPolicy)
-        and recorded.verify_gradients != required.verify_gradients
-        or isinstance(required, VerificationPolicy)
-        and recorded.gradient_input_indices != required.gradient_input_indices
-        or isinstance(required, VerificationPolicy)
-        and required.verify_gradients
-        and any(
-            (
-                getattr(recorded, f"gradient_{name}")
-                if getattr(recorded, f"gradient_{name}") is not None
-                else getattr(recorded, name)
+        or (recorded.allow_negative_inf and not required.allow_negative_inf)
+        or (
+            isinstance(required, VerificationPolicy)
+            and recorded.preserved_input_indices
+            != tuple(required.preserved_input_indices)
+        )
+        or (
+            isinstance(required, VerificationPolicy)
+            and recorded.verify_gradients != required.verify_gradients
+        )
+        or (
+            isinstance(required, VerificationPolicy)
+            and recorded.gradient_input_indices
+            != required.gradient_input_indices
+        )
+        or (
+            isinstance(required, VerificationPolicy)
+            and required.verify_gradients
+            and any(
+                (
+                    getattr(recorded, f"gradient_{name}")
+                    if getattr(recorded, f"gradient_{name}") is not None
+                    else getattr(recorded, name)
+                )
+                > (
+                    getattr(required, f"gradient_{name}")
+                    if getattr(required, f"gradient_{name}") is not None
+                    else getattr(required, name)
+                )
+                for name in ("atol", "rtol")
             )
-            > (
-                getattr(required, f"gradient_{name}")
-                if getattr(required, f"gradient_{name}") is not None
-                else getattr(required, name)
-            )
-            for name in ("atol", "rtol")
         )
     ):
         raise VerificationError(
@@ -851,3 +825,42 @@ def _validated_replay_device(
                 )
     require_current_semantic_runtime(execution)
     return replay_device
+
+
+def _recorded_tolerance(tolerance: Mapping[str, Any]) -> VerificationPolicy:
+    """Decode the recorded tolerance and gradient verification fields."""
+    return VerificationPolicy(
+        atol=float(tolerance.get("atol", math.inf)),
+        rtol=float(tolerance.get("rtol", math.inf)),
+        required_matched_ratio=float(
+            tolerance.get("required_matched_ratio", -1.0),
+        ),
+        max_error_cap=(
+            float(tolerance["max_error_cap"])
+            if tolerance.get("max_error_cap") is not None
+            else None
+        ),
+        allow_negative_inf=bool(
+            tolerance.get("allow_negative_inf", False),
+        ),
+        preserved_input_indices=tuple(
+            int(index)
+            for index in tolerance.get("preserved_input_indices") or ()
+        ),
+        verify_gradients=bool(tolerance.get("verify_gradients", True)),
+        gradient_input_indices=(
+            tuple(int(index) for index in tolerance["gradient_input_indices"])
+            if tolerance.get("gradient_input_indices") is not None
+            else None
+        ),
+        gradient_atol=(
+            float(tolerance["gradient_atol"])
+            if tolerance.get("gradient_atol") is not None
+            else None
+        ),
+        gradient_rtol=(
+            float(tolerance["gradient_rtol"])
+            if tolerance.get("gradient_rtol") is not None
+            else None
+        ),
+    )

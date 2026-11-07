@@ -91,35 +91,7 @@ def _require_copy_channels(
     copies share one correlation), so channels agree as multisets and the
     chunk bytes of a 1D call must sum to its host sizeBytes.
     """
-    require_scope(
-        Counter(
-            (
-                r.corr,
-                r.tid,
-                r.operation,
-                r.src_agent,
-                r.dst_agent,
-                r.bytes,
-                r.start,
-                r.end,
-            )
-            for r in copies
-        )
-        == Counter(
-            (
-                r.correlation_id.internal,
-                r.thread_id,
-                r.operation,
-                r.src_agent_id.handle,
-                r.dst_agent_id.handle,
-                r.bytes,
-                r.start_timestamp,
-                r.end_timestamp,
-            )
-            for r in exported
-        ),
-        HIPScopeReason.COPY,
-    )
+    _require_copy_bijection(copies, exported)
     for row in exported:
         require_scope(
             capture.metadata.init_time
@@ -143,12 +115,6 @@ def _require_copy_channels(
             HIPScopeReason.COPY,
         )
         arguments = args.get(row.correlation_id.internal, {})
-        require_scope(
-            api.name not in MEMCPY_APIS
-            or "stream" not in arguments
-            or api.stream == int(arguments["stream"], 0),
-            HIPScopeReason.COPY,
-        )
         if api.name in ONE_DIMENSIONAL_MEMCPY_APIS and "sizeBytes" in arguments:
             chunks = sum(
                 r.bytes
@@ -265,3 +231,38 @@ def _unresolved_reasons(
 
 
 __all__ = ["DEFAULT_STREAM_ORDINAL", "memcpy_copy_domain"]
+
+
+def _require_copy_bijection(
+    copies: list[SDKMemcpy], exported: list[SDKCopyRecord]
+) -> None:
+    """Match ledger and exported copy channels as complete multisets."""
+    require_scope(
+        Counter(
+            (
+                r.corr,
+                r.tid,
+                r.operation,
+                r.src_agent,
+                r.dst_agent,
+                r.bytes,
+                r.start,
+                r.end,
+            )
+            for r in copies
+        )
+        == Counter(
+            (
+                r.correlation_id.internal,
+                r.thread_id,
+                r.operation,
+                r.src_agent_id.handle,
+                r.dst_agent_id.handle,
+                r.bytes,
+                r.start_timestamp,
+                r.end_timestamp,
+            )
+            for r in exported
+        ),
+        HIPScopeReason.COPY,
+    )

@@ -93,7 +93,9 @@ def test_m09_four_points_forward_oracle_and_pareto_units(request_profile):
         resource_work={"valu": {"fp32": 120}},
         total_unfused_bytes=80,
         external_reads=ExternalReads(
-            AccessQuality.EXACT, (AccessReason.STATIC,), DEFAULT_ACCESS_BUDGET
+            quality=AccessQuality.EXACT,
+            reasons=(AccessReason.STATIC,),
+            budget=DEFAULT_ACCESS_BUDGET,
         ),
     )
     formal = FormalAnalysis(
@@ -196,7 +198,10 @@ def test_huge_cache_coordinate_is_cheap_and_does_not_expand_tensor_storage(
 ):
     request, profile = request_profile
     profile = replace(
-        profile, memory_hierarchy=(MemoryLevel("cache", "device", 1),)
+        profile,
+        memory_hierarchy=(
+            MemoryLevel(name="cache", scope="device", capacity_bytes=1),
+        ),
     )
     request = request.model_copy(
         update={
@@ -230,7 +235,7 @@ def test_huge_cache_coordinate_is_cheap_and_does_not_expand_tensor_storage(
     ids=["duplicate", "no-baseline", "fractional-capacity", "dram-capacity"],
 )
 def test_invalid_axes_are_rejected(axis):
-    with pytest.raises(ValueError, match="axis|axes"):
+    with pytest.raises(ValueError, match=r"axis|axes"):
         ScanAxis.model_validate(axis)
 
 
@@ -245,6 +250,9 @@ def test_existing_audit_request_cannot_qualify_scan(request_profile):
 def test_profile_roundtrip_preserves_absent_cache_source(request_profile):
     _, profile = request_profile
     profile = replace(
-        profile, memory_hierarchy=(MemoryLevel("cache", "device", 64),)
+        profile,
+        memory_hierarchy=(
+            MemoryLevel(name="cache", scope="device", capacity_bytes=64),
+        ),
     )
     assert ArchitectureProfile.load(profile.to_dict()) == profile

@@ -40,7 +40,7 @@ class DemandDeclinedError(Exception):
         self.reason = reason
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class DemandWork:
     """Reserve coordinate/term work before allocating; check time between nodes."""
 
@@ -75,7 +75,7 @@ class DemandKind(StrEnum):
     BOUNDARY = "boundary"
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class DemandPlan:
     """Logical flat-index mappings; no tensor values or Python reference code."""
 
@@ -114,9 +114,9 @@ def flat_index(point: tuple[int, ...], shape: tuple[int, ...]) -> int:
 
 def _boundary(layer: IntrinsicLayer, reason: DemandReason) -> DemandPlan:
     return DemandPlan(
-        layer,
-        DemandKind.BOUNDARY,
-        str(layer_operation(layer.data.layer).get("target", "")),
+        layer=layer,
+        kind=DemandKind.BOUNDARY,
+        target=str(layer_operation(layer.data.layer).get("target", "")),
         boundary=reason,
     )
 
@@ -147,7 +147,10 @@ def _view_plan(layer: IntrinsicLayer, work: DemandWork) -> DemandPlan:
         for view in views
     )
     return DemandPlan(
-        layer, DemandKind.VIEW, str(semantic["target"]), maps=maps
+        layer=layer,
+        kind=DemandKind.VIEW,
+        target=str(semantic["target"]),
+        maps=maps,
     )
 
 
@@ -182,9 +185,9 @@ def _pointwise_plan(layer: IntrinsicLayer, work: DemandWork) -> DemandPlan:
             )
         )
     return DemandPlan(
-        layer,
-        DemandKind.POINTWISE,
-        str(layer_operation(data.layer)["target"]),
+        layer=layer,
+        kind=DemandKind.POINTWISE,
+        target=str(layer_operation(data.layer)["target"]),
         maps=tuple(maps),
     )
 
@@ -217,7 +220,10 @@ def _triangle_plan(layer: IntrinsicLayer, work: DemandWork) -> DemandPlan:
         )
     )
     return DemandPlan(
-        layer, DemandKind.TRIANGLE, target, structural_zeros=zeros
+        layer=layer,
+        kind=DemandKind.TRIANGLE,
+        target=target,
+        structural_zeros=zeros,
     )
 
 
@@ -287,9 +293,9 @@ def _contraction_plan(
         for p in coordinates(tuple(sizes[label] for label in labels), work)
     )
     return DemandPlan(
-        layer,
-        DemandKind.CONTRACTION,
-        str(layer_operation(data.layer).get("target", "einsum")),
+        layer=layer,
+        kind=DemandKind.CONTRACTION,
+        target=str(layer_operation(data.layer).get("target", "einsum")),
         terms=triples,
     )
 

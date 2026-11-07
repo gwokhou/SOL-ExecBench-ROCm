@@ -48,6 +48,7 @@ from typing import Any
 
 import networkx as nx
 
+from solar.composition import BoundComponent
 from solar.ir.extended_einsum.equations import (
     validate_tensor_names_match_shapes,
 )
@@ -60,9 +61,6 @@ from solar.ir.extended_einsum.operations.conversion import (
     OperationRepresentation,
     default_operation_representation,
 )
-from solar.ir.extended_einsum.torchview.converter_contract import (
-    ConverterMixinContract,
-)
 from solar.ir.extended_einsum.torchview.converter_models import (
     ConversionError,
     ConvertedTensorMetadata,
@@ -72,7 +70,7 @@ from solar.types import TensorShapes
 PathLike = str | Path
 
 
-class ConverterLayersMixin(ConverterMixinContract):
+class GeneralOperationConverter(BoundComponent):
     """Build normalized extended-einsum layers and connections."""
 
     def _find_entry_node_for_predecessor(

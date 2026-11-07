@@ -6,11 +6,15 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import TypedDict
 
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+    ProfilerSessionArtifactKind,
+)
 from sol_execbench.core.bench.timing_policy import (
     TimingActivityDomain,
     TimingBackend,
@@ -19,9 +23,6 @@ from sol_execbench.core.bench.timing_policy import (
 from sol_execbench.core.evidence import CANONICAL_BENCHMARK_OUTPUT
 from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeGPUTelemetry,
-)
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
 )
 from sol_execbench.core.text_utils import normalize_ascii_alnum, text_tail
 
@@ -115,7 +116,7 @@ PROFILE_OUTPUT_DIR_NAMES = {
 }
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Rocprofv3ProfileArtifact:
     """One profiler artifact registered from a `rocprofv3` output directory."""
 
@@ -127,7 +128,7 @@ class Rocprofv3ProfileArtifact:
         """Normalize boundary input and reject unknown artifact kinds."""
         object.__setattr__(self, "kind", Rocprofv3ArtifactKind(self.kind))
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """Return a JSON-serializable artifact payload."""
         return {
             "path": str(self.path),
@@ -151,7 +152,7 @@ class Rocprofv3ProfileRequest:
     timeout_seconds: int | None = None
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Rocprofv3ProfileResult:
     """Result metadata for optional `rocprofv3` artifact collection."""
 
@@ -178,7 +179,11 @@ class Rocprofv3ProfileResult:
     environment_snapshots: tuple[RuntimeGPUTelemetry, ...] = ()
     schema_version: str = field(
         init=False,
-        default=SchemaVersion.ROCPROFV3_PROFILE,
+        default=ProfilerArtifactSchema.ROCPROFV3_SESSION,
+    )
+    artifact_kind: str = field(
+        init=False,
+        default=ProfilerSessionArtifactKind.PROFILE,
     )
 
     def __post_init__(self) -> None:
@@ -233,10 +238,11 @@ class Rocprofv3ProfileResult:
         """
         return has_profiler_data_artifact(self.artifacts)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """Return a JSON-serializable diagnostic sidecar payload."""
         return {
             "schema_version": self.schema_version,
+            "artifact_kind": self.artifact_kind,
             "status": self.status,
             "diagnostic_only": True,
             "score_authority": False,
@@ -266,7 +272,7 @@ class Rocprofv3ProfileResult:
         }
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Rocprofv3TimingRow:
     """One normalized timing row parsed from `rocprofv3` CSV output."""
 
@@ -286,7 +292,7 @@ class Rocprofv3TimingRow:
         normalized = normalize_ascii_alnum(self.domain)
         return "kernel" in normalized
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """Return a JSON-serializable row payload."""
         return {
             "name": self.name,
@@ -298,7 +304,7 @@ class Rocprofv3TimingRow:
         }
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Rocprofv3TimingEvidence:
     """Derived profiler timing evidence for one profiled command."""
 
@@ -319,7 +325,7 @@ class Rocprofv3TimingEvidence:
     profiler_overhead_ms: float | None = None
     schema_version: str = field(
         init=False,
-        default=SchemaVersion.ROCPROFV3_TIMING,
+        default=ProfilerArtifactSchema.ROCPROFV3_TIMING,
     )
     derived: bool = True
     canonical_output: str = CANONICAL_BENCHMARK_OUTPUT
@@ -333,7 +339,7 @@ class Rocprofv3TimingEvidence:
             if row.is_kernel_activity
         )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """Return a JSON-serializable evidence payload."""
         return {
             "schema_version": self.schema_version,
@@ -358,7 +364,7 @@ class Rocprofv3TimingEvidence:
         }
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class DefaultTimingSelection:
     """Policy-aware decision for profiler-backed timing or fallback."""
 
@@ -367,7 +373,7 @@ class DefaultTimingSelection:
     fallback_applied: bool
     reason: str
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """Return a JSON-serializable selection payload."""
         return {
             "policy": self.policy.to_dict(),
@@ -375,6 +381,23 @@ class DefaultTimingSelection:
             "fallback_applied": self.fallback_applied,
             "reason": self.reason,
         }
+
+
+class Rocprofv3ExecutionArguments(TypedDict):
+    """Typed shared arguments used to convert profiler requests."""
+
+    application_command: tuple[str, ...]
+    output_directory: Path
+    output_file: str
+    tool_version: str
+    gpu_architecture: str
+    executable: str
+    warmup_runs: int | None
+    iterations: int | None
+    min_measurement_time_seconds: float | None
+    trial_count: int | None
+    clock_locked: bool | None
+    timeout_seconds: float
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -394,11 +417,21 @@ class Rocprofv3ExecutionRequest:
     clock_locked: bool | None = None
     timeout_seconds: float = 300.0
 
-    def execution_arguments(self) -> dict[str, Any]:
+    def execution_arguments(self) -> Rocprofv3ExecutionArguments:
         """Return every shared field for lossless request conversion."""
         return {
-            item.name: getattr(self, item.name)
-            for item in fields(Rocprofv3ExecutionRequest)
+            "application_command": self.application_command,
+            "output_directory": self.output_directory,
+            "output_file": self.output_file,
+            "tool_version": self.tool_version,
+            "gpu_architecture": self.gpu_architecture,
+            "executable": self.executable,
+            "warmup_runs": self.warmup_runs,
+            "iterations": self.iterations,
+            "min_measurement_time_seconds": self.min_measurement_time_seconds,
+            "trial_count": self.trial_count,
+            "clock_locked": self.clock_locked,
+            "timeout_seconds": self.timeout_seconds,
         }
 
 
@@ -428,7 +461,7 @@ class SourceTimingRequest(Rocprofv3ExecutionRequest):
         )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Rocprofv3CollectionResult:
     """Result of live profiler collection or explicit fallback routing."""
 
@@ -459,7 +492,7 @@ class Rocprofv3CollectionResult:
         """Whether live profiler evidence was collected and parsed."""
         return self.evidence is not None and not self.selection.fallback_applied
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """Return a JSON-serializable collection result payload."""
         return {
             "profiler_collected": self.profiler_collected,

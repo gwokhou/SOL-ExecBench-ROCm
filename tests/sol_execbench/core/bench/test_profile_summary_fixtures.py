@@ -6,12 +6,14 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+)
 from sol_execbench.core.bench.profile_summary import (
     ProfileSummarySidecar,
     evaluate_profile_summary_governance,
     validate_profile_summary_freshness,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 FIXTURE_DIR = REPO_ROOT / "tests/sol_execbench/fixtures/profile_summary"
@@ -154,7 +156,7 @@ def test_profile_summary_docs_explain_hip_mapping_and_fixture_semantics():
     for expected in (
         "HIP Consumer Mapping",
         "profile_summary.sidecar",
-        SchemaVersion.PROFILE_SUMMARY,
+        PerformanceArtifactSchema.PROFILE_SUMMARY,
         "summary.profiler_status",
         "summary.metrics[]",
         "summary.workload_metrics[]",

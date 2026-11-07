@@ -26,7 +26,9 @@ from sol_execbench.core.bench.batch_gpu_qualification import (
     BatchGPUQualificationStage,
 )
 from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarStatus
-from sol_execbench.core.bench.performance_model.builder import _load_calibration
+from sol_execbench.core.bench.performance_model.calibration_loader import (
+    load_calibration_profile,
+)
 from sol_execbench.core.bench.performance_model.corpus_preflight import (
     DiagnosticCorpusCase,
     DiagnosticCorpusDesign,
@@ -294,7 +296,7 @@ def _validate_calibration(profile: Path, audit: Path) -> None:
         raise ValueError(
             "calibration audit path does not match production loader"
         )
-    if _load_calibration(profile) is None:
+    if load_calibration_profile(profile) is None:
         raise ValueError("calibration profile is unavailable")
     load_calibration_gpu_identity(
         profile,

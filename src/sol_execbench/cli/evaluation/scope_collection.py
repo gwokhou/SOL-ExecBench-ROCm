@@ -28,9 +28,11 @@ from sol_execbench.core.bench.rocm_profiler.hip_causality_json import (
     MAX_SDK_API_RECORDS,
 )
 from sol_execbench.core.bench.rocm_profiler.models import Rocprofv3ProfileResult
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
 from sol_execbench.core.bench.safetensors_io import flashinfer_safetensors_env
 from sol_execbench.core.data.json_utils import atomic_write_json_value
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 
 
@@ -52,7 +54,7 @@ def collect_evaluate_scope(
         SCOPE_TOOL_ENV: str(tool),
         SCOPE_LEDGER_ENV: str(directory / SCOPE_LEDGER_FILE),
         SCOPE_RUN_ENV: intent.run_id,
-        SCOPE_SCHEMA_ENV: str(SchemaVersion.HIP_SDK_LEDGER),
+        SCOPE_SCHEMA_ENV: str(ProfilerArtifactSchema.HIP_SDK_LEDGER),
         SCOPE_MAX_ROWS_ENV: str(MAX_SDK_API_RECORDS),
     }
 

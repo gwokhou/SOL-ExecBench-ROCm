@@ -14,11 +14,13 @@ from sol_execbench.core.bench.eval_runtime import (
     run_reward_hack_check,
 )
 from sol_execbench.core.bench.eval_workload_runner import evaluate_workloads
+from sol_execbench.core.bench.evaluation import make_eval
 from sol_execbench.core.bench.evaluation_requests import (
     EvaluationDependencies,
     WorkloadEvaluationRequest,
 )
 from sol_execbench.core.bench.io import allocate_outputs, gen_inputs
+from sol_execbench.core.bench.output_collection import call_and_collect_outputs
 from sol_execbench.core.bench.reference_protocol import connect_reference_worker
 from sol_execbench.core.bench.reward_hack import (
     RewardHackError,
@@ -32,7 +34,6 @@ from sol_execbench.core.bench.reward_hack import (
     snapshot_runtime_integrity,
     verify_timing_function_intact,
 )
-from sol_execbench.core.bench.utils import call_and_collect_outputs, make_eval
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype
 from sol_execbench.core.data.json_utils import atomic_write_jsonl_values

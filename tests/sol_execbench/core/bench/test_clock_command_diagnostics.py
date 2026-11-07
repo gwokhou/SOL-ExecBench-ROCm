@@ -56,7 +56,8 @@ def test_setup_failure_persists_bounded_redacted_output(
     assert event["returncode"] == 1
     assert event["stdout"] == "setup stdout"
     assert event["stderr"].endswith("password=<redacted>\nsetup rejected")
-    assert len(event["stderr"]) <= 4096 and event["stderr_truncated"]
+    assert len(event["stderr"]) <= 4096
+    assert event["stderr_truncated"]
     assert event["command"] == [
         "sudo",
         "-n",
@@ -87,7 +88,8 @@ def test_restore_failure_persists_output_and_still_returns_false(
     monkeypatch.setattr(clock_lock.subprocess, "run", fail)
     assert clock_lock.unlock_clocks(UUID) is False
     (event,) = diagnostics(diagnostic_log)
-    assert event["phase"] == "restore" and event["returncode"] == 1
+    assert event["phase"] == "restore"
+    assert event["returncode"] == 1
     assert event["stdout"] == "restore stdout"
     assert event["stderr"] == "restore rejected"
     assert event["command"] == [
@@ -190,7 +192,5 @@ def test_setup_timeout_or_missing_executable_preserves_failure(
         "TimeoutExpired" if failure == "timeout" else "FileNotFoundError"
     )
     if failure == "timeout":
-        assert (
-            event["stdout"] == "partial stdout"
-            and event["stderr"] == "partial stderr"
-        )
+        assert event["stdout"] == "partial stdout"
+        assert event["stderr"] == "partial stderr"

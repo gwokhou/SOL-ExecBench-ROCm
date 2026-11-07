@@ -19,7 +19,7 @@ class CalibrationPhase(StrEnum):
     FINALIZE = "cpu_finalize"
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class CalibrationTimings:
     """Emit bounded phase durations even when a phase raises or is cancelled."""
 

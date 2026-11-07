@@ -33,7 +33,7 @@ DEFAULT_ACCESS_CELLS = 2_000_000
 DEFAULT_ACCESS_SECONDS = 1.0
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AccessBudget:
     """All behavior-changing limits for one union query."""
 
@@ -62,7 +62,7 @@ class AccessBudget:
 DEFAULT_ACCESS_BUDGET = AccessBudget()
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AccessFootprint:
     """Element count and proof status for a single base and epoch."""
 
@@ -77,7 +77,7 @@ class _BudgetExceededError(Exception):
         self.reason = reason
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class _WorkBudget:
     remaining: int
     deadline: float
@@ -140,14 +140,24 @@ def union_boxes(
     floor = max((_box_elements(box) for box in boxes), default=0)
     if len(boxes) > budget.regions:
         return AccessFootprint(
-            floor, AccessQuality.LOWER_BOUND, AccessReason.REGION_BUDGET
+            elements=floor,
+            quality=AccessQuality.LOWER_BOUND,
+            reason=AccessReason.REGION_BUDGET,
         )
-    work = _WorkBudget(budget.cells, monotonic() + budget.seconds)
+    work = _WorkBudget(
+        remaining=budget.cells, deadline=monotonic() + budget.seconds
+    )
     try:
         elements = _union_size(boxes, work)
     except _BudgetExceededError as exc:
-        return AccessFootprint(floor, AccessQuality.LOWER_BOUND, exc.reason)
-    return AccessFootprint(elements, AccessQuality.EXACT, AccessReason.STATIC)
+        return AccessFootprint(
+            elements=floor, quality=AccessQuality.LOWER_BOUND, reason=exc.reason
+        )
+    return AccessFootprint(
+        elements=elements,
+        quality=AccessQuality.EXACT,
+        reason=AccessReason.STATIC,
+    )
 
 
 def _flat_boxes(
@@ -185,7 +195,9 @@ def union_accesses(
 ) -> AccessFootprint:
     """Count one base/epoch; reject incompatible identities before combining."""
     if not accesses:
-        return AccessFootprint(0, AccessQuality.EXACT, AccessReason.STATIC)
+        return AccessFootprint(
+            elements=0, quality=AccessQuality.EXACT, reason=AccessReason.STATIC
+        )
     first = accesses[0]
     identity = (first.base_id, first.base_shape, first.dtype, first.epoch)
     if any(
@@ -196,7 +208,9 @@ def union_accesses(
             "access union requires one base, shape, dtype and effect epoch"
         )
     floor = max(a.elements for a in accesses)
-    work = _WorkBudget(budget.cells, monotonic() + budget.seconds)
+    work = _WorkBudget(
+        remaining=budget.cells, deadline=monotonic() + budget.seconds
+    )
     try:
         boxes: list[Box] = []
         for view in accesses:
@@ -207,5 +221,11 @@ def union_accesses(
             raise _BudgetExceededError(AccessReason.REGION_BUDGET)
         elements = _union_size(boxes, work)
     except _BudgetExceededError as exc:
-        return AccessFootprint(floor, AccessQuality.LOWER_BOUND, exc.reason)
-    return AccessFootprint(elements, AccessQuality.EXACT, AccessReason.STATIC)
+        return AccessFootprint(
+            elements=floor, quality=AccessQuality.LOWER_BOUND, reason=exc.reason
+        )
+    return AccessFootprint(
+        elements=elements,
+        quality=AccessQuality.EXACT,
+        reason=AccessReason.STATIC,
+    )

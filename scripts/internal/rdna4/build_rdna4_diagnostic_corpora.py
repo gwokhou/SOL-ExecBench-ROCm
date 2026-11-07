@@ -30,12 +30,17 @@ from sol_execbench.cli.evaluation.profile_mode import ProfileMode
 from sol_execbench.cli.sidecars.static_evidence import _static_evidence_payload
 from sol_execbench.core.bench.batch_gpu_qualification import (
     BatchGPUQualificationStage,
+    qualification_parent_stage,
 )
 from sol_execbench.core.bench.config import BenchmarkConfig
 from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarStatus
 from sol_execbench.core.bench.performance_model.corpus_preflight import (
     DiagnosticCorpusDesign,
     preflight,
+)
+from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
+    DiagnosticArtifactSchema,
+    DiagnosticCorpusDesignArtifactKind,
 )
 from sol_execbench.core.bench.performance_model.evidence_manifest import (
     PerformanceEvidenceArtifact,
@@ -100,11 +105,11 @@ from sol_execbench.core.data.json_utils import (
     load_json_value,
     load_jsonl_file,
 )
+from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
 from sol_execbench.core.data.solution_instance import Solution
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_NATIVE_COMPILE_CACHE,
     ENV_SOL_EXECBENCH_SOURCE_REVISION,
@@ -478,7 +483,7 @@ _QUALIFICATION_FAMILY_ORDER = (
 )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CaseSpec:
     """One workload in the preregistered three-way stratified split."""
 
@@ -720,59 +725,61 @@ def _transformer_shape(global_index: int) -> dict[str, int]:
     return {"M": sequence, "N": TRANSFORMER_CHANNELS}
 
 
+def _elementwise_shape(global_index: int) -> dict[str, int]:
+    for start, factory in (
+        (FRESH_SUCCESSOR_START, _fresh_elementwise_shape),
+        (REPLAY_RECOVERY_SUCCESSOR_START, _replay_recovery_elementwise_shape),
+        (
+            TWO_FAMILY_REPLACEMENT_SUCCESSOR_START,
+            _two_family_replacement_elementwise_shape,
+        ),
+        (FULL_REPLACEMENT_SUCCESSOR_START, _full_replacement_elementwise_shape),
+    ):
+        if start <= global_index < start + UNIVERSE_CASES_PER_FAMILY:
+            return factory(global_index)
+    return {
+        "M": 512 + 64 * global_index,
+        "N": 768 + 32 * ((17 * global_index) % 40),
+    }
+
+
+def _transpose_shape(global_index: int) -> dict[str, int]:
+    for start, factory in (
+        (FRESH_SUCCESSOR_START, _fresh_transpose_shape),
+        (REPLAY_RECOVERY_SUCCESSOR_START, _replay_recovery_transpose_shape),
+        (
+            TWO_FAMILY_REPLACEMENT_SUCCESSOR_START,
+            _two_family_replacement_transpose_shape,
+        ),
+    ):
+        if start <= global_index < start + UNIVERSE_CASES_PER_FAMILY:
+            return factory(global_index)
+    return {
+        "M": 513 + 53 * global_index,
+        "N": 769 + 37 * ((13 * global_index) % 40),
+    }
+
+
+def _matmul_shape(global_index: int) -> dict[str, int]:
+    if global_index >= PAIR_DISJOINT_SUCCESSOR_START:
+        rows = SUCCESSOR_MATMUL_ROWS_START + (
+            SUCCESSOR_MATMUL_ROWS_STRIDE
+            * (global_index - PAIR_DISJOINT_SUCCESSOR_START)
+        )
+    else:
+        rows = 64 + 16 * (global_index % 10)
+    return {
+        "M": rows,
+        "N": 80 + 16 * ((7 * global_index) % 10),
+        "K": 64 + 16 * ((3 * global_index) % 13),
+    }
+
+
 def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
     if family is WorkloadKind.ELEMENTWISE:
-        if (
-            FRESH_SUCCESSOR_START
-            <= global_index
-            < FRESH_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
-        ):
-            return _fresh_elementwise_shape(global_index)
-        if (
-            REPLAY_RECOVERY_SUCCESSOR_START
-            <= global_index
-            < REPLAY_RECOVERY_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
-        ):
-            return _replay_recovery_elementwise_shape(global_index)
-        if (
-            TWO_FAMILY_REPLACEMENT_SUCCESSOR_START
-            <= global_index
-            < TWO_FAMILY_REPLACEMENT_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
-        ):
-            return _two_family_replacement_elementwise_shape(global_index)
-        if (
-            FULL_REPLACEMENT_SUCCESSOR_START
-            <= global_index
-            < FULL_REPLACEMENT_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
-        ):
-            return _full_replacement_elementwise_shape(global_index)
-        return {
-            "M": 512 + 64 * global_index,
-            "N": 768 + 32 * ((17 * global_index) % 40),
-        }
+        return _elementwise_shape(global_index)
     if family is WorkloadKind.TRANSPOSE:
-        if (
-            FRESH_SUCCESSOR_START
-            <= global_index
-            < FRESH_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
-        ):
-            return _fresh_transpose_shape(global_index)
-        if (
-            REPLAY_RECOVERY_SUCCESSOR_START
-            <= global_index
-            < REPLAY_RECOVERY_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
-        ):
-            return _replay_recovery_transpose_shape(global_index)
-        if (
-            TWO_FAMILY_REPLACEMENT_SUCCESSOR_START
-            <= global_index
-            < TWO_FAMILY_REPLACEMENT_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
-        ):
-            return _two_family_replacement_transpose_shape(global_index)
-        return {
-            "M": 513 + 53 * global_index,
-            "N": 769 + 37 * ((13 * global_index) % 40),
-        }
+        return _transpose_shape(global_index)
     if family is WorkloadKind.REDUCTION:
         calibrated_widths = (32, 64, 128, 256, 512, 1024)
         return {
@@ -796,22 +803,7 @@ def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
             "M": 32 + 8 * (global_index - HISTORICAL_UNIVERSE_START),
             "N": 768,
         }
-    if (
-        family is WorkloadKind.MATMUL
-        and global_index >= PAIR_DISJOINT_SUCCESSOR_START
-    ):
-        return {
-            "M": SUCCESSOR_MATMUL_ROWS_START
-            + SUCCESSOR_MATMUL_ROWS_STRIDE
-            * (global_index - PAIR_DISJOINT_SUCCESSOR_START),
-            "N": 80 + 16 * ((7 * global_index) % 10),
-            "K": 64 + 16 * ((3 * global_index) % 13),
-        }
-    return {
-        "M": 64 + 16 * (global_index % 10),
-        "N": 80 + 16 * ((7 * global_index) % 10),
-        "K": 64 + 16 * ((3 * global_index) % 13),
-    }
+    return _matmul_shape(global_index)
 
 
 def _representative_transformer_sequence(global_index: int) -> int:
@@ -875,7 +867,8 @@ def _design_payload(
         *_cases("held_out", universe_start),
     ]
     payload: dict[str, Any] = {
-        "schema_version": SchemaVersion.RDNA4_DIAGNOSTIC_CORPUS_DESIGN.value,
+        "schema_version": DiagnosticArtifactSchema.DIAGNOSTIC_CORPUS_DESIGN.value,
+        "artifact_kind": DiagnosticCorpusDesignArtifactKind.DESIGN.value,
         "design": "adjacent_shape_stratified_three_way_rotation",
         "universe_start": universe_start,
         "universe_cases_per_family": UNIVERSE_CASES_PER_FAMILY,
@@ -1004,7 +997,7 @@ def _workload(case: CaseSpec, output_name: str) -> dict[str, object]:
         inputs = {"input": {"type": "random"}}
         tolerance = 0.01 if case.family is WorkloadKind.REDUCTION else 1e-5
     return {
-        "schema_version": SchemaVersion.WORKLOAD,
+        "schema_version": BenchmarkArtifactSchema.WORKLOAD,
         "axes": case.axes,
         "inputs": inputs,
         "uuid": case.workload_uuid,
@@ -1777,16 +1770,6 @@ def _cases_by_family(cases: Sequence[CaseSpec]) -> list[list[CaseSpec]]:
     ]
 
 
-def _expected_parent_stage(
-    stage: BatchGPUQualificationStage,
-) -> BatchGPUQualificationStage | None:
-    if stage is BatchGPUQualificationStage.STATIC:
-        return None
-    if stage is BatchGPUQualificationStage.CANARY:
-        return BatchGPUQualificationStage.STATIC
-    return BatchGPUQualificationStage.CANARY
-
-
 def _verify_gate_receipts(
     root: Path,
     qualification_root: Path,
@@ -1820,7 +1803,7 @@ def _verify_qualification_gate(
     stage: BatchGPUQualificationStage,
     role: Role | None = None,
 ) -> DiagnosticCorpusQualification:
-    parent_stage = _expected_parent_stage(stage)
+    parent_stage = qualification_parent_stage(stage)
     parent: DiagnosticCorpusQualification | None = None
     if parent_stage is not None:
         parent_role = (
@@ -1894,7 +1877,7 @@ def _run_qualification_stage(
     if stage is BatchGPUQualificationStage.STATIC:
         _ensure_qualification_config(qualification_root)
         _qualification_preflight(root, qualification_root)
-    parent_stage = _expected_parent_stage(stage)
+    parent_stage = qualification_parent_stage(stage)
     parent_hash: str | None = None
     if parent_stage is not None:
         parent_role = (

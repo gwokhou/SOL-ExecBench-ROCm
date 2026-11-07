@@ -27,6 +27,9 @@ from sol_execbench.core.bench.performance_model.lifecycle.identity import (
 from sol_execbench.core.bench.performance_model.lifecycle.models import (
     DiagnosticReleaseLifecycleManifest,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.schema_versions import (
+    DiagnosticLifecycleSchema,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
     published_releases_dir,
     releases_dir,
@@ -43,7 +46,6 @@ from sol_execbench.core.data.json_utils import (
     load_json_file,
 )
 from sol_execbench.core.integrity import SHA256Digest, sha256_file
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.platform.runtime import resolve_tool_path
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 
@@ -86,11 +88,13 @@ class DiagnosticPublishedReleaseAsset(FrozenArtifactModel):
 class DiagnosticPublishedRelease(CurrentFrozenSchemaModel):
     """Immutable receipt reconstructed from downloaded public assets."""
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_PUBLISHED_RELEASE
-
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_PUBLISHED_RELEASE] = (
-        SchemaVersion.DIAGNOSTIC_PUBLISHED_RELEASE
+    current_schema_version = (
+        DiagnosticLifecycleSchema.DIAGNOSTIC_PUBLISHED_RELEASE
     )
+
+    schema_version: Literal[
+        DiagnosticLifecycleSchema.DIAGNOSTIC_PUBLISHED_RELEASE
+    ] = DiagnosticLifecycleSchema.DIAGNOSTIC_PUBLISHED_RELEASE
     release_id: SHA256Digest
     purpose: DiagnosticEvidencePurpose
     repository: str = Field(min_length=3)
@@ -339,6 +343,9 @@ def _verified_downloaded_assets(
         source_revision=attestation.source_revision,
         producer_version=attestation.producer_version,
         archive_size_bytes=attestation.archive.size_bytes,
+        hardware_validation_receipt_sha256=(
+            attestation.hardware_validation.receipt_sha256
+        ),
         purpose=attestation.purpose,
     )
     if expected_release_id != attestation.release_id:

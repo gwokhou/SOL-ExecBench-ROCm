@@ -67,7 +67,8 @@ def test_cache_atomic_concurrent_publication_and_restore(tmp_path):
     assert len(list(cache.root.glob("*/entry.json"))) == 1
     target.write_bytes(b"not a cache edit")
     third = tmp_path / "third" / target.name
-    assert cache.restore(third) and third.read_bytes() == b"same binary"
+    assert cache.restore(third)
+    assert third.read_bytes() == b"same binary"
 
 
 def test_cache_failed_store_removes_partial_entry(tmp_path):

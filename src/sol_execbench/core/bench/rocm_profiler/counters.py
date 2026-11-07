@@ -26,14 +26,14 @@ from sol_execbench.core.bench.performance_model.models import (
     EvidenceReference,
     ResourceFootprint,
 )
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
 from sol_execbench.core.data.base_model import (
     BaseModelWithDocstrings,
     CurrentSchemaModel,
 )
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 from sol_execbench.core.text_utils import normalize_ascii_alnum
 
 MAX_COUNTER_CSV_BYTES = 128 * 1024 * 1024
@@ -89,11 +89,11 @@ class CounterManifest(CurrentSchemaModel):
     """Versioned per-architecture counter selection policy."""
 
     model_config = _MODEL_CONFIG
-    current_schema_version = SchemaVersion.ROCPROFV3_COUNTER_MANIFEST
+    current_schema_version = ProfilerArtifactSchema.ROCPROFV3_COUNTER_MANIFEST
 
-    schema_version: Literal[SchemaVersion.ROCPROFV3_COUNTER_MANIFEST] = (
-        SchemaVersion.ROCPROFV3_COUNTER_MANIFEST
-    )
+    schema_version: Literal[
+        ProfilerArtifactSchema.ROCPROFV3_COUNTER_MANIFEST
+    ] = ProfilerArtifactSchema.ROCPROFV3_COUNTER_MANIFEST
     architecture: str
     rocm_compatibility: str
     groups: list[CounterGroup] = Field(min_length=1)
@@ -115,7 +115,7 @@ class CounterManifest(CurrentSchemaModel):
         return self
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CounterPassCSV:
     """One pass-indexed counter CSV artifact."""
 
@@ -123,7 +123,7 @@ class CounterPassCSV:
     path: Path
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class _MutableDispatch:
     workload_uuid: str
     candidate_sha256: str
@@ -147,7 +147,10 @@ def load_counter_manifest(path: str | Path) -> CounterManifest:
     """Load a strict versioned counter manifest."""
     payload = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
     manifest = CounterManifest.model_validate(payload)
-    if manifest.schema_version != SchemaVersion.ROCPROFV3_COUNTER_MANIFEST:
+    if (
+        manifest.schema_version
+        != ProfilerArtifactSchema.ROCPROFV3_COUNTER_MANIFEST
+    ):
         raise ValueError("unsupported_counter_manifest_schema")
     return manifest
 
@@ -323,7 +326,7 @@ def counter_pass_index(path: str | Path) -> int | None:
 def counter_dispatch_sequence_digest(path: str | Path) -> str:
     """Hash per-queue dispatch order without nondeterministic queue interleaving."""
     parsed = _parse_counter_pass(
-        CounterPassCSV(1, Path(path)),
+        CounterPassCSV(pass_index=1, path=Path(path)),
         workload_uuid="digest",
         candidate_sha256="0" * 64,
     )
@@ -610,7 +613,7 @@ def _dimensions(
         values = [int(value) for value in re.findall(r"\d+", combined)]
         if not values:
             raise ValueError(f"invalid_{combined_name}")
-        padded = values + [1, 1]
+        padded = [*values, 1, 1]
         return padded[0], padded[1], padded[2]
     values = [
         _optional_int(_field(row, f"{prefix}size{axis}", f"{prefix}{axis}"))

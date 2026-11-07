@@ -43,7 +43,7 @@ MAX_MANIFEST_BYTES = 2 * 1024 * 1024
 MAX_REUSE_LAYERS = 10000
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class VerifiedProgram:
     """Owned, hash-checked data; no executable reference or pickle is loaded."""
 
@@ -58,7 +58,7 @@ class VerifiedProgram:
         """Read the source profile from the captured, manifest-bound analysis."""
         metadata = self.prior_analysis.require_mapping("metadata")
         return ArtifactDocument(
-            self.prior_analysis.path, metadata
+            path=self.prior_analysis.path, data=metadata
         ).require_mapping("architecture")
 
 
@@ -143,7 +143,13 @@ def load_verified_program(request: VerifiedProgramRequest) -> VerifiedProgram:
         request.directory / ANALYSIS_FILENAME, captured[ANALYSIS_FILENAME]
     )
     _require_analysis_binding(analysis, manifest, digests[graph_name])
-    return VerifiedProgram(request, manifest, graph, access, analysis)
+    return VerifiedProgram(
+        identity=request,
+        manifest=manifest,
+        graph=graph,
+        access=access,
+        prior_analysis=analysis,
+    )
 
 
 def _validated_graph(

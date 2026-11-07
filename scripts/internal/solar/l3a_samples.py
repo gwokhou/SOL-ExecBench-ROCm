@@ -37,7 +37,7 @@ def data_dependent_branch(value: torch.Tensor) -> torch.Tensor:
     return value * 3.0
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class FocusedSample:
     """One focused pilot sample with CPU-replayable deterministic inputs."""
 
@@ -78,18 +78,22 @@ class FocusedSample:
 
 FOCUSED_SAMPLES: tuple[FocusedSample, ...] = (
     FocusedSample(
-        "mutation_inplace",
-        mutation_inplace,
-        ((16,),),
-        (("a", 8), ("b", 4)),
+        sample_id="mutation_inplace",
+        reference=mutation_inplace,
+        shapes=((16,),),
+        scalar_inputs=(("a", 8), ("b", 4)),
     ),
     FocusedSample(
-        "scalar_constants",
-        scalar_constants,
-        ((5, 7),),
-        (("alpha", 1.5), ("beta", 2.5)),
+        sample_id="scalar_constants",
+        reference=scalar_constants,
+        shapes=((5, 7),),
+        scalar_inputs=(("alpha", 1.5), ("beta", 2.5)),
     ),
-    FocusedSample("data_dependent_branch", data_dependent_branch, ((8,),)),
+    FocusedSample(
+        sample_id="data_dependent_branch",
+        reference=data_dependent_branch,
+        shapes=((8,),),
+    ),
 )
 
 

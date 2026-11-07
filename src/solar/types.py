@@ -29,7 +29,7 @@ TensorShape = list[int]
 NodeDict = dict[str, Any]
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class TensorShapes:
     """Positional tensor shapes for an operation.
 

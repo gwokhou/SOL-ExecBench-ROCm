@@ -37,9 +37,11 @@ from sol_execbench.core.bench.gpu_lock_paths import (
     LEGACY_CLOCK_STATE_DIRECTORY,
     normalize_gpu_uuid,
 )
+from sol_execbench.core.control_plane_schema_versions import (
+    ExecutionControlSchema,
+)
 from sol_execbench.core.data.base_model import CurrentFrozenSchemaModel
 from sol_execbench.core.data.json_utils import atomic_write_json_value
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.platform.amd_smi import AMDSMIListPayload
 from sol_execbench.core.platform.runtime import resolve_rocm_tool_command
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
@@ -80,9 +82,9 @@ class ClockDevice(BaseModel):
 class ClockOwnerRecord(CurrentFrozenSchemaModel):
     """Persistent receipt plus live file lock used for cooperative borrowing."""
 
-    current_schema_version = SchemaVersion.CLOCK_OWNER
-    schema_version: Literal[SchemaVersion.CLOCK_OWNER] = (
-        SchemaVersion.CLOCK_OWNER
+    current_schema_version = ExecutionControlSchema.CLOCK_OWNER
+    schema_version: Literal[ExecutionControlSchema.CLOCK_OWNER] = (
+        ExecutionControlSchema.CLOCK_OWNER
     )
     lease_id: str = Field(pattern=OWNER_TOKEN_PATTERN.pattern)
     devices: tuple[ClockDevice, ...] = Field(min_length=1)

@@ -9,17 +9,15 @@ import pytest
 import torch
 
 from sol_execbench.core.data.definition import Definition
+from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset.aka_equivalence import normalize_outputs
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 
 
 def _contract() -> tuple[Definition, Workload]:
     definition = Definition.model_validate(
         {
-            "schema_version": SchemaVersion.DEFINITION,
+            "schema_version": BenchmarkArtifactSchema.DEFINITION,
             "name": "multi_output",
             "op_type": "test",
             "axes": {"N": {"type": "var", "description": "elements"}},
@@ -47,7 +45,7 @@ def _contract() -> tuple[Definition, Workload]:
     )
     workload = Workload.model_validate(
         {
-            "schema_version": SchemaVersion.WORKLOAD,
+            "schema_version": BenchmarkArtifactSchema.WORKLOAD,
             "axes": {"N": 4},
             "inputs": {"x": {"type": "random"}},
             "checks": [

@@ -17,36 +17,16 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     DiagnosticRetentionClass,
     DiagnosticStageStatus,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.schema_versions import (
+    DiagnosticLifecycleSchema,
+)
 
-_SCHEMA_BY_STAGE = {
-    DiagnosticLifecycleStage.DESIGN: "sol_execbench.diagnostic_lifecycle_design.v2",
-    DiagnosticLifecycleStage.COLLECTION_RUN: (
-        "sol_execbench.diagnostic_lifecycle_collection_run.v2"
-    ),
-    DiagnosticLifecycleStage.CORPUS_SNAPSHOT: (
-        "sol_execbench.diagnostic_lifecycle_corpus_snapshot.v2"
-    ),
-    DiagnosticLifecycleStage.CALIBRATION: (
-        "sol_execbench.diagnostic_lifecycle_calibration.v2"
-    ),
-    DiagnosticLifecycleStage.MODEL_BUILD: (
-        "sol_execbench.diagnostic_lifecycle_model_build.v2"
-    ),
-    DiagnosticLifecycleStage.ACCEPTANCE: (
-        "sol_execbench.diagnostic_lifecycle_acceptance.v2"
-    ),
-    DiagnosticLifecycleStage.PUBLICATION: (
-        "sol_execbench.diagnostic_lifecycle_publication.v2"
-    ),
-    DiagnosticLifecycleStage.RELEASE: (
-        "sol_execbench.diagnostic_lifecycle_release.v2"
-    ),
-}
+_LIFECYCLE_SCHEMA = DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_MANIFEST
 
 
 def _base(stage: DiagnosticLifecycleStage) -> dict[str, object]:
     return {
-        "schema_version": _SCHEMA_BY_STAGE[stage],
+        "schema_version": _LIFECYCLE_SCHEMA,
         "stage": stage,
         "stage_id": "a" * 64,
         "status": DiagnosticStageStatus.VERIFIED,
@@ -141,6 +121,7 @@ def _design_payload() -> dict[str, object]:
                 "archive_sha256": "c1" * 32,
                 "archive_size_bytes": 1234,
                 "attestation_sha256": "d1" * 32,
+                "hardware_validation_receipt_sha256": "e1" * 32,
             },
             DiagnosticReleaseLifecycleManifest,
         ),
@@ -160,17 +141,15 @@ def test_lifecycle_manifest_dispatch_matches_its_stage(
 
 def test_lifecycle_manifest_rejects_wrong_schema_version() -> None:
     payload = _design_payload()
-    payload["schema_version"] = "sol_execbench.diagnostic_lifecycle_release.v2"
-    with pytest.raises(ValidationError, match="archive_sha256"):
+    payload["schema_version"] = "future.v999"
+    with pytest.raises(ValidationError, match="requires schema_version"):
         DIAGNOSTIC_LIFECYCLE_MANIFEST_ADAPTER.validate_python(payload)
 
 
 def test_stage_field_must_match_schema_family() -> None:
     payload = _design_payload()
     payload["stage"] = DiagnosticLifecycleStage.RELEASE
-    # The stage field is not the discriminator; construction still requires a
-    # consistent, schema-current object. The design family rejects a foreign
-    # stage value by a plain validation failure.
+    # The stage is the family discriminator and each concrete model pins it.
     with pytest.raises(ValidationError):
         DiagnosticDesignManifest.model_validate(payload)
 

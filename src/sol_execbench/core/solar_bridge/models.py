@@ -11,8 +11,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
+from sol_execbench.core.control_plane_schema_versions import (
+    ExecutionControlSchema,
 )
 from solar.artifacts.names import (
     ANALYSIS_FILENAME,
@@ -36,18 +36,18 @@ from solar.ir.contracts import (
 
 
 def _require_worker_schema(value: Mapping[str, Any]) -> None:
-    if value.get("schema_version") != SchemaVersion.SOLAR_WORKER_IPC:
+    if value.get("schema_version") != ExecutionControlSchema.SOLAR_WORKER_IPC:
         raise ValueError("SOLAR worker IPC schema mismatch")
 
 
 def _normalize_worker_outcome(value: Any) -> None:
     """Normalize fields shared by distinct worker outcome state machines."""
-    if value.schema_version != SchemaVersion.SOLAR_WORKER_IPC:
+    if value.schema_version != ExecutionControlSchema.SOLAR_WORKER_IPC:
         raise ValueError("SOLAR worker IPC schema mismatch")
     object.__setattr__(
         value,
         "schema_version",
-        SchemaVersion(value.schema_version),
+        ExecutionControlSchema(value.schema_version),
     )
     object.__setattr__(value, "ir_path", normalize_ir_path(value.ir_path))
 
@@ -109,7 +109,7 @@ def readiness_stage_artifacts(
 READINESS_STAGES = tuple(readiness_stage_artifacts(DEFAULT_IR_PATH))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _SolarWorkerRequestBase:
     """Common process-boundary contract for isolated SOLAR requests."""
 
@@ -122,7 +122,7 @@ class _SolarWorkerRequestBase:
         """Reject requests that bypassed process-boundary normalization."""
         if (
             getattr(self, "schema_version", None)
-            != SchemaVersion.SOLAR_WORKER_IPC
+            != ExecutionControlSchema.SOLAR_WORKER_IPC
         ):
             raise ValueError("SOLAR worker IPC schema mismatch")
         if not isinstance(getattr(self, "ir_path", None), IRPath):
@@ -140,7 +140,7 @@ class _SolarWorkerRequestBase:
             "ir_path": normalize_ir_path(
                 value.get("ir_path", DEFAULT_IR_PATH),
             ),
-            "schema_version": SchemaVersion(value["schema_version"]),
+            "schema_version": ExecutionControlSchema(value["schema_version"]),
         }
 
     def to_dict(self) -> dict[str, Any]:
@@ -148,7 +148,7 @@ class _SolarWorkerRequestBase:
         return asdict(self)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SolarWorkerRequest(_SolarWorkerRequestBase):
     """Serializable request for one isolated SOLAR analysis."""
 
@@ -156,13 +156,13 @@ class SolarWorkerRequest(_SolarWorkerRequestBase):
     device_stage_lock_path: str | None = None
     device_stage_lock_timeout_seconds: float = 14_400.0
     ir_path: IRPath = DEFAULT_IR_PATH
-    schema_version: Literal[SchemaVersion.SOLAR_WORKER_IPC] = (
-        SchemaVersion.SOLAR_WORKER_IPC
+    schema_version: Literal[ExecutionControlSchema.SOLAR_WORKER_IPC] = (
+        ExecutionControlSchema.SOLAR_WORKER_IPC
     )
 
     def __post_init__(self) -> None:
         """Validate the analysis-specific execution controls."""
-        super().__post_init__()
+        _SolarWorkerRequestBase.__post_init__(self)
         if self.device_stage_lock_timeout_seconds <= 0:
             raise ValueError("device stage lock timeout must be positive")
 
@@ -187,13 +187,13 @@ class SolarWorkerRequest(_SolarWorkerRequestBase):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SolarStageAuditRequest(_SolarWorkerRequestBase):
     """One corpus workload request for the isolated three-stage audit."""
 
     ir_path: IRPath = DEFAULT_IR_PATH
-    schema_version: Literal[SchemaVersion.SOLAR_WORKER_IPC] = (
-        SchemaVersion.SOLAR_WORKER_IPC
+    schema_version: Literal[ExecutionControlSchema.SOLAR_WORKER_IPC] = (
+        ExecutionControlSchema.SOLAR_WORKER_IPC
     )
 
     @classmethod
@@ -202,7 +202,7 @@ class SolarStageAuditRequest(_SolarWorkerRequestBase):
         return cls(**cls._common_arguments(value))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SolarAnalysisOutcome:
     """Serializable success or failure from an isolated SOLAR analysis."""
 
@@ -219,8 +219,8 @@ class SolarAnalysisOutcome:
     reason_code: str | None = None
     message: str | None = None
     publication_eligible: bool = False
-    schema_version: Literal[SchemaVersion.SOLAR_WORKER_IPC] = (
-        SchemaVersion.SOLAR_WORKER_IPC
+    schema_version: Literal[ExecutionControlSchema.SOLAR_WORKER_IPC] = (
+        ExecutionControlSchema.SOLAR_WORKER_IPC
     )
 
     def __post_init__(self) -> None:
@@ -284,7 +284,7 @@ class SolarAnalysisOutcome:
         return valid_formal_artifact_paths(paths, self.ir_path)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SolarStageAuditOutcome:
     """Outer-package copy of one benchmark-agnostic readiness result."""
 
@@ -298,8 +298,8 @@ class SolarStageAuditOutcome:
     failure_stage: SolarStage | None = None
     reason_code: str | None = None
     message: str | None = None
-    schema_version: Literal[SchemaVersion.SOLAR_WORKER_IPC] = (
-        SchemaVersion.SOLAR_WORKER_IPC
+    schema_version: Literal[ExecutionControlSchema.SOLAR_WORKER_IPC] = (
+        ExecutionControlSchema.SOLAR_WORKER_IPC
     )
 
     def __post_init__(self) -> None:

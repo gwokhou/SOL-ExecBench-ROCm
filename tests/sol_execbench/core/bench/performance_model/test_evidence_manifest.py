@@ -63,7 +63,7 @@ def test_manifest_verifies_all_content_addressed_artifacts(
         "tampered",
         encoding="utf-8",
     )
-    with pytest.raises(ValueError, match="(size|SHA-256) mismatch"):
+    with pytest.raises(ValueError, match=r"(size|SHA-256) mismatch"):
         load_and_verify_performance_evidence_manifest(manifest_path)
 
 

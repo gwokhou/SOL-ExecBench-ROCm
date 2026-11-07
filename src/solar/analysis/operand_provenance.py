@@ -22,7 +22,7 @@ from solar.types import NodeDict
 type SourceTrace = tuple[set[str], bool, bool]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _ProducedTensor:
     layer: NodeDict
     output_index: int
@@ -161,7 +161,9 @@ class _RegionOutputTracer:
 class _OperandSourceTracer:
     def __init__(self, layers: dict[str, NodeDict]) -> None:
         self._producers = {
-            str(name): _ProducedTensor(producer, output_index)
+            str(name): _ProducedTensor(
+                layer=producer, output_index=output_index
+            )
             for producer in layers.values()
             for output_index, name in enumerate(
                 (producer.get("tensor_names") or {}).get("outputs") or [],

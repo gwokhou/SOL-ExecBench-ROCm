@@ -22,10 +22,6 @@ from sol_execbench.core.bench.performance_model.lifecycle.resolver import (
     BlobStoreResolver,
     materialize_corpus_references,
 )
-from sol_execbench.core.bench.performance_model.lifecycle.shared import (
-    GpuLifecycleIdentity,
-    require_complete_gpu_identity,
-)
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
     store_root,
 )
@@ -33,13 +29,17 @@ from sol_execbench.core.bench.performance_model.validation_corpus import (
     DiagnosticValidationCorpus,
 )
 from sol_execbench.core.data.json_utils import load_json_file
+from sol_execbench.core.platform.hardware import (
+    HardwareExecutionIdentity,
+    require_complete_execution_identity,
+)
 
 
 def load_collection_gpu_identity(
     corpus_path: Path,
     *,
     corpus_root: Path,
-) -> GpuLifecycleIdentity:
+) -> HardwareExecutionIdentity:
     """Return the one complete GPU identity shared by all collected cases.
 
     Both tree-backed (path) and blob-backed corpus references are supported.
@@ -68,11 +68,11 @@ def load_collection_gpu_identity(
 
 def require_consistent_collection_gpu_identity(
     runs: Iterable[PerformanceRunIdentity],
-) -> GpuLifecycleIdentity:
+) -> HardwareExecutionIdentity:
     """Return one complete identity or reject cross-case hardware drift."""
-    identities: list[GpuLifecycleIdentity] = []
+    identities: list[HardwareExecutionIdentity] = []
     for run in runs:
-        gpu = GpuLifecycleIdentity(
+        gpu = HardwareExecutionIdentity(
             gpu_architecture=run.gpu_architecture,
             gpu_id=run.gpu_id,
             gpu_bdf=run.gpu_bdf,
@@ -82,9 +82,9 @@ def require_consistent_collection_gpu_identity(
             clock_mode=run.clock_mode,
             power_profile=run.power_profile,
         )
-        require_complete_gpu_identity(
+        require_complete_execution_identity(
             gpu,
-            stage=DiagnosticLifecycleStage.COLLECTION_RUN,
+            context=DiagnosticLifecycleStage.COLLECTION_RUN.value,
             require_pcie_topology=True,
         )
         identities.append(gpu)

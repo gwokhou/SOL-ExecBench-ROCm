@@ -24,14 +24,12 @@ Based on PyTorch's scaled_dot_product_attention:
 https://docs.pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
 """
 
-from typing import Any
-
 from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOp,
     EinsumOperand,
     EinsumOpHandler,
 )
-from solar.types import TensorShape, TensorShapes
+from solar.types import DynamicValue, TensorShape, TensorShapes
 
 
 class ScaledDotProductAttentionHandler(EinsumOpHandler):
@@ -60,7 +58,7 @@ class ScaledDotProductAttentionHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for scaled dot-product attention.
 
@@ -111,10 +109,18 @@ class ScaledDotProductAttentionHandler(EinsumOpHandler):
             V = value embedding dimension (Ev)
         """
         operands = [
-            EinsumOperand("Query", ["B", "H", "Q", "D"], is_output=False),
-            EinsumOperand("Key", ["B", "H", "K", "D"], is_output=False),
-            EinsumOperand("Value", ["B", "H", "K", "V"], is_output=False),
-            EinsumOperand("Output", ["B", "H", "Q", "V"], is_output=True),
+            EinsumOperand(
+                name="Query", dims=["B", "H", "Q", "D"], is_output=False
+            ),
+            EinsumOperand(
+                name="Key", dims=["B", "H", "K", "D"], is_output=False
+            ),
+            EinsumOperand(
+                name="Value", dims=["B", "H", "K", "V"], is_output=False
+            ),
+            EinsumOperand(
+                name="Output", dims=["B", "H", "Q", "V"], is_output=True
+            ),
         ]
 
         # Fused equation: combines Q@K^T and result@V
@@ -138,7 +144,7 @@ class FlexAttentionHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for flex_attention."""
         if tensor_shapes.num_inputs < 3:
@@ -161,10 +167,18 @@ class FlexAttentionHandler(EinsumOpHandler):
     ) -> EinsumOp:
         """Generate einsum for flex_attention."""
         operands = [
-            EinsumOperand("Query", ["B", "H", "Q", "D"], is_output=False),
-            EinsumOperand("Key", ["B", "H", "K", "D"], is_output=False),
-            EinsumOperand("Value", ["B", "H", "K", "V"], is_output=False),
-            EinsumOperand("Output", ["B", "H", "Q", "V"], is_output=True),
+            EinsumOperand(
+                name="Query", dims=["B", "H", "Q", "D"], is_output=False
+            ),
+            EinsumOperand(
+                name="Key", dims=["B", "H", "K", "D"], is_output=False
+            ),
+            EinsumOperand(
+                name="Value", dims=["B", "H", "K", "V"], is_output=False
+            ),
+            EinsumOperand(
+                name="Output", dims=["B", "H", "Q", "V"], is_output=True
+            ),
         ]
 
         equation = "BHQD,BHKD,BHKV->BHQV"
@@ -187,7 +201,7 @@ class MultiHeadAttentionHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for multi-head attention."""
         if tensor_shapes.num_inputs < 1:
@@ -203,8 +217,8 @@ class MultiHeadAttentionHandler(EinsumOpHandler):
         We represent it as a single attention-like operation.
         """
         operands = [
-            EinsumOperand("Input", ["B", "S", "D"], is_output=False),
-            EinsumOperand("Output", ["B", "S", "D"], is_output=True),
+            EinsumOperand(name="Input", dims=["B", "S", "D"], is_output=False),
+            EinsumOperand(name="Output", dims=["B", "S", "D"], is_output=True),
         ]
 
         equation = "BSD->BSD"

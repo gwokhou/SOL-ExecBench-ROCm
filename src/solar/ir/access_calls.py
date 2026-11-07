@@ -52,7 +52,7 @@ PARTITION_TARGETS = frozenset({"split", "chunk", "tensor_split"})
 INDEX_TARGETS = frozenset({"slice", "narrow", "select", "getitem"})
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _Call:
     target: str
     exact_target: str
@@ -99,8 +99,8 @@ def _getitem(view: TensorAccess, index: DynamicValue) -> TensorAccess:
         if item is None:
             data = view.model_dump()
             data.update(
-                shape=view.shape[:axis] + (1,) + view.shape[axis:],
-                strides=view.strides[:axis] + (1,) + view.strides[axis:],
+                shape=(*view.shape[:axis], 1, *view.shape[axis:]),
+                strides=(*view.strides[:axis], 1, *view.strides[axis:]),
             )
             view = TensorAccess.model_validate(data)
             axis += 1
@@ -273,11 +273,11 @@ def _flattened(view: TensorAccess, call: _Call) -> TensorAccess:
         raise UnsupportedAccessError(AccessReason.COPY)
     stride = view.strides[axes[-1]] if axes else 1
     shape = (
-        view.shape[:start]
-        + (prod(view.shape[start : end + 1]),)
-        + view.shape[end + 1 :]
+        *view.shape[:start],
+        prod(view.shape[start : end + 1]),
+        *view.shape[end + 1 :],
     )
-    strides = view.strides[:start] + (stride,) + view.strides[end + 1 :]
+    strides = (*view.strides[:start], stride, *view.strides[end + 1 :])
     return TensorAccess.model_validate(
         {**view.model_dump(), "shape": shape, "strides": strides}
     )
@@ -290,10 +290,10 @@ def derive_accesses(
 ) -> tuple[TensorAccess, ...]:
     """Resolve only structured semantics; output shapes independently cross-check."""
     call = _Call(
-        str(semantic.get("target")),
-        str(semantic.get("exact_target", "")),
-        operation_operands(semantic),
-        operation_attributes(semantic),
+        target=str(semantic.get("target")),
+        exact_target=str(semantic.get("exact_target", "")),
+        args=operation_operands(semantic),
+        attrs=operation_attributes(semantic),
     )
     if not call.args or call.args[0] != {"tensor": 0}:
         raise UnsupportedAccessError(AccessReason.UNSUPPORTED_VIEW)

@@ -18,8 +18,10 @@ from sol_execbench.core.bench.rocm_profiler.hip_sdk_models import (
     HIPSDKScheduleQualification,
     HIPSDKScheduleReason,
 )
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
 from sol_execbench.core.data.base_model import CurrentFrozenSchemaModel
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 SCOPE_LAUNCH_FILE = "scope-launch.json"
 SCOPE_INTENT_FILE = "scope-intent.json"
@@ -61,9 +63,9 @@ class EvaluateScopeIntent(CurrentFrozenSchemaModel):
     """Written by the parent before the candidate process can execute."""
 
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
-    current_schema_version = SchemaVersion.HIP_EVALUATE_INTENT
-    schema_version: Literal[SchemaVersion.HIP_EVALUATE_INTENT] = (
-        SchemaVersion.HIP_EVALUATE_INTENT
+    current_schema_version = ProfilerArtifactSchema.HIP_EVALUATE_INTENT
+    schema_version: Literal[ProfilerArtifactSchema.HIP_EVALUATE_INTENT] = (
+        ProfilerArtifactSchema.HIP_EVALUATE_INTENT
     )
     run_id: str = Field(pattern=UUID_PATTERN)
     workload_uuid: str
@@ -81,9 +83,9 @@ class EvaluateScopeReceipt(CurrentFrozenSchemaModel):
     """Candidate-process receipt must agree with the retained controller intent."""
 
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
-    current_schema_version = SchemaVersion.HIP_EVALUATE_RECEIPT
-    schema_version: Literal[SchemaVersion.HIP_EVALUATE_RECEIPT] = (
-        SchemaVersion.HIP_EVALUATE_RECEIPT
+    current_schema_version = ProfilerArtifactSchema.HIP_EVALUATE_RECEIPT
+    schema_version: Literal[ProfilerArtifactSchema.HIP_EVALUATE_RECEIPT] = (
+        ProfilerArtifactSchema.HIP_EVALUATE_RECEIPT
     )
     intent_sha256: str = Field(pattern=SHA256_PATTERN)
     input_sha256: str = Field(pattern=SHA256_PATTERN)
@@ -97,9 +99,9 @@ class EvaluateScopeResult(CurrentFrozenSchemaModel):
     """Coverage qualification is conditional on the existing execution trust model."""
 
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
-    current_schema_version = SchemaVersion.HIP_EVALUATE_SCOPE
-    schema_version: Literal[SchemaVersion.HIP_EVALUATE_SCOPE] = (
-        SchemaVersion.HIP_EVALUATE_SCOPE
+    current_schema_version = ProfilerArtifactSchema.HIP_EVALUATE_SCOPE
+    schema_version: Literal[ProfilerArtifactSchema.HIP_EVALUATE_SCOPE] = (
+        ProfilerArtifactSchema.HIP_EVALUATE_SCOPE
     )
     intent: EvaluateScopeIntent
     status: EvaluateScopeStatus

@@ -365,7 +365,7 @@ def _attach_compulsory_witness(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _LayerRunPlan:
     output: Path
     paths: dict[str, Path]

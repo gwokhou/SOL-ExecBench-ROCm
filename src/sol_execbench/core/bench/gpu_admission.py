@@ -19,12 +19,14 @@ from sol_execbench.core.bench.gpu_lock_paths import (
     LEGACY_CLOCK_STATE_DIRECTORY,
     configured_gpu_locks,
 )
+from sol_execbench.core.control_plane_schema_versions import (
+    ExecutionControlSchema,
+)
 from sol_execbench.core.data.base_model import (
     CurrentFrozenSchemaModel,
     FrozenArtifactModel,
 )
 from sol_execbench.core.data.json_utils import atomic_write_json_value
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 ADMISSION_ENV = "SOL_EXECBENCH_ADMISSION_RECORD"
 CLOCK_STATE_ENV = "SOL_EXECBENCH_CLOCK_STATE_DIR"
@@ -72,9 +74,9 @@ class AdmissionOwner(FrozenArtifactModel):
 class AdmissionRecord(CurrentFrozenSchemaModel):
     """The frozen six-field neutral record, with no project-private fields."""
 
-    current_schema_version = SchemaVersion.GPU_ADMISSION
-    schema_version: Literal[SchemaVersion.GPU_ADMISSION] = (
-        SchemaVersion.GPU_ADMISSION
+    current_schema_version = ExecutionControlSchema.GPU_ADMISSION
+    schema_version: Literal[ExecutionControlSchema.GPU_ADMISSION] = (
+        ExecutionControlSchema.GPU_ADMISSION
     )
     device: AdmissionDevice
     state: AdmissionState
@@ -139,7 +141,7 @@ def durable_json_write(path: Path, value: object) -> None:
     _sync_directory(path.parent)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Admission:
     """Read and publish neutral state while the caller owns physical exclusion."""
 
@@ -246,4 +248,4 @@ def configured_admission() -> Admission | None:
         raise AdmissionError("gpu_admission_explicit_paths_required")
     if clock_state_directory(shared).resolve() == shared.resolve():
         raise AdmissionError("gpu_admission_private_state_required")
-    return Admission(path)
+    return Admission(path=path)

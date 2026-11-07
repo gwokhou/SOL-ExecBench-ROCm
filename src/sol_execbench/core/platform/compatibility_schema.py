@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.platform.compatibility_entry_models import (
     MatrixEntry,
     RocmCompatibilityMatrixReport,
@@ -14,6 +13,7 @@ from sol_execbench.core.platform.compatibility_enums import (
     MATRIX_ENTRY_JSON_SCHEMA_ID,
     ROCM_COMPATIBILITY_MATRIX_REPORT_JSON_SCHEMA_ID,
 )
+from sol_execbench.core.platform.schema_versions import PlatformArtifactSchema
 
 
 def matrix_json_schema_with_metadata(
@@ -24,9 +24,11 @@ def matrix_json_schema_with_metadata(
     """Attach repository compatibility metadata to a JSON schema."""
     enriched = dict(schema)
     enriched["$id"] = schema_id
-    enriched["schema_version"] = SchemaVersion.ROCM_COMPATIBILITY_MATRIX
+    enriched["schema_version"] = (
+        PlatformArtifactSchema.ROCM_COMPATIBILITY_MATRIX
+    )
     enriched["x-sol-execbench-schema-version"] = (
-        SchemaVersion.ROCM_COMPATIBILITY_MATRIX
+        PlatformArtifactSchema.ROCM_COMPATIBILITY_MATRIX
     )
     return enriched
 

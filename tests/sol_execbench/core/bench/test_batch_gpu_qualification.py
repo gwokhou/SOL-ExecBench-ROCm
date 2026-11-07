@@ -14,6 +14,10 @@ from sol_execbench.core.bench.batch_gpu_qualification import (
     require_isolated_qualification_root,
     select_risk_first_axis_extrema,
 )
+from sol_execbench.core.control_plane_schema_versions import (
+    BatchGPUQualificationArtifactKind,
+    ExecutionControlSchema,
+)
 
 _DIGEST = "a" * 64
 
@@ -70,6 +74,27 @@ def test_gate_rejects_incomplete_receipt_coverage() -> None:
         )
 
 
+def test_gate_and_receipt_share_one_discriminated_contract() -> None:
+    receipt = _receipt(BatchGPUQualificationStage.STATIC, ("item",))
+    gate = BatchGPUQualificationGate(
+        task=LargeBatchGPUTask.RELEASE_EVALUATION,
+        stage=BatchGPUQualificationStage.STATIC,
+        scope_id="release",
+        subject_sha256=_DIGEST,
+        runner_sha256=_DIGEST,
+        configuration_sha256=_DIGEST,
+        source_revision="revision",
+        item_ids=("item",),
+        receipts=(receipt,),
+        created_at="2026-08-09T00:00:00Z",
+    )
+
+    assert gate.schema_version == ExecutionControlSchema.BATCH_GPU_QUALIFICATION
+    assert gate.artifact_kind == BatchGPUQualificationArtifactKind.GATE
+    assert receipt.schema_version == gate.schema_version
+    assert receipt.artifact_kind == BatchGPUQualificationArtifactKind.RECEIPT
+
+
 def test_qualification_root_must_be_isolated(tmp_path) -> None:
     output = tmp_path / "formal"
     with pytest.raises(ValueError, match="inside batch output"):
@@ -79,7 +104,7 @@ def test_qualification_root_must_be_isolated(tmp_path) -> None:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _Shape:
     name: str
     axes: dict[str, int]
@@ -87,10 +112,10 @@ class _Shape:
 
 def test_risk_first_selection_covers_each_axis_extreme() -> None:
     shapes = (
-        _Shape("small", {"M": 1, "N": 8}),
-        _Shape("wide", {"M": 2, "N": 64}),
-        _Shape("tall", {"M": 32, "N": 4}),
-        _Shape("middle", {"M": 8, "N": 16}),
+        _Shape(name="small", axes={"M": 1, "N": 8}),
+        _Shape(name="wide", axes={"M": 2, "N": 64}),
+        _Shape(name="tall", axes={"M": 32, "N": 4}),
+        _Shape(name="middle", axes={"M": 8, "N": 16}),
     )
 
     selected = select_risk_first_axis_extrema(

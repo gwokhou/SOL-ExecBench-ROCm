@@ -7,8 +7,8 @@ from typing import cast
 
 import pytest
 
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
+from sol_execbench.core.control_plane_schema_versions import (
+    ExecutionControlSchema,
 )
 from sol_execbench.core.solar_bridge import stage_worker, worker
 from sol_execbench.core.solar_bridge.models import (
@@ -49,7 +49,7 @@ def _write_request(tmp_path: Path) -> tuple[Path, Path]:
     request.write_text(
         json.dumps(
             {
-                "schema_version": SchemaVersion.SOLAR_WORKER_IPC,
+                "schema_version": ExecutionControlSchema.SOLAR_WORKER_IPC,
                 "problem_dir": str(tmp_path / "problem"),
                 "workload_uuid": "workload-1",
                 "output_dir": str(tmp_path / "output"),
@@ -67,7 +67,7 @@ def _write_stage_request(tmp_path: Path) -> tuple[Path, Path]:
     request.write_text(
         json.dumps(
             {
-                "schema_version": SchemaVersion.SOLAR_WORKER_IPC,
+                "schema_version": ExecutionControlSchema.SOLAR_WORKER_IPC,
                 "problem_dir": str(tmp_path / "problem"),
                 "workload_uuid": "workload-1",
                 "output_dir": str(tmp_path / "output"),
@@ -145,7 +145,7 @@ def test_analysis_worker_converts_exception_to_stable_failure(
         "output_dir": None,
         "publication_eligible": False,
         "reason_code": "bridge_failed",
-        "schema_version": SchemaVersion.SOLAR_WORKER_IPC,
+        "schema_version": ExecutionControlSchema.SOLAR_WORKER_IPC,
         "stage": "outer_bridge",
         "status": "failed",
     }
@@ -219,7 +219,8 @@ def test_unsatisfied_oom_isolation_still_requires_effective_write(
     score.write_text("0\n")
 
     def failed_write(self, text, **_kwargs):
-        assert self == score and text == "500\n"
+        assert self == score
+        assert text == "500\n"
         if failure == "denied":
             raise PermissionError("read-only policy")
         return len(text)

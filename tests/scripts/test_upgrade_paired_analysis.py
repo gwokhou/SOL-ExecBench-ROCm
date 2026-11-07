@@ -62,5 +62,5 @@ def test_invalid_pairs_cannot_produce_a_speedup(paired_rows, mutation):
             rows[0] = rows[0].model_copy(update={"gpu_uuid": "other"})
         case "order":
             rows[0] = rows[0].model_copy(update={"old_first": False})
-    with pytest.raises(ValueError, match="paired|correctness|identity"):
+    with pytest.raises(ValueError, match=r"paired|correctness|identity"):
         analyze(rows, ids)

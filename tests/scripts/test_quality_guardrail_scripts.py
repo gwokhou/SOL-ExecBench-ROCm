@@ -229,6 +229,31 @@ def test_coupling_rejects_domain_cycles_without_module_cycles(
     ]
 
 
+def test_coupling_excludes_audit_only_aggregate_edges(
+    load_script,
+    tmp_path: Path,
+) -> None:
+    coupling = load_script("scripts/check_coupling.py")
+    audit_module = "sol_execbench.core.integrity.artifact_registry"
+    platform_module = "sol_execbench.core.platform.schema_versions"
+    audit_path = tmp_path / "artifact_registry.py"
+    platform_path = tmp_path / "schema_versions.py"
+    audit_path.write_text(
+        "from sol_execbench.core.platform.schema_versions import Schema\n",
+        encoding="utf-8",
+    )
+    platform_path.write_text("class Schema: pass\n", encoding="utf-8")
+
+    edges = coupling.internal_import_edges(
+        {
+            audit_module: audit_path,
+            platform_module: platform_path,
+        },
+    )
+
+    assert edges == set()
+
+
 def test_coupling_limit_failures_include_lines_fanout_and_exact_imports(
     load_script,
 ) -> None:
@@ -334,6 +359,8 @@ def test_dataset_redistribution_loads_policy_and_emits_json(
     provenance.write_text(
         """
 [dataset_policy]
+schema_version = "sol_execbench.dataset_governance.v1"
+artifact_kind = "policy"
 [[dataset_policy.sources]]
 id = "restricted"
 name = "Restricted corpus"
@@ -379,6 +406,25 @@ def test_dataset_redistribution_rejects_invalid_policy(
     path.write_text(content, encoding="utf-8")
 
     with pytest.raises(ValueError, match=r"\[dataset_policy\]"):
+        redistribution.load_dataset_policy(path)
+
+
+def test_dataset_redistribution_requires_current_policy_schema(
+    load_script,
+    tmp_path: Path,
+) -> None:
+    redistribution = load_script("scripts/check_dataset_redistribution.py")
+    path = tmp_path / "provenance.toml"
+    path.write_text(
+        """
+[dataset_policy]
+schema_version = "future.v999"
+sources = []
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="requires schema_version"):
         redistribution.load_dataset_policy(path)
 
 
@@ -442,6 +488,7 @@ def test_readability_metrics_automatically_scan_scripts(
 
     assert metrics.long_functions == 1
     assert metrics.production_any_modules == 1
+    assert metrics.production_any_references == 1
     assert failures == []
 
 
@@ -456,7 +503,6 @@ def test_readability_solar_debt_detects_added_removed_and_changed_items(
         "wide_functions": {},
         "oversized_modules": {},
         "any_modules": ["removed.py"],
-        "wildcard_imports": [],
     }
     baseline_path = tmp_path / "solar-debt.json"
     baseline_path.write_text(json.dumps(baseline), encoding="utf-8")
@@ -466,7 +512,6 @@ def test_readability_solar_debt_detects_added_removed_and_changed_items(
         "wide_functions": {},
         "oversized_modules": {},
         "any_modules": ["added.py"],
-        "wildcard_imports": [],
     }
 
     failures = readability.check_solar_debt(current)

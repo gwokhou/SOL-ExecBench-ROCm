@@ -173,7 +173,8 @@ def test_rocpd_reads_only_supported_schema(tmp_path):
         """)
     before = path.read_bytes()
     result, warnings = read_hip_events(path)
-    assert len(result) == 1 and warnings == []
+    assert len(result) == 1
+    assert warnings == []
     assert path.read_bytes() == before
     with sqlite3.connect(path) as connection:
         connection.execute("UPDATE rocpd_metadata SET value='unknown'")

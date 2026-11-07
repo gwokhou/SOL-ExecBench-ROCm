@@ -127,7 +127,9 @@ def test_m03_f03_complete_capacity_curve_and_evidence_bindings(
     ]
     counts = []
     for result in results:
-        document = ArtifactDocument(result.output_dir, result.analysis)
+        document = ArtifactDocument(
+            path=result.output_dir, data=result.analysis
+        )
         metadata = document.require_mapping("metadata")
         counts.append(document.require_mapping("total")["macs"])
         view = read_analysis_views(metadata["views"])[AnalysisView.CACHE_AWARE]
@@ -154,15 +156,16 @@ def test_m03_f03_complete_capacity_curve_and_evidence_bindings(
         )
     views = [
         read_analysis_views(
-            ArtifactDocument(r.output_dir, r.analysis).require_mapping(
-                "metadata"
-            )["views"]
+            ArtifactDocument(
+                path=r.output_dir, data=r.analysis
+            ).require_mapping("metadata")["views"]
         )[AnalysisView.CACHE_AWARE]
         for r in results
     ]
     assert [v.io_bytes for v in views] == [392, 196]
     assert counts == [84, 84]
-    assert views[0].seconds is not None and views[1].seconds is not None
+    assert views[0].seconds is not None
+    assert views[1].seconds is not None
     assert views[0].seconds >= views[1].seconds
     assert (
         results[0].record.intrinsic_sha256 == results[1].record.intrinsic_sha256
@@ -182,11 +185,12 @@ def test_missing_capacity_or_invalid_proof_keeps_cache_view_unavailable(
     )
     result = ReuseSession(source).project(projection(tmp_path, 64, mode))
     metadata = ArtifactDocument(
-        result.output_dir, result.analysis
+        path=result.output_dir, data=result.analysis
     ).require_mapping("metadata")
     view = read_analysis_views(metadata["views"])[AnalysisView.CACHE_AWARE]
     assert view.status is ViewAvailability.UNAVAILABLE
-    assert view.seconds is None and view.io_bytes is None
+    assert view.seconds is None
+    assert view.io_bytes is None
     assert not result.record.publication_eligible
 
 

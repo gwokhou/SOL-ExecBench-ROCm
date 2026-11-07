@@ -18,9 +18,13 @@ from sol_execbench.core.platform.docker_matrix import (
     docker_build_args_for_target,
     select_docker_target,
 )
+from sol_execbench.core.platform.schema_versions import (
+    PlatformArtifactSchema,
+    PlatformPreflightArtifactKind,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
+MANIFEST_PATH = REPO_ROOT / "src/sol_execbench/data/rocm_targets.json"
 
 
 def _default_observation(**overrides: object) -> DockerPreflightObservation:
@@ -116,6 +120,10 @@ def test_preflight_result_payload_contains_build_args_and_decision_flags() -> (
     )
     payload = result.to_preview_payload()
 
+    assert (
+        payload["schema_version"] == PlatformArtifactSchema.PLATFORM_PREFLIGHT
+    )
+    assert payload["artifact_kind"] == PlatformPreflightArtifactKind.DOCKER
     assert payload["target_id"]
     assert payload["image_repository"] == "rocm/pytorch"
     assert (

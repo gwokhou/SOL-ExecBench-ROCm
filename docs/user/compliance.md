@@ -4,11 +4,11 @@
 
 This repository is distributed under Apache-2.0. See `LICENSE`.
 
-This repository is a ROCm GPU-kernel benchmark whose problem corpus is derived
-from AMD AgentKernelArena (AKA, Apache-2.0). The SOL-ExecBench paper is cited
-as methodology context for the construction and evaluation framework; the
-benchmark problems themselves are AKA-native AMD operators. Files derived from
-AKA preserve AMD-AGI copyright notices where they apply to upstream-retained or
+This repository is a ROCm GPU-kernel benchmark with an AKA-derived legacy
+corpus and an independently authored LLM Core corpus. The SOL-ExecBench paper
+is cited as methodology context for the construction and evaluation framework;
+legacy AKA problems remain AKA-native AMD operators. Files derived from AKA
+preserve AMD-AGI copyright notices where they apply to upstream-retained or
 derivative material. Independent ROCm work uses project attribution. See
 `docs/user/provenance.md` and `provenance.toml` for the active provenance
 policy.
@@ -53,6 +53,12 @@ corrected through ordinary commits; this project does not rewrite git history
 for ordinary metadata cleanup unless a separate legal review requires it.
 
 ## Dataset Redistribution
+
+`problems/LLM_CORE/**` is an Apache-2.0 clean-room reconstruction. Its pinned
+model records contain architecture facts, revisions, source-file hashes, and
+license metadata; the repository does not redistribute model weights, upstream
+kernels, or NVIDIA SOL-ExecBench dataset content. LLM Core references and
+workloads are independently authored project material.
 
 The problem corpus is derived from AMD AgentKernelArena under Apache-2.0 and is
 redistributable: authored definitions, workloads, and references under

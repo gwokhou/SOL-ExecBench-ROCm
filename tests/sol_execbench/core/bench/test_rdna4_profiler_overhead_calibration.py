@@ -18,6 +18,9 @@ from sol_execbench.core.bench.rocm_profiler import (
     build_timing_evidence,
     read_overhead_calibration,
 )
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
 from sol_execbench.core.bench.timing_policy import (
     TimingActivityDomain,
     TimingBackend,
@@ -25,7 +28,6 @@ from sol_execbench.core.bench.timing_policy import (
     TimingSourceType,
 )
 from sol_execbench.core.integrity import sha256_file
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 def _make_policy(**overrides) -> TimingPolicy:
@@ -118,7 +120,7 @@ class TestReadOverheadCalibration:
     @staticmethod
     def _payload(**overrides):
         payload = {
-            "schema_version": SchemaVersion.ROCPROFV3_OVERHEAD_CALIBRATION,
+            "schema_version": ProfilerArtifactSchema.ROCPROFV3_OVERHEAD_CALIBRATION,
             "generated_at": "2026-07-20T00:00:00Z",
             "baseline_median_ms": 0.05,
             "profiler_median_ms": 0.073,
@@ -262,7 +264,8 @@ class TestCalibrationScriptArgs:
             "run_rdna4_profiler_overhead_calibration",
             SCRIPT_PATH,
         )
-        assert spec is not None and spec.loader is not None
+        assert spec is not None
+        assert spec.loader is not None
         mod = module_from_spec(spec)
         spec.loader.exec_module(mod)
         return mod
@@ -331,12 +334,13 @@ class TestCalibrationJSONSchema:
             "run_rdna4_profiler_overhead_calibration_schema",
             SCRIPT_PATH,
         )
-        assert spec is not None and spec.loader is not None
+        assert spec is not None
+        assert spec.loader is not None
         mod = module_from_spec(spec)
         spec.loader.exec_module(mod)
         assert (
             mod.Rocprofv3OverheadCalibration.current_schema_version
-            == SchemaVersion.ROCPROFV3_OVERHEAD_CALIBRATION
+            == ProfilerArtifactSchema.ROCPROFV3_OVERHEAD_CALIBRATION
         )
 
 
@@ -355,7 +359,8 @@ class TestCalibrationClockSetup:
             "run_rdna4_profiler_overhead_calibration_clock_setup",
             SCRIPT_PATH,
         )
-        assert spec is not None and spec.loader is not None
+        assert spec is not None
+        assert spec.loader is not None
         mod = module_from_spec(spec)
         spec.loader.exec_module(mod)
         return mod

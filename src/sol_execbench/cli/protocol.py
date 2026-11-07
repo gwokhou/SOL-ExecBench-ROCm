@@ -5,17 +5,18 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import IntEnum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 import click
 from pydantic import Field
 
+from sol_execbench.core.control_plane_schema_versions import (
+    CLIArtifactKind,
+    ExecutionControlSchema,
+)
 from sol_execbench.core.data.base_model import (
     CurrentFrozenSchemaModel,
     FrozenArtifactModel,
-)
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
 )
 
 
@@ -29,12 +30,12 @@ class CliExitCode(IntEnum):
     EXECUTION = 4
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CliResult:
     """Structured command result before text or JSON rendering."""
 
-    data: Any = field(default_factory=dict)
-    artifacts: tuple[dict[str, Any], ...] = ()
+    data: object = field(default_factory=dict)
+    artifacts: tuple[dict[str, object], ...] = ()
     warnings: tuple[str, ...] = ()
     exit_code: CliExitCode = CliExitCode.SUCCESS
 
@@ -48,7 +49,7 @@ class CliFailure(click.ClickException):
         *,
         code: str = "input_error",
         exit_code: CliExitCode = CliExitCode.INPUT,
-        details: Any = None,
+        details: object = None,
         hint: str | None = None,
     ) -> None:
         """Initialize a classified user-facing CLI failure."""
@@ -71,21 +72,23 @@ class CliError(FrozenArtifactModel):
 
     code: str = Field(min_length=1)
     message: str
-    details: Any
+    details: object
     hint: str | None
 
 
 class CliSuccessResponse(CurrentFrozenSchemaModel):
     """Current successful CLI response envelope."""
 
-    current_schema_version = SchemaVersion.CLI_RESPONSE
+    current_schema_version = ExecutionControlSchema.CLI_PROTOCOL
+    current_artifact_kind = CLIArtifactKind.RESPONSE
 
-    schema_version: Literal[SchemaVersion.CLI_RESPONSE] = (
-        SchemaVersion.CLI_RESPONSE
+    schema_version: Literal[ExecutionControlSchema.CLI_PROTOCOL] = (
+        ExecutionControlSchema.CLI_PROTOCOL
     )
+    artifact_kind: Literal[CLIArtifactKind.RESPONSE] = CLIArtifactKind.RESPONSE
     ok: Literal[True]
     command: str = Field(min_length=1)
-    data: Any
+    data: object
     artifacts: list[CliArtifact]
     warnings: list[str]
 
@@ -93,28 +96,33 @@ class CliSuccessResponse(CurrentFrozenSchemaModel):
 class CliFailureResponse(CurrentFrozenSchemaModel):
     """Current failed CLI response envelope."""
 
-    current_schema_version = SchemaVersion.CLI_RESPONSE
+    current_schema_version = ExecutionControlSchema.CLI_PROTOCOL
+    current_artifact_kind = CLIArtifactKind.RESPONSE
 
-    schema_version: Literal[SchemaVersion.CLI_RESPONSE] = (
-        SchemaVersion.CLI_RESPONSE
+    schema_version: Literal[ExecutionControlSchema.CLI_PROTOCOL] = (
+        ExecutionControlSchema.CLI_PROTOCOL
     )
+    artifact_kind: Literal[CLIArtifactKind.RESPONSE] = CLIArtifactKind.RESPONSE
     ok: Literal[False]
     command: str = Field(min_length=1)
     error: CliError
 
 
-def artifact(path: Path, artifact_type: str) -> dict[str, Any]:
+def artifact(path: Path, artifact_type: str) -> dict[str, object]:
     """Return a serialized CLI artifact reference."""
     return CliArtifact(type=artifact_type, path=str(path)).model_dump(
         mode="json",
     )
 
 
-def response_success(command: str, result: CliResult | None) -> dict[str, Any]:
+def response_success(
+    command: str, result: CliResult | None
+) -> dict[str, object]:
     """Build a successful machine-readable CLI response."""
     result = result or CliResult()
     response = {
-        "schema_version": SchemaVersion.CLI_RESPONSE,
+        "schema_version": ExecutionControlSchema.CLI_PROTOCOL,
+        "artifact_kind": CLIArtifactKind.RESPONSE,
         "ok": True,
         "command": command,
         "data": result.data,
@@ -124,7 +132,7 @@ def response_success(command: str, result: CliResult | None) -> dict[str, Any]:
     return CliSuccessResponse.model_validate(response).model_dump(mode="json")
 
 
-def response_failure(command: str, error: BaseException) -> dict[str, Any]:
+def response_failure(command: str, error: BaseException) -> dict[str, object]:
     """Build a failed machine-readable CLI response."""
     if isinstance(error, CliFailure):
         code = error.code
@@ -143,7 +151,8 @@ def response_failure(command: str, error: BaseException) -> dict[str, Any]:
         details = {"exception_type": type(error).__name__}
         hint = None
     response = {
-        "schema_version": SchemaVersion.CLI_RESPONSE,
+        "schema_version": ExecutionControlSchema.CLI_PROTOCOL,
+        "artifact_kind": CLIArtifactKind.RESPONSE,
         "ok": False,
         "command": command,
         "error": {

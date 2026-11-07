@@ -37,7 +37,7 @@ from sol_execbench.core.dataset.aka_corpus import (
     SEED_SET_MIN_PROBLEMS,
     AKACorpusManifest,
 )
-from sol_execbench.core.integrity.schema_versions import (
+from sol_execbench.core.dataset.schema_versions import (
     AKA_CORPUS_MANIFEST_SCHEMA_VERSION,
 )
 from sol_execbench.core.platform.runtime import RocmDeviceInfo
@@ -53,6 +53,7 @@ TEST_TARGET = materialization_target(
         index=0,
         name="test gfx1200",
         gfx_target="gfx1200",
+        visible_compute_units=32,
         total_memory_bytes=16 * 1024**3,
         l2_cache_bytes=4 * 1024**2,
         torch_version="test",
@@ -122,7 +123,7 @@ def test_aka_manifest_loads_and_pins_revision():
 
 def test_corpus_architecture_identity_matches_packaged_solar_profile():
     from sol_execbench.core.dataset.aka_corpus import FORMAL_ARCHITECTURE_SHA256
-    from sol_execbench.core.solar_bridge.analyzer import (
+    from sol_execbench.core.solar_bridge.formal_device import (
         formal_architecture_profile_hash,
     )
 
@@ -329,7 +330,9 @@ def test_target_incompatible_role_requires_every_workload_to_exceed_limit(
     monkeypatch.setattr(
         aka_corpus,
         "static_reference_storage",
-        lambda _definition, _workload: StaticReferenceStorage(0, next(sizes)),
+        lambda _definition, _workload: StaticReferenceStorage(
+            input_storage_bytes=0, reference_case_bytes=next(sizes)
+        ),
     )
 
     with pytest.raises(

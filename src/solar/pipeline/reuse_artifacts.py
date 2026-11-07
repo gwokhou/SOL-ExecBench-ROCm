@@ -152,7 +152,12 @@ def load_projection(
     ):
         raise ValueError("reuse analysis architecture identity differs")
     restricted = _read_restricted(directory, captured, record, analysis)
-    return ReuseResult(directory, analysis.data, record, restricted)
+    return ReuseResult(
+        output_dir=directory,
+        analysis=analysis.data,
+        record=record,
+        restricted=restricted,
+    )
 
 
 def _read_restricted(

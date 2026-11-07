@@ -595,7 +595,9 @@ def test_multi_einsum_region_rejects_coerced_schema_version() -> None:
         OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION,
     )
 
-    with pytest.raises(orojenesis.OrojenesisError, match="unsupported.*schema"):
+    with pytest.raises(
+        orojenesis.OrojenesisError, match=r"unsupported.*schema"
+    ):
         orojenesis.multi_einsum_region_problem(region)
 
 

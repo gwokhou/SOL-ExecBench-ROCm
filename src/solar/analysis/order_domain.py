@@ -33,7 +33,7 @@ class OrderDomainError(SolarError):
     reason_code = "contraction_order_domain_unsupported"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class MatrixChain:
     """Source operand order, adjacent index sizes and original association."""
 
@@ -168,10 +168,10 @@ def matrix_chain(graph: NodeDict) -> MatrixChain:
     )
     tree_cost(original, dimensions)
     return MatrixChain(
-        indices,
-        tuple(item[1] for item in reader.inputs),
-        dimensions,
-        dtype,
-        original,
-        outputs[0],
+        source_indices=indices,
+        input_names=tuple(item[1] for item in reader.inputs),
+        dimensions=dimensions,
+        dtype=dtype,
+        original=original,
+        output_name=outputs[0],
     )

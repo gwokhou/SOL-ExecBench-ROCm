@@ -157,7 +157,7 @@ def _reduction_groups(
     return max(1, int(math.prod(shape)) // max(1, reduced))
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _ResourceContext:
     semantic: Mapping[str, Any]
     target: str
@@ -250,7 +250,7 @@ class _ResourceContext:
         )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class _ResourceAccumulator:
     work: dict[str, dict[str, int]] = field(default_factory=dict)
     formulas: list[str] = field(default_factory=list)
@@ -283,7 +283,7 @@ class _ResourceAccumulator:
         }
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _RuleResult:
     matched: bool
     exemption_reason: str | None = None

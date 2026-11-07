@@ -35,6 +35,7 @@ from sol_execbench.core.solar_bridge.corpus_readiness import (
 from sol_execbench.core.timestamps import utc_timestamp
 from solar.artifacts import sha256_file
 from solar.ir.contracts import IRPath
+from solar.schema_versions import SchemaVersion
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CORPUS_ROOT = REPO_ROOT / "problems" / "AMD_AKA"
@@ -212,34 +213,10 @@ def assemble(
     }
     reconciliation = reconcile_canary(canary, fresh)
 
-    differential = []
-    by_item: dict[str, dict[str, Any]] = {}
-    for row in rows:
-        by_item.setdefault(row["item"], {})[row["ir_path"]] = row
-    for item_id, per_path in sorted(by_item.items()):
-        if set(per_path) != {path.value for path in PATHS}:
-            continue
-        left, right = (
-            per_path[PATHS[0].value],
-            per_path[PATHS[1].value],
-        )
-        if left["formal_analysis"] != "analyzed" or (
-            right["formal_analysis"] != "analyzed"
-        ):
-            continue
-        differential.append(
-            {
-                "item": item_id,
-                "make_fx_totals": left["resource_totals"],
-                "torchview_totals": right["resource_totals"],
-                "totals_equal": (
-                    left["resource_totals"] == right["resource_totals"]
-                ),
-            }
-        )
+    differential = _path_differential(rows)
 
     family_summary: dict[str, Any] = {}
-    for family in sorted(ROADMAP_FAMILIES) + ["elementwise", "other"]:
+    for family in [*sorted(ROADMAP_FAMILIES), "elementwise", "other"]:
         tagged = [row for row in rows if family in row["families"]]
         per_path = Counter(row["ir_path"] for row in tagged)
         analyzed = sum(
@@ -319,7 +296,7 @@ def main() -> int:
         assembled["family_summary"],
     )
     summary = {
-        "schema_version": "sol_execbench.solar_l3c_summary.v1",
+        "schema_version": SchemaVersion.SOLAR_L3C_SUMMARY,
         "generated_at": utc_timestamp(),
         "identity": _identity(args),
         "gate": assembled["gate"],
@@ -344,6 +321,37 @@ def main() -> int:
         )
     )
     return 0 if assembled["gate"]["passed"] else 1
+
+
+def _path_differential(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Compare totals only for rows analyzed through both IR paths."""
+    differential = []
+    by_item: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        by_item.setdefault(row["item"], {})[row["ir_path"]] = row
+    for item_id, per_path in sorted(by_item.items()):
+        if set(per_path) != {path.value for path in PATHS}:
+            continue
+        left, right = (
+            per_path[PATHS[0].value],
+            per_path[PATHS[1].value],
+        )
+        if left["formal_analysis"] != "analyzed" or (
+            right["formal_analysis"] != "analyzed"
+        ):
+            continue
+        differential.append(
+            {
+                "item": item_id,
+                "make_fx_totals": left["resource_totals"],
+                "torchview_totals": right["resource_totals"],
+                "totals_equal": (
+                    left["resource_totals"] == right["resource_totals"]
+                ),
+            }
+        )
+
+    return differential
 
 
 if __name__ == "__main__":

@@ -61,7 +61,7 @@ def test_render_sudoers_covers_only_exact_amd_smi_clock_commands():
     ],
 )
 def test_render_sudoers_rejects_injection(user, amd_smi, label):
-    with pytest.raises(ValueError, match="unsafe|absolute path"):
+    with pytest.raises(ValueError, match=r"unsafe|absolute path"):
         sudoers.render_sudoers(user=user, amd_smi=amd_smi, label=label)
 
 
@@ -297,8 +297,10 @@ def test_local_rule_contains_exactly_two_target_setters():
         ["/usr/bin/amd-smi", "set", "-l", "AUTO", "-g", UUID],
     ]
     assert text.count(UUID) == 2
-    assert "version" not in text and "/opt/" not in text
-    assert "NOPASSWD: ALL" not in text and "*" not in text
+    assert "version" not in text
+    assert "/opt/" not in text
+    assert "NOPASSWD: ALL" not in text
+    assert "*" not in text
 
 
 @pytest.mark.parametrize(

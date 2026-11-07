@@ -27,7 +27,7 @@ def _row_major_contiguous(view: TensorAccess) -> bool:
     return tuple(view.strides) == tuple(contiguous_strides(view.shape))
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class GraphAccessMaps:
     """Proofs and unresolved reasons; neither is inferred from display strings."""
 
@@ -96,22 +96,7 @@ def _view_maps(
     target = str(semantic.get("target", ""))
     effects = semantic.get("effects") or {}
     inputs = (layer.get("tensor_names") or {}).get("inputs") or []
-    if (
-        effects.get("mutates")
-        or effects.get("atomic")
-        or effects.get("opaque_library_call")
-    ):
-        affected = (
-            [inputs[index] for index in effects.get("mutates") or []]
-            if effects.get("mutates")
-            else inputs
-        )
-        maps.effect_bases.update(
-            maps.tensors[name].base_id
-            for name in affected
-            if name in maps.tensors
-        )
-        raise UnsupportedAccessError(AccessReason.EFFECT)
+    _reject_view_effects(effects, inputs, maps)
     if target == "contiguous":
         # Batch-2 spec: the conditional alias is decidable from strides; a
         # row-major contiguous input makes contiguous a no-op alias, any
@@ -228,3 +213,25 @@ def resolve_graph_accesses(layers: Mapping[str, NodeDict]) -> GraphAccessMaps:
         if not is_source:
             maps.transparent_layers.add(layer_id)
     return maps
+
+
+def _reject_view_effects(
+    effects: NodeDict, inputs: list[str], maps: GraphAccessMaps
+) -> None:
+    """Record affected storage before rejecting an effectful layer."""
+    if (
+        effects.get("mutates")
+        or effects.get("atomic")
+        or effects.get("opaque_library_call")
+    ):
+        affected = (
+            [inputs[index] for index in effects.get("mutates") or []]
+            if effects.get("mutates")
+            else inputs
+        )
+        maps.effect_bases.update(
+            maps.tensors[name].base_id
+            for name in affected
+            if name in maps.tensors
+        )
+        raise UnsupportedAccessError(AccessReason.EFFECT)

@@ -23,8 +23,6 @@ formal-evidence contract.
 
 from __future__ import annotations
 
-from typing import Any
-
 from solar.analysis import formal_evidence
 from solar.analysis.graph_context import (
     GraphTopology,
@@ -37,14 +35,15 @@ from solar.analysis.graph_models import (
     GraphIoTotals,
     LowerBound,
 )
-from solar.analysis.mixin_contract import AnalysisMixinContract
 from solar.analysis.orojenesis.runner import (
     OrojenesisRunner,
 )
+from solar.composition import BoundComponent
 from solar.schema_versions import OROJENESIS_ANALYSIS_SCHEMA_VERSION
+from solar.types import NodeDict
 
 
-class FormalAnalysisMixin(AnalysisMixinContract):
+class FormalBoundAnalyzer(BoundComponent):
     """Compute formal lower bounds and proof requirements."""
 
     def _run_formal_analysis(
@@ -62,11 +61,11 @@ class FormalAnalysisMixin(AnalysisMixinContract):
         )
         if not (prepared.semantic_graph and prepared.semantic_complete):
             return FormalAnalysis(
-                None,
-                orojenesis,
-                io_totals.fused_bytes,
-                io_totals.fused_bytes,
-                False,
+                fusion=None,
+                orojenesis=orojenesis,
+                audited_fused_bytes=io_totals.fused_bytes,
+                audited_prefetched_bytes=io_totals.fused_bytes,
+                tile_aware_bound=False,
             )
         plan = self._plan_fusion(prepared, topology)
         orojenesis["unsupported_contraction_layers"] = list(
@@ -153,7 +152,7 @@ class FormalAnalysisMixin(AnalysisMixinContract):
         seconds: float | None = None
         resource_seconds: dict[str, float] = {}
         compute_resource: str | None = None
-        components: dict[str, Any] | None = None
+        components: NodeDict | None = None
         if (
             prepared.profile is not None
             and prepared.semantic_graph
@@ -192,8 +191,8 @@ class FormalAnalysisMixin(AnalysisMixinContract):
                 "strict analysis did not produce a complete tile-aware bound",
             )
         return LowerBound(
-            seconds,
-            resource_seconds,
-            compute_resource,
-            components,
+            seconds=seconds,
+            resource_seconds=resource_seconds,
+            compute_resource=compute_resource,
+            components=components,
         )

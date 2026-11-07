@@ -16,14 +16,14 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticSidecarStatus,
     SizedDiagnosticArtifactCitation,
 )
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+)
 from sol_execbench.core.bench.profile_summary.models import (
     ProfileSummaryBottleneckHint,
     ProfileSummaryContent,
     ProfileSummaryKernelMetric,
     ProfileSummaryStructuredMetric,
-)
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
 )
 
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
@@ -47,10 +47,10 @@ class ProfileSummarySidecar(CurrentDiagnosticSidecarEnvelope):
     """Strict diagnostic-only sidecar for normalized profiler metadata."""
 
     model_config = _MODEL_CONFIG
-    current_schema_version = SchemaVersion.PROFILE_SUMMARY
+    current_schema_version = PerformanceArtifactSchema.PROFILE_SUMMARY
 
-    schema_version: Literal[SchemaVersion.PROFILE_SUMMARY] = (
-        SchemaVersion.PROFILE_SUMMARY
+    schema_version: Literal[PerformanceArtifactSchema.PROFILE_SUMMARY] = (
+        PerformanceArtifactSchema.PROFILE_SUMMARY
     )
     status: DiagnosticSidecarStatus
     reason_code: ProfileSummaryReasonCode

@@ -51,7 +51,7 @@ from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeGPUTelemetry,
 )
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
-from sol_execbench.core.platform.runtime import PCIeTopologyIdentity
+from sol_execbench.core.platform.hardware import PCIeTopologyIdentity
 
 console = Console(stderr=True)
 

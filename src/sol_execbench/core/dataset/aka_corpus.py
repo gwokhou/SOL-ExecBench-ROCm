@@ -5,7 +5,7 @@
 
 Replaces the NVIDIA-parquet corpus engine. Benchmark problems are authored
 artifacts derived from AMD AgentKernelArena (AKA) tasks under the methodology in
-``docs/internal/aka-sol-task-source-research.md`` §8 and the SOL-ExecBench paper
+``docs/internal/aka-sol-task-source-case-study.md`` §8 and the SOL-ExecBench paper
 (arXiv 2603.19173) §3. Each problem is committed under
 ``problems/AMD_AKA/<suite>/<name>/`` as ``definition.json`` + ``workload.jsonl``
 (+ optional ``reference.py``), in the current schema consumed by
@@ -71,14 +71,14 @@ from sol_execbench.core.dataset.aka_schemas import (
 from sol_execbench.core.dataset.aka_tolerance import (
     validate_calibration_binding,
 )
+from sol_execbench.core.dataset.schema_versions import (
+    AKA_CORPUS_MANIFEST_SCHEMA_VERSION,
+    AKA_MATERIALIZATION_MANIFEST_SCHEMA_VERSION,
+)
 from sol_execbench.core.integrity import (
     sha256_file,
     validate_relative_artifact_path,
     validate_sha256,
-)
-from sol_execbench.core.integrity.schema_versions import (
-    AKA_CORPUS_MANIFEST_SCHEMA_VERSION,
-    AKA_MATERIALIZATION_MANIFEST_SCHEMA_VERSION,
 )
 from sol_execbench.core.platform.runtime import derive_cache_clear_policy
 
@@ -92,8 +92,6 @@ AKA_PROVENANCE_CLASS = "ecosystem_grounded"
 # in solar_bridge.formal_device.FORMAL_ARCHITECTURE.
 FORMAL_ARCHITECTURE = "solar:RX_9060_XT"
 FORMAL_GFX_TARGET = "gfx1200"
-# Reviewed rx9060xt-amd-resource-v6: ROCm 10.1 audit/support evidence changed;
-# nominal rates did not. Keep this pin explicit so evidence drift is rejected.
 FORMAL_ARCHITECTURE_SHA256 = (
     "f77f2f1301a7a08cc8679d91fde4b216e83faf348888829a52a2bae60c78a604"
 )
@@ -106,7 +104,7 @@ SEED_SET_MIN_PROBLEMS = 15
 SEED_SET_MAX_PROBLEMS = 48
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AKAArtifactBinding:
     """One content-addressed file within an AKA task."""
 
@@ -115,7 +113,7 @@ class AKAArtifactBinding:
     sha256: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AKACorpusEntry:
     """One AKA-derived problem selected into the seed set."""
 
@@ -142,7 +140,7 @@ class AKACorpusEntry:
         return Path(self.suite) / self.problem_name
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AKACorpusManifest:
     """Validated AKA-derived corpus manifest."""
 
@@ -201,15 +199,17 @@ class AKACorpusManifest:
             ),
         )
         return cls(
-            manifest_path,
-            dict(data.get("source") or {}),
-            load_execution_targets(data.get("execution_targets") or {}),
-            dict(data.get("formal_analysis") or {}),
-            entries,
-            materialized_problem_sha256,
-            coverage,
-            dict(data.get("official_scoring") or {}),
-            calibration,
+            path=manifest_path,
+            source=dict(data.get("source") or {}),
+            execution_targets=load_execution_targets(
+                data.get("execution_targets") or {}
+            ),
+            formal_analysis=dict(data.get("formal_analysis") or {}),
+            entries=entries,
+            materialized_problem_sha256=materialized_problem_sha256,
+            formal_coverage_requirements=coverage,
+            official_scoring=dict(data.get("official_scoring") or {}),
+            tolerance_calibration=calibration,
         )
 
     def materialize(

@@ -42,7 +42,7 @@ class CustomInputFailureClass(StrEnum):
     DEVICE_MISMATCH = "gen_inputs_device_mismatch"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CustomInputProvenance:
     """Reproducibility and failure metadata for custom input generation."""
 

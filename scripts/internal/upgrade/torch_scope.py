@@ -28,9 +28,11 @@ from sol_execbench.core.bench.rocm_profiler.pmc_clock import (
     TARGET_ROCR_UUID,
     pmc_clock_window,
 )
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.integrity.checksums import sha256_file
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 REPETITIONS = 3
 TIMEOUT_SECONDS = 60
@@ -141,7 +143,7 @@ def _collect(
         "ROCP_TOOL_LIBRARIES": str(tool),
         "SOL_SCOPE_LEDGER": str(directory / "ledger.json"),
         "SOL_SCOPE_RUN": nonce,
-        "SOL_SCOPE_SCHEMA": str(SchemaVersion.HIP_SDK_LEDGER),
+        "SOL_SCOPE_SCHEMA": str(ProfilerArtifactSchema.HIP_SDK_LEDGER),
         "SOL_SCOPE_MAX_ROWS": str(MAX_SDK_API_RECORDS),
     }
     previous = {key: os.environ.get(key) for key in environment}

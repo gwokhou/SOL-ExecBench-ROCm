@@ -10,11 +10,13 @@ from sol_execbench.core.bench.rocm_profiler.hip_causality_models import (
     MAX_CAUSAL_RECORDS,
     HIPEventDispatchLink,
 )
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
 from sol_execbench.core.data.base_model import (
     BaseModelWithDocstrings,
     CurrentFrozenSchemaModel,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 SHA256_PATTERN = r"^[0-9a-f]{64}$"
 UUID_PATTERN = r"^[0-9a-f]{32}$"
@@ -69,9 +71,9 @@ class HIPTraceJournal(CurrentFrozenSchemaModel):
     """A normally terminated independent journal from the trusted executor."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
-    current_schema_version = SchemaVersion.HIP_TRACE_JOURNAL
-    schema_version: Literal[SchemaVersion.HIP_TRACE_JOURNAL] = (
-        SchemaVersion.HIP_TRACE_JOURNAL
+    current_schema_version = ProfilerArtifactSchema.HIP_TRACE_JOURNAL
+    schema_version: Literal[ProfilerArtifactSchema.HIP_TRACE_JOURNAL] = (
+        ProfilerArtifactSchema.HIP_TRACE_JOURNAL
     )
     run_id: str = Field(pattern=UUID_PATTERN)
     workload_id: str = Field(min_length=1)
@@ -121,9 +123,9 @@ class HIPBoundDispatch(BaseModelWithDocstrings):
 class HIPTraceScopeQualification(CurrentFrozenSchemaModel):
     """Qualified only relative to an independently audited executor call set."""
 
-    current_schema_version = SchemaVersion.HIP_TRACE_SCOPE
-    schema_version: Literal[SchemaVersion.HIP_TRACE_SCOPE] = (
-        SchemaVersion.HIP_TRACE_SCOPE
+    current_schema_version = ProfilerArtifactSchema.HIP_TRACE_SCOPE
+    schema_version: Literal[ProfilerArtifactSchema.HIP_TRACE_SCOPE] = (
+        ProfilerArtifactSchema.HIP_TRACE_SCOPE
     )
     status: Literal["qualified_controlled_scope"] = "qualified_controlled_scope"
     scope: HIPScopeExpectation

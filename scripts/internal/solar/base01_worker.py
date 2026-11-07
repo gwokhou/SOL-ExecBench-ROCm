@@ -106,7 +106,8 @@ def observe_accounting(
         else "einsum_graph.yaml"
     )
     graph = IRGraphArtifact(
-        output / "conversion" / graph_name, conversion.ir_path.ir_kind
+        path=output / "conversion" / graph_name,
+        kind=conversion.ir_path.ir_kind,
     )
     request = AnalysisRequest(
         conversion=conversion,

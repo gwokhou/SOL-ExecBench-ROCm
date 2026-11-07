@@ -24,14 +24,13 @@ This module provides einsum handlers for:
 """
 
 import string
-from typing import Any
 
 from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOp,
     EinsumOperand,
     EinsumOpHandler,
 )
-from solar.types import TensorShape, TensorShapes
+from solar.types import DynamicValue, TensorShape, TensorShapes
 
 
 class EmbeddingHandler(EinsumOpHandler):
@@ -43,7 +42,7 @@ class EmbeddingHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for embedding lookup."""
         if tensor_shapes.num_inputs < 2:
@@ -71,9 +70,13 @@ class EmbeddingHandler(EinsumOpHandler):
         batch_labels = string.ascii_uppercase[:batch_dims]
 
         operands = [
-            EinsumOperand("Input", list(batch_labels), is_output=False),
-            EinsumOperand("Weight", ["V", "D"], is_output=False),
-            EinsumOperand("Output", list(batch_labels) + ["D"], is_output=True),
+            EinsumOperand(
+                name="Input", dims=list(batch_labels), is_output=False
+            ),
+            EinsumOperand(name="Weight", dims=["V", "D"], is_output=False),
+            EinsumOperand(
+                name="Output", dims=[*batch_labels, "D"], is_output=True
+            ),
         ]
 
         equation = f"{batch_labels},VD->{batch_labels}D"
@@ -97,7 +100,7 @@ class GRUHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for GRU."""
         input_shape = (
@@ -136,11 +139,11 @@ class GRUHandler(EinsumOpHandler):
         GRU has 3 gates (reset, update, new) each with ih and hh weights.
         """
         operands = [
-            EinsumOperand("Input", ["S", "B", "I"], is_output=False),
-            EinsumOperand("Weight_ih", ["G", "I"], is_output=False),
-            EinsumOperand("Weight_hh", ["G", "H"], is_output=False),
-            EinsumOperand("Hidden", ["B", "H"], is_output=False),
-            EinsumOperand("Output", ["S", "B", "H"], is_output=True),
+            EinsumOperand(name="Input", dims=["S", "B", "I"], is_output=False),
+            EinsumOperand(name="Weight_ih", dims=["G", "I"], is_output=False),
+            EinsumOperand(name="Weight_hh", dims=["G", "H"], is_output=False),
+            EinsumOperand(name="Hidden", dims=["B", "H"], is_output=False),
+            EinsumOperand(name="Output", dims=["S", "B", "H"], is_output=True),
         ]
 
         equation = "SBI,GI,GH,BH->SBH"
@@ -163,7 +166,7 @@ class LSTMHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for LSTM."""
         input_shape = (
@@ -206,12 +209,12 @@ class LSTMHandler(EinsumOpHandler):
         LSTM has 4 gates (input, forget, cell, output) each with ih and hh weights.
         """
         operands = [
-            EinsumOperand("Input", ["S", "B", "I"], is_output=False),
-            EinsumOperand("Weight_ih", ["G", "I"], is_output=False),
-            EinsumOperand("Weight_hh", ["G", "H"], is_output=False),
-            EinsumOperand("Hidden", ["B", "H"], is_output=False),
-            EinsumOperand("Cell", ["B", "H"], is_output=False),
-            EinsumOperand("Output", ["S", "B", "H"], is_output=True),
+            EinsumOperand(name="Input", dims=["S", "B", "I"], is_output=False),
+            EinsumOperand(name="Weight_ih", dims=["G", "I"], is_output=False),
+            EinsumOperand(name="Weight_hh", dims=["G", "H"], is_output=False),
+            EinsumOperand(name="Hidden", dims=["B", "H"], is_output=False),
+            EinsumOperand(name="Cell", dims=["B", "H"], is_output=False),
+            EinsumOperand(name="Output", dims=["S", "B", "H"], is_output=True),
         ]
 
         equation = "SBI,GI,GH,BH,BH->SBH"
@@ -234,7 +237,7 @@ class RNNHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for basic RNN."""
         (
@@ -244,11 +247,11 @@ class RNNHandler(EinsumOpHandler):
         )
 
         operands = [
-            EinsumOperand("Input", ["S", "B", "I"], is_output=False),
-            EinsumOperand("Weight_ih", ["H", "I"], is_output=False),
-            EinsumOperand("Weight_hh", ["H", "H"], is_output=False),
-            EinsumOperand("Hidden", ["B", "H"], is_output=False),
-            EinsumOperand("Output", ["S", "B", "H"], is_output=True),
+            EinsumOperand(name="Input", dims=["S", "B", "I"], is_output=False),
+            EinsumOperand(name="Weight_ih", dims=["H", "I"], is_output=False),
+            EinsumOperand(name="Weight_hh", dims=["H", "H"], is_output=False),
+            EinsumOperand(name="Hidden", dims=["B", "H"], is_output=False),
+            EinsumOperand(name="Output", dims=["S", "B", "H"], is_output=True),
         ]
 
         equation = "SBI,HI,HH,BH->SBH"
@@ -271,7 +274,7 @@ class CrossEntropyHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for cross-entropy loss."""
         pred = tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else None
@@ -303,11 +306,11 @@ class CrossEntropyHandler(EinsumOpHandler):
         out_labels = labels[0] if reduction == "none" else ""
 
         operands = [
-            EinsumOperand("Input", list(labels), is_output=False),
-            EinsumOperand("Target", [labels[0]], is_output=False),
+            EinsumOperand(name="Input", dims=list(labels), is_output=False),
+            EinsumOperand(name="Target", dims=[labels[0]], is_output=False),
             EinsumOperand(
-                "Output",
-                list(out_labels) if out_labels else [],
+                name="Output",
+                dims=list(out_labels) if out_labels else [],
                 is_output=True,
             ),
         ]
@@ -346,7 +349,7 @@ class PairwiseLossHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for pairwise loss."""
         pred = tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else None
@@ -391,11 +394,13 @@ class PairwiseLossHandler(EinsumOpHandler):
         out_labels = labels if reduction == "none" else ""
 
         operands = [
-            EinsumOperand("Input", list(labels), is_output=False),
-            EinsumOperand("Target", list(target_labels), is_output=False),
+            EinsumOperand(name="Input", dims=list(labels), is_output=False),
             EinsumOperand(
-                "Output",
-                list(out_labels) if out_labels else [],
+                name="Target", dims=list(target_labels), is_output=False
+            ),
+            EinsumOperand(
+                name="Output",
+                dims=list(out_labels) if out_labels else [],
                 is_output=True,
             ),
         ]
@@ -425,7 +430,7 @@ class TopKHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Build a non-contraction representation for exact ATen replay."""
         del kwargs
@@ -439,8 +444,10 @@ class TopKHandler(EinsumOpHandler):
         )
         return EinsumOp(
             operands=[
-                EinsumOperand("Input", input_labels, is_output=False),
-                EinsumOperand("Output", output_labels, is_output=True),
+                EinsumOperand(name="Input", dims=input_labels, is_output=False),
+                EinsumOperand(
+                    name="Output", dims=output_labels, is_output=True
+                ),
             ],
             equation=(f"{''.join(input_labels)}->{''.join(output_labels)}"),
             name=op_name,
@@ -474,7 +481,7 @@ class TrivialOpsHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for trivial operations."""
         if tensor_shapes.num_inputs < 1:
@@ -494,8 +501,8 @@ class TrivialOpsHandler(EinsumOpHandler):
         labels = string.ascii_uppercase[:dims]
 
         operands = [
-            EinsumOperand("Input", list(labels), is_output=False),
-            EinsumOperand("Output", list(labels), is_output=True),
+            EinsumOperand(name="Input", dims=list(labels), is_output=False),
+            EinsumOperand(name="Output", dims=list(labels), is_output=True),
         ]
 
         equation = f"{labels}->{labels}"

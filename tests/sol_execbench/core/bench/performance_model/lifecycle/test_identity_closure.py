@@ -26,7 +26,6 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     DiagnosticReleaseLifecycleManifest,
     DiagnosticRetentionClass,
     DiagnosticStageStatus,
-    GpuLifecycleIdentity,
     SoftwareLifecycleIdentity,
     acceptance_id,
     calibration_id,
@@ -39,7 +38,11 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     recompute_stage_id,
     release_id,
 )
-from sol_execbench.core.platform.runtime import (
+from sol_execbench.core.bench.performance_model.lifecycle.schema_versions import (
+    DiagnosticLifecycleSchema,
+)
+from sol_execbench.core.platform.hardware import (
+    HardwareExecutionIdentity,
     PCIeLinkIdentity,
     PCIeTopologyIdentity,
 )
@@ -81,7 +84,7 @@ _TOPOLOGY = PCIeTopologyIdentity(
     effective_width=_LINK.current_width,
 )
 
-_GPU = GpuLifecycleIdentity(
+_GPU = HardwareExecutionIdentity(
     gpu_architecture="gfx1200",
     gpu_id="a3ff7590-0000-1000-800f-a29c1cca1511",
     gpu_bdf="0000:03:00.0",
@@ -94,30 +97,7 @@ _GPU = GpuLifecycleIdentity(
 _SW = SoftwareLifecycleIdentity(sol_version="4.0.0", python_version="3.13")
 
 
-_SCHEMA_BY_STAGE: dict[DiagnosticLifecycleStage, str] = {
-    DiagnosticLifecycleStage.DESIGN: "sol_execbench.diagnostic_lifecycle_design.v2",
-    DiagnosticLifecycleStage.COLLECTION_RUN: (
-        "sol_execbench.diagnostic_lifecycle_collection_run.v2"
-    ),
-    DiagnosticLifecycleStage.CORPUS_SNAPSHOT: (
-        "sol_execbench.diagnostic_lifecycle_corpus_snapshot.v2"
-    ),
-    DiagnosticLifecycleStage.CALIBRATION: (
-        "sol_execbench.diagnostic_lifecycle_calibration.v2"
-    ),
-    DiagnosticLifecycleStage.MODEL_BUILD: (
-        "sol_execbench.diagnostic_lifecycle_model_build.v2"
-    ),
-    DiagnosticLifecycleStage.ACCEPTANCE: (
-        "sol_execbench.diagnostic_lifecycle_acceptance.v2"
-    ),
-    DiagnosticLifecycleStage.PUBLICATION: (
-        "sol_execbench.diagnostic_lifecycle_publication.v2"
-    ),
-    DiagnosticLifecycleStage.RELEASE: (
-        "sol_execbench.diagnostic_lifecycle_release.v2"
-    ),
-}
+_LIFECYCLE_SCHEMA = DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_MANIFEST
 
 
 def _manifest_data(
@@ -129,7 +109,7 @@ def _manifest_data(
     return {
         "stage": stage,
         "stage_id": stage_id,
-        "schema_version": _SCHEMA_BY_STAGE[stage],
+        "schema_version": _LIFECYCLE_SCHEMA,
         "status": DiagnosticStageStatus.VERIFIED,
         "retention_class": DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE,
         "source_revision": _SOURCE,
@@ -334,7 +314,7 @@ def test_calibration_identity_recomputes_and_binds_hardware() -> None:
 
 
 def test_calibration_rejects_partial_gpu_identity() -> None:
-    partial_gpu = GpuLifecycleIdentity(gpu_architecture="gfx1200")
+    partial_gpu = HardwareExecutionIdentity(gpu_architecture="gfx1200")
     with pytest.raises(ValidationError, match="gpu_identity is missing"):
         DiagnosticCalibrationLifecycleManifest.model_validate(
             _manifest_data(
@@ -449,6 +429,7 @@ def test_release_identity_recomputes() -> None:
         source_revision=_SOURCE,
         producer_version="4.0.0",
         archive_size_bytes=99,
+        hardware_validation_receipt_sha256="c" * 64,
     )
     manifest = DiagnosticReleaseLifecycleManifest.model_validate(
         _manifest_data(
@@ -457,6 +438,7 @@ def test_release_identity_recomputes() -> None:
             archive_sha256=D_ARCHIVE,
             archive_size_bytes=99,
             attestation_sha256=D_ATTEST,
+            hardware_validation_receipt_sha256="c" * 64,
             producer_version="4.0.0",
             parents=(_parent(DiagnosticLifecycleStage.PUBLICATION, D_PUB),),
         ),
@@ -584,6 +566,7 @@ def test_source_revision_changes_every_stage_identity() -> None:
                     source_revision=revision,
                     producer_version="4.0.0",
                     archive_size_bytes=99,
+                    hardware_validation_receipt_sha256="c" * 64,
                 )
                 for revision in revisions
             }

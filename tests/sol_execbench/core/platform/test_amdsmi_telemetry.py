@@ -85,7 +85,8 @@ def test_capture_keeps_raw_before_binding_bool_conversion(
     assert isinstance(raw_result, dict)
     field = cast(dict[str, object], raw_result.get("throttle_status"))
     assert isinstance(field, dict)
-    assert field["value"] == raw and field["type"] == "int"
+    assert field["value"] == raw
+    assert field["type"] == "int"
     assert field["binding_value"] == converted
     assert field["binding_type"] == type(converted).__name__
     assert result["metrics_header"] == {

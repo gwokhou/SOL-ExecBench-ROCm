@@ -22,9 +22,11 @@ from sol_execbench.core.bench.rocm_profiler.pmc_clock import (
     TARGET_ROCR_UUID,
     pmc_clock_window,
 )
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.integrity.checksums import sha256_bytes, sha256_file
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 CASES = ("reuse", "recreate", "independent")
 REPETITIONS = 3
@@ -44,7 +46,7 @@ def collect_case(probe: Path, directory: Path, case: str) -> dict:
         str(journal),
         nonce,
         binary_hash,
-        str(SchemaVersion.HIP_TRACE_JOURNAL),
+        str(ProfilerArtifactSchema.HIP_TRACE_JOURNAL),
     )
     sources = {
         name: sha256_file(Path(__file__).with_name(name))

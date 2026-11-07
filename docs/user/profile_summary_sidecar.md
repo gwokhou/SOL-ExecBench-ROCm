@@ -15,7 +15,8 @@ profile metadata sidecar remains the raw diagnostic metadata record and is cited
 from the normalized profile summary when present.
 
 When a `rocprofv3` profile result is supplied, the summary carries bounded
-artifact registration metadata from `sol_execbench.rocprofv3_profile.v1`:
+artifact registration metadata from the `profile` variant of
+`sol_execbench.rocprofv3_session.v1`:
 `summary.artifact_coverage_status`, `summary.reason_codes`,
 `summary.warnings`, `summary.artifact_count`, and `summary.artifact_kinds`.
 Return-code-zero profile runs can report partial profiler status when
@@ -70,7 +71,7 @@ work is independent. An explicitly successful `hipEventSynchronize` for the same
 event can establish completion before rerecording; an event observation timestamp
 alone is not an exact completion fence. See the [acceptance criteria and evidence boundary](../internal/hip-event-causality-acceptance.md).
 
-The performance model's `sol_execbench.performance_schedule_evidence.v3`
+The performance model's nested schedule evidence
 retains only verified precedence: same-lane order, plus cross-lane
 `event_wait` edges when an independently qualified scope schedule supplied
 verified event links. Timestamp order across lanes still does not establish a

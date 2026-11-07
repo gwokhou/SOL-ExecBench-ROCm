@@ -44,7 +44,8 @@ def test_compile_parallel_is_bounded_and_ordered(
     result = producer._compile_calibration_binaries(
         "gfx1200", tmp_path, "mock", compile_jobs=8
     )
-    assert peak == 2 and active == 0
+    assert peak == 2
+    assert active == 0
     assert list(result) == [f"{i}.hip" for i in range(5)]
 
 

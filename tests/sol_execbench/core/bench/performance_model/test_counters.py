@@ -41,7 +41,10 @@ def test_counter_parser_aligns_passes_without_exposing_duration(
     _write_pass(second, 99, "FETCH_SIZE", "2")
 
     dispatches = parse_and_align_counter_passes(
-        [CounterPassCSV(1, first), CounterPassCSV(2, second)],
+        [
+            CounterPassCSV(pass_index=1, path=first),
+            CounterPassCSV(pass_index=2, path=second),
+        ],
         workload_uuid="workload-1",
         candidate_sha256="c" * 64,
         required_counters={"SQ_WAVES_sum", "FETCH_SIZE"},
@@ -70,7 +73,10 @@ def test_counter_parser_invalidates_cross_pass_misalignment(
     )
 
     dispatches = parse_and_align_counter_passes(
-        [CounterPassCSV(1, first), CounterPassCSV(2, second)],
+        [
+            CounterPassCSV(pass_index=1, path=first),
+            CounterPassCSV(pass_index=2, path=second),
+        ],
         workload_uuid="workload-1",
         candidate_sha256="c" * 64,
     )
@@ -169,7 +175,7 @@ def test_counter_parser_rejects_negative_hardware_values(
 
     with pytest.raises(ValueError, match="negative_counter_value"):
         parse_and_align_counter_passes(
-            [CounterPassCSV(1, counter_path)],
+            [CounterPassCSV(pass_index=1, path=counter_path)],
             workload_uuid="workload-1",
             candidate_sha256="c" * 64,
         )

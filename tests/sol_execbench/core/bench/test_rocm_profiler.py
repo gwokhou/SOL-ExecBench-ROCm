@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 from collections.abc import Sequence
+from typing import Any, cast
 
 import pytest
 
@@ -17,12 +18,14 @@ from sol_execbench.core.bench.rocm_profiler import (
     parse_rocprofv3_csv,
     select_default_timing,
 )
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
 from sol_execbench.core.bench.timing_policy import (
     TimingBackend,
     TimingSourceType,
     select_timing_policy,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 ROCPROFV3_CSV = """Domain,Name,Start_Timestamp,End_Timestamp,Duration(ns)
 KERNEL_DISPATCH,rmsnorm_kernel,1000,5000,4000
@@ -190,11 +193,11 @@ def test_profile_collection_records_success_metadata(tmp_path):
     )
 
     result = collect_rocprofv3_profile(request, runner=runner)
-    payload = result.to_dict()
+    payload = cast(Any, result.to_dict())
 
     assert result.succeeded is True
     assert calls[0][-3:] == ["--", "python", "eval_driver.py"]
-    assert payload["schema_version"] == SchemaVersion.ROCPROFV3_PROFILE
+    assert payload["schema_version"] == ProfilerArtifactSchema.ROCPROFV3_SESSION
     assert payload["diagnostic_only"] is True
     assert payload["score_authority"] is False
     assert payload["status"] == "success"
@@ -266,7 +269,7 @@ def test_profile_collection_unavailable_is_nonfatal_metadata(tmp_path):
     assert result.status == "unavailable"
     assert result.returncode is None
     assert result.skipped_reason == "rocprofv3 is not available on PATH"
-    payload = result.to_dict()
+    payload = cast(Any, result.to_dict())
     assert payload["artifact_coverage_status"] == "unavailable"
     assert payload["reason_codes"] == ["rocprof_unavailable"]
     assert payload["artifacts"] == []
@@ -293,7 +296,7 @@ def test_profile_collection_failure_records_artifact_and_stderr_tail(tmp_path):
     )
 
     result = collect_rocprofv3_profile(request, runner=runner)
-    payload = result.to_dict()
+    payload = cast(Any, result.to_dict())
 
     assert result.status == "failed"
     assert payload["returncode"] == 22
@@ -332,7 +335,7 @@ def test_profile_collection_no_artifacts_records_stable_reason_code(tmp_path):
     )
 
     result = collect_rocprofv3_profile(request, runner=runner)
-    payload = result.to_dict()
+    payload = cast(Any, result.to_dict())
 
     assert result.status == "partial"
     assert result.succeeded is False
@@ -371,7 +374,7 @@ def test_profile_collection_no_profiler_data_registers_diagnostic_log(tmp_path):
     )
 
     result = collect_rocprofv3_profile(request, runner=runner)
-    payload = result.to_dict()
+    payload = cast(Any, result.to_dict())
 
     assert result.status == "partial"
     assert result.succeeded is False
@@ -429,7 +432,7 @@ def test_profile_collection_existing_diagnostic_log_does_not_count_as_success(
     )
 
     result = collect_rocprofv3_profile(request, runner=runner)
-    payload = result.to_dict()
+    payload = cast(Any, result.to_dict())
 
     assert result.status == "partial"
     assert result.succeeded is False
@@ -488,7 +491,7 @@ def test_timing_evidence_contains_auditable_profiler_fields():
         trial_count=1,
         clock_locked=True,
     )
-    payload = evidence.to_dict()
+    payload = cast(Any, evidence.to_dict())
 
     assert payload["derived"] is True
     assert payload["canonical_output"] == "trace_jsonl"
@@ -561,7 +564,7 @@ def test_live_collection_invokes_runner_and_reads_generated_csv(tmp_path):
     )
 
     result = collect_rocprofv3_timing(request, runner=runner)
-    payload = result.to_dict()
+    payload = cast(Any, result.to_dict())
 
     assert result.profiler_collected is True
     assert calls

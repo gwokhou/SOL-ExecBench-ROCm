@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
+from concurrent.futures import Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -41,7 +41,7 @@ from sol_execbench.core.solar_bridge.resource_policy import (
 from sol_execbench.core.solar_bridge.runner import run_solar_worker
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SolarReleaseResult:
     """Summary of an exact formal-manifest release build."""
 
@@ -53,7 +53,7 @@ class SolarReleaseResult:
     ir_path: IRPath = DEFAULT_IR_PATH
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _SolarReleaseWorkItem:
     """One deterministically ordered release workload invocation."""
 
@@ -299,7 +299,7 @@ def _run_parallel_items(
         for _ in range(min(jobs, len(items))):
             _submit_next(executor, active, iterator, timeout_seconds)
         while active:
-            done, _ = wait(active, return_when=FIRST_COMPLETED)
+            done, _ = wait(active)
             completed = sorted(
                 ((active.pop(future), future) for future in done),
                 key=lambda pair: pair[0].ordinal,

@@ -67,7 +67,11 @@ def extract_bound(
     elif kind not in SOL_BOUND_KINDS:
         raise ValueError(f"analysis returned unsupported bound kind {kind!r}")
     resource = total.get("compute_resource")
-    return SOLBound(float(seconds), kind, str(resource) if resource else None)
+    return SOLBound(
+        seconds=float(seconds),
+        kind=kind,
+        limiting_resource=str(resource) if resource else None,
+    )
 
 
 def finish_artifacts(
@@ -99,7 +103,10 @@ def finish_artifacts(
     if missing:
         raise ValueError(f"analysis is missing required artifacts: {missing}")
     return tuple(
-        ArtifactRef(path.relative_to(staging).as_posix(), sha256_file(path))
+        ArtifactRef(
+            path=path.relative_to(staging).as_posix(),
+            sha256=sha256_file(path),
+        )
         for path in paths
     )
 

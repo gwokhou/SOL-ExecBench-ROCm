@@ -7,15 +7,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 
 
 def write_worker_response(
     path: Path,
-    response: Mapping[str, Any],
-    fallback: Mapping[str, Any],
+    response: Mapping[str, object],
+    fallback: Mapping[str, object],
 ) -> bool:
     """Write a response atomically, replacing unserializable output with failure."""
     try:

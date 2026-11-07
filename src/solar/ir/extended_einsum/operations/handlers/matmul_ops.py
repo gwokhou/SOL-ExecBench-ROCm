@@ -22,14 +22,12 @@ This module provides einsum handlers for:
 - mm (2D matrix multiplication)
 """
 
-from typing import Any
-
 from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOp,
     EinsumOperand,
     EinsumOpHandler,
 )
-from solar.types import TensorShape, TensorShapes
+from solar.types import DynamicValue, TensorShape, TensorShapes
 
 
 class MatmulHandler(EinsumOpHandler):
@@ -41,7 +39,7 @@ class MatmulHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for matrix multiplication."""
         input_shape = tensor_shapes.inputs[0]
@@ -83,9 +81,9 @@ class MatmulHandler(EinsumOpHandler):
             *(["N"] if other_rank > 1 else []),
         ]
         operands = [
-            EinsumOperand("Input", input_dims, is_output=False),
-            EinsumOperand("Weight", other_dims, is_output=False),
-            EinsumOperand("Output", output_dims, is_output=True),
+            EinsumOperand(name="Input", dims=input_dims, is_output=False),
+            EinsumOperand(name="Weight", dims=other_dims, is_output=False),
+            EinsumOperand(name="Output", dims=output_dims, is_output=True),
         ]
         return EinsumOp(
             operands=operands,
@@ -108,7 +106,7 @@ class LinearHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for linear layer."""
         input_shape = tensor_shapes.inputs[0]
@@ -143,14 +141,14 @@ class LinearHandler(EinsumOpHandler):
         batch_dims = len(input_shape) - 1
         batch_letters = [f"B{i}" for i in range(batch_dims)]
 
-        input_dims = batch_letters + ["K"]
+        input_dims = [*batch_letters, "K"]
         weight_dims = ["N", "K"]  # Weight is [out_features, in_features]
-        output_dims = batch_letters + ["N"]
+        output_dims = [*batch_letters, "N"]
 
         operands = [
-            EinsumOperand("Input", input_dims, is_output=False),
-            EinsumOperand("Weight", weight_dims, is_output=False),
-            EinsumOperand("Output", output_dims, is_output=True),
+            EinsumOperand(name="Input", dims=input_dims, is_output=False),
+            EinsumOperand(name="Weight", dims=weight_dims, is_output=False),
+            EinsumOperand(name="Output", dims=output_dims, is_output=True),
         ]
 
         input_str = "".join(input_dims)
@@ -176,7 +174,7 @@ class BmmHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for batch matrix multiplication."""
         input_shape = tensor_shapes.inputs[0]
@@ -199,9 +197,9 @@ class BmmHandler(EinsumOpHandler):
         bmm: [B, M, K] x [B, K, N] -> [B, M, N]
         """
         operands = [
-            EinsumOperand("Input", ["B", "M", "K"], is_output=False),
-            EinsumOperand("Weight", ["B", "K", "N"], is_output=False),
-            EinsumOperand("Output", ["B", "M", "N"], is_output=True),
+            EinsumOperand(name="Input", dims=["B", "M", "K"], is_output=False),
+            EinsumOperand(name="Weight", dims=["B", "K", "N"], is_output=False),
+            EinsumOperand(name="Output", dims=["B", "M", "N"], is_output=True),
         ]
 
         equation = "BMK,BKN->BMN"

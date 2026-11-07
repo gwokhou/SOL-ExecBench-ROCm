@@ -44,6 +44,7 @@ from solar.api import AnalysisRequest, analyze
 from solar.artifacts import sha256_file
 from solar.graph.extraction import extract_operator_graph
 from solar.ir.contracts import IRPath
+from solar.schema_versions import SchemaVersion
 from solar.shapes import (
     Assumption,
     AssumptionOp,
@@ -88,37 +89,61 @@ def r06_shape_domain() -> ShapeDomain:
     return ShapeDomain(
         domain_id="r06-moe-topk-softmax-shape-v1",
         symbols={
-            "T": ShapeSymbol("T", 64, 1024, 64, provenance="definition.axes:T"),
-            "E": ShapeSymbol("E", 64, 256, 64, provenance="definition.axes:E"),
-            "K": ShapeSymbol("K", 2, 256, 2, provenance="definition.axes:K"),
+            "T": ShapeSymbol(
+                name="T",
+                lower=64,
+                upper=1024,
+                divisibility=64,
+                provenance="definition.axes:T",
+            ),
+            "E": ShapeSymbol(
+                name="E",
+                lower=64,
+                upper=256,
+                divisibility=64,
+                provenance="definition.axes:E",
+            ),
+            "K": ShapeSymbol(
+                name="K",
+                lower=2,
+                upper=256,
+                divisibility=2,
+                provenance="definition.axes:K",
+            ),
         },
         tensors={
             "gating": TensorBinding(
-                "gating",
-                TensorRole.INPUT,
-                (DimExpr.symbol("T"), DimExpr.symbol("E")),
+                tensor="gating",
+                role=TensorRole.INPUT,
+                dims=(DimExpr.symbol("T"), DimExpr.symbol("E")),
             ),
             "bias": TensorBinding(
-                "bias", TensorRole.INPUT, (DimExpr.symbol("E"),)
+                tensor="bias",
+                role=TensorRole.INPUT,
+                dims=(DimExpr.symbol("E"),),
             ),
-            "topk": TensorBinding("topk", TensorRole.INPUT, ()),
-            "route_scale": TensorBinding("route_scale", TensorRole.INPUT, ()),
+            "topk": TensorBinding(
+                tensor="topk", role=TensorRole.INPUT, dims=()
+            ),
+            "route_scale": TensorBinding(
+                tensor="route_scale", role=TensorRole.INPUT, dims=()
+            ),
             "weights": TensorBinding(
-                "weights",
-                TensorRole.OUTPUT,
-                (DimExpr.symbol("T"), DimExpr.symbol("K")),
+                tensor="weights",
+                role=TensorRole.OUTPUT,
+                dims=(DimExpr.symbol("T"), DimExpr.symbol("K")),
             ),
             "ids": TensorBinding(
-                "ids",
-                TensorRole.OUTPUT,
-                (DimExpr.symbol("T"), DimExpr.symbol("K")),
+                tensor="ids",
+                role=TensorRole.OUTPUT,
+                dims=(DimExpr.symbol("T"), DimExpr.symbol("K")),
             ),
         },
         assumptions=(
             Assumption(
-                DimExpr.symbol("K"),
-                AssumptionOp.LE,
-                DimExpr.symbol("E"),
+                left=DimExpr.symbol("K"),
+                op=AssumptionOp.LE,
+                right=DimExpr.symbol("E"),
             ),
         ),
     )
@@ -467,7 +492,7 @@ def main() -> int:
         domain, args, args.output_root / "instance-analysis"
     )
     summary = {
-        "schema_version": "sol_execbench.solar_l3b_summary.v1",
+        "schema_version": SchemaVersion.SOLAR_L3B_SUMMARY,
         "generated_at": utc_timestamp(),
         "identity": _identity(args),
         "domain_sha256": domain.stable_identity(),

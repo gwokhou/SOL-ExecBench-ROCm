@@ -36,7 +36,7 @@ from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeGPUTelemetry,
 )
 from sol_execbench.core.integrity import stable_json_checksum
-from sol_execbench.core.platform.runtime import (
+from sol_execbench.core.platform.hardware import (
     PCIeLinkIdentity,
     PCIeTopologyIdentity,
 )
@@ -301,7 +301,10 @@ def test_replay_rejects_cross_pass_helper_lane_drift(
             encoding="utf-8",
         )
     aligned = parse_and_align_counter_passes(
-        [CounterPassCSV(index, path) for index, path in enumerate(paths, 1)],
+        [
+            CounterPassCSV(pass_index=index, path=path)
+            for index, path in enumerate(paths, 1)
+        ],
         workload_uuid="w0",
         candidate_sha256="f" * 64,
     )

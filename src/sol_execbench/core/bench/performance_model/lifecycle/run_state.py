@@ -26,11 +26,13 @@ from sol_execbench.core.bench.performance_model.lifecycle.enums import (
 from sol_execbench.core.bench.performance_model.lifecycle.identity import (
     collection_run_id as derive_collection_run_id,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.schema_versions import (
+    DiagnosticLifecycleSchema,
+    DiagnosticLifecycleStateKind,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
     DiagnosticLifecycleParent,
-    GpuLifecycleIdentity,
-    require_complete_gpu_identity,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
     attempts_dir,
@@ -41,7 +43,13 @@ from sol_execbench.core.data.base_model import (
     FrozenArtifactModel,
 )
 from sol_execbench.core.integrity import SHA256Digest, stable_json_checksum
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.platform.hardware import (
+    HardwareExecutionIdentity,
+    require_complete_execution_identity,
+)
+from sol_execbench.core.platform.rdna4_validation import (
+    HardwareValidationBinding,
+)
 
 
 def _exclude_none(value: object) -> bool:
@@ -57,14 +65,62 @@ class DiagnosticRunStageState(FrozenArtifactModel):
     receipt_path: str = ""
     outputs: tuple[DiagnosticLifecycleArtifact, ...] = ()
 
+    @classmethod
+    def running(
+        cls,
+        stage: DiagnosticLifecycleStage,
+        attempts: int,
+    ) -> DiagnosticRunStageState:
+        """Build the canonical transient state for an active attempt."""
+        return cls(
+            stage=stage,
+            status=DiagnosticStageStatus.RUNNING,
+            attempts=attempts,
+        )
+
+    @classmethod
+    def verified(
+        cls,
+        stage: DiagnosticLifecycleStage,
+        attempts: int,
+        outputs: tuple[DiagnosticLifecycleArtifact, ...],
+    ) -> DiagnosticRunStageState:
+        """Build the canonical verified state for a completed stage."""
+        return cls(
+            stage=stage,
+            status=DiagnosticStageStatus.VERIFIED,
+            attempts=attempts,
+            receipt_path=f"{stage.value}.json",
+            outputs=outputs,
+        )
+
+    @classmethod
+    def failed(
+        cls,
+        stage: DiagnosticLifecycleStage,
+        attempts: int,
+    ) -> DiagnosticRunStageState:
+        """Build the canonical failed state without stale output claims."""
+        return cls(
+            stage=stage,
+            status=DiagnosticStageStatus.FAILED,
+            attempts=attempts,
+        )
+
 
 class DiagnosticStageAttempt(CurrentFrozenSchemaModel):
     """One immutable append-only execution attempt for a lifecycle stage."""
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_LIFECYCLE_ATTEMPT
+    current_schema_version = (
+        DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    )
+    current_artifact_kind = DiagnosticLifecycleStateKind.ATTEMPT
 
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_LIFECYCLE_ATTEMPT] = (
-        SchemaVersion.DIAGNOSTIC_LIFECYCLE_ATTEMPT
+    schema_version: Literal[
+        DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    ] = DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    artifact_kind: Literal[DiagnosticLifecycleStateKind.ATTEMPT] = (
+        DiagnosticLifecycleStateKind.ATTEMPT
     )
     run_id: SHA256Digest
     stage: DiagnosticLifecycleStage
@@ -88,10 +144,16 @@ class DiagnosticStageAttempt(CurrentFrozenSchemaModel):
 class DiagnosticLifecyclePlan(CurrentFrozenSchemaModel):
     """One immutable, reviewable set of lifecycle execution inputs."""
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_LIFECYCLE_PLAN
+    current_schema_version = (
+        DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    )
+    current_artifact_kind = DiagnosticLifecycleStateKind.PLAN
 
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_LIFECYCLE_PLAN] = (
-        SchemaVersion.DIAGNOSTIC_LIFECYCLE_PLAN
+    schema_version: Literal[
+        DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    ] = DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    artifact_kind: Literal[DiagnosticLifecycleStateKind.PLAN] = (
+        DiagnosticLifecycleStateKind.PLAN
     )
     plan_id: SHA256Digest
     design: DiagnosticLifecycleParent
@@ -101,7 +163,7 @@ class DiagnosticLifecyclePlan(CurrentFrozenSchemaModel):
         min_length=1
     )
     collection_run_id: SHA256Digest
-    gpu_identity: GpuLifecycleIdentity | None = None
+    gpu_identity: HardwareExecutionIdentity | None = None
     generation: int = Field(ge=1)
     roles: tuple[Literal["held_out"], ...] = ("held_out",)
     calibration_profile_path: str = Field(min_length=1)
@@ -124,6 +186,18 @@ class DiagnosticLifecyclePlan(CurrentFrozenSchemaModel):
     )
     frozen_inference_profile: DiagnosticLifecycleArtifact | None = Field(
         default=None, exclude_if=_exclude_none
+    )
+    hardware_validation_receipt_path: str | None = Field(
+        default=None,
+        exclude_if=_exclude_none,
+    )
+    hardware_validation_evidence_dir: str | None = Field(
+        default=None,
+        exclude_if=_exclude_none,
+    )
+    hardware_validation: HardwareValidationBinding | None = Field(
+        default=None,
+        exclude_if=_exclude_none,
     )
 
     @model_validator(mode="after")
@@ -152,10 +226,25 @@ class DiagnosticLifecyclePlan(CurrentFrozenSchemaModel):
             raise ValueError(
                 "frozen inference path and artifact must be paired"
             )
+        hardware_fields = (
+            self.hardware_validation_receipt_path,
+            self.hardware_validation_evidence_dir,
+            self.hardware_validation,
+        )
+        if any(value is None for value in hardware_fields) and any(
+            value is not None for value in hardware_fields
+        ):
+            raise ValueError(
+                "hardware validation inputs must be provided together"
+            )
+        if self.hardware_validation is not None and (
+            self.hardware_validation.source_revision != self.source_revision
+        ):
+            raise ValueError("hardware validation source revision mismatch")
         if self.purpose is DiagnosticEvidencePurpose.PRODUCTION:
-            require_complete_gpu_identity(
+            require_complete_execution_identity(
                 self.gpu_identity,
-                stage=DiagnosticLifecycleStage.COLLECTION_RUN,
+                context=DiagnosticLifecycleStage.COLLECTION_RUN.value,
                 require_pcie_topology=True,
             )
         paths = tuple(item.relative_path for item in self.collection_inventory)
@@ -194,6 +283,9 @@ def diagnostic_lifecycle_plan_payload(
         "vram_policy",
         "frozen_inference_profile_path",
         "frozen_inference_profile",
+        "hardware_validation_receipt_path",
+        "hardware_validation_evidence_dir",
+        "hardware_validation",
     ):
         if getattr(plan, field) is None:
             payload.pop(field, None)
@@ -209,10 +301,16 @@ class DiagnosticRunManifest(CurrentFrozenSchemaModel):
     recorded entry rather than trusting file existence.
     """
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_LIFECYCLE_RUN
+    current_schema_version = (
+        DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    )
+    current_artifact_kind = DiagnosticLifecycleStateKind.RUN
 
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_LIFECYCLE_RUN] = (
-        SchemaVersion.DIAGNOSTIC_LIFECYCLE_RUN
+    schema_version: Literal[
+        DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    ] = DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    artifact_kind: Literal[DiagnosticLifecycleStateKind.RUN] = (
+        DiagnosticLifecycleStateKind.RUN
     )
     run_id: str = Field(min_length=1)
     collection_run_id: SHA256Digest

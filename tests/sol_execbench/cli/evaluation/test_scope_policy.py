@@ -3,6 +3,7 @@
 
 from contextlib import contextmanager
 from types import SimpleNamespace
+from typing import cast
 from unittest.mock import Mock
 
 import pytest
@@ -102,8 +103,10 @@ def test_scope_rejection_is_a_cli_failure_without_overwriting_canonical_status(
         scope_qualified=admitted,
     )
     assert result.exit_code == code
-    assert result.data["all_passed"]
+    assert isinstance(result.data, dict)
+    data = cast(dict[str, object], result.data)
+    assert data["all_passed"]
     if admitted is not None:
-        assert result.data["scope_qualified"] is admitted
+        assert data["scope_qualified"] is admitted
     else:
-        assert "scope_qualified" not in result.data
+        assert "scope_qualified" not in data

@@ -46,7 +46,7 @@ def convert_operator_graph(
     validate_extended_einsum_graph(converted)
     einsum_path = output / "einsum_graph.yaml"
     einsum_path.write_text(yaml.safe_dump(converted, sort_keys=False))
-    artifact = IRGraphArtifact(einsum_path, IRKind.EXTENDED_EINSUM)
+    artifact = IRGraphArtifact(path=einsum_path, kind=IRKind.EXTENDED_EINSUM)
     write_access_document(artifact, operator)
     return artifact
 

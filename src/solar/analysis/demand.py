@@ -28,7 +28,7 @@ from solar.ir.contracts import layer_operation
 from solar.ir.triangular import TRIANGULAR_TARGETS
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class DemandCounts:
     """Owned profile-independent counts for a single transformed layer."""
 
@@ -41,7 +41,7 @@ class DemandCounts:
     zero_initializations: int
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class DemandGraph:
     """Original graph stays untouched; None means a cheap unchanged scenario."""
 
@@ -188,13 +188,13 @@ def _layer_demands(
         reads = [{mapping[index] for index in active} for mapping in plan.maps]
         evaluated = len(active)
     return DemandCounts(
-        plan,
-        tuple(frozenset(items) for items in reads),
-        tuple(len(items) for items in output),
-        writes,
-        macs,
-        evaluated,
-        initialization,
+        plan=plan,
+        reads=tuple(frozenset(items) for items in reads),
+        demanded=tuple(len(items) for items in output),
+        writes=writes,
+        macs=macs,
+        evaluated_outputs=evaluated,
+        zero_initializations=initialization,
     )
 
 
@@ -210,7 +210,9 @@ def restrict_computation(
         for layer in intrinsic.layers
     ):
         return None
-    work = DemandWork(request.budget, monotonic() + request.budget.seconds)
+    work = DemandWork(
+        budget=request.budget, deadline=monotonic() + request.budget.seconds
+    )
     plans = _prepare_plans(intrinsic, work)
     zeros = _forward_zeros(plans, work)
     demands: dict[str, set[int]] = {}
@@ -246,7 +248,9 @@ def restrict_computation(
         if name not in producers
     }
     return DemandGraph(
-        tuple(reversed(results)),
-        sources,
-        frozenset(plan.boundary for plan in plans if plan.boundary is not None),
+        layers=tuple(reversed(results)),
+        source_demands=sources,
+        boundary_reasons=frozenset(
+            plan.boundary for plan in plans if plan.boundary is not None
+        ),
     )

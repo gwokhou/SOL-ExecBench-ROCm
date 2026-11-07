@@ -29,7 +29,7 @@ class StaticToolRunLike(Protocol):
         ...
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ExtractorStatusVocabulary[StatusT]:
     """Domain status values used by the generic extractor aggregator."""
 
@@ -39,7 +39,7 @@ class ExtractorStatusVocabulary[StatusT]:
     unavailable: StatusT
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ExtractorReasonVocabulary[StatusT, ReasonT]:
     """Status-to-reason vocabulary for one extractor evidence schema."""
 

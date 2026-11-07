@@ -44,7 +44,7 @@ from solar.ir.topk_gather import (
 )
 from solar.ir.triangular import TRIANGULAR_TARGETS, triangular_accesses
 from solar.precision import BYTES_PER_ELEMENT
-from solar.types import NodeDict
+from solar.types import GraphValue, NodeDict
 
 FULL_OPERAND_READS = frozenset(
     {
@@ -127,7 +127,7 @@ POOL_WINDOW_TARGETS = frozenset(
 )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ExternalReads:
     """External reads independently of output writes and capacity traffic."""
 
@@ -453,32 +453,9 @@ def _blocking_reason(
             return None
         return AccessReason.DYNAMIC_INDEX
     if target in STATIC_VIEW_TARGETS:
-        reasons = {
-            access.reasons[name]
-            for name in (layer.get("tensor_names") or {}).get("outputs") or []
-        }
-        # Batch-2 spec: a resolved static logical remap reads exactly its
-        # tracked base (reads are attributed via base_id), so STATIC views
-        # pass like materialized ones; unsupported or dynamic reasons still
-        # block.
-        if reasons <= {AccessReason.MATERIALIZED, AccessReason.STATIC}:
-            return None
-        return next(iter(sorted(reasons)), AccessReason.UNSUPPORTED_VIEW)
+        return _static_view_read_reason(layer, access)
     if semantic.get("kind") == "einsum":
-        equation = str(semantic.get("equation", ""))
-        inputs = equation.partition("->")[0].split(",")
-        try:
-            tokens = [parse_dim_tokens(term) for term in inputs]
-        except ValueError:
-            return AccessReason.UNKNOWN_READS
-        if inputs and all(
-            ranks
-            and "".join(ranks) == term.upper()
-            and all(rank[0].isalpha() for rank in ranks)
-            for term, ranks in zip(inputs, tokens, strict=True)
-        ):
-            return None
-        return AccessReason.UNKNOWN_READS
+        return _einsum_read_reason(semantic)
     if target in {"addmm", "conv2d"}:
         # Batch-8 spec: window coverage generalizes the 1x1 contraction
         # special case; both prove the unique-element union read.
@@ -582,7 +559,12 @@ def _union_reads(
         if result.quality is AccessQuality.LOWER_BOUND:
             quality = AccessQuality.LOWER_BOUND
     return ExternalReads(
-        quality, tuple(sorted(reasons)), budget, elements, byte_counts, bases
+        quality=quality,
+        reasons=tuple(sorted(reasons)),
+        budget=budget,
+        elements=elements,
+        bytes=byte_counts,
+        bases=bases,
     )
 
 
@@ -608,7 +590,9 @@ def external_reads(
     """Combine proven operand reads and expose all unsupported domains."""
     if access is None or access.source_storage is None:
         return ExternalReads(
-            AccessQuality.UNAVAILABLE, (AccessReason.MISSING_STORAGE,), budget
+            quality=AccessQuality.UNAVAILABLE,
+            reasons=(AccessReason.MISSING_STORAGE,),
+            budget=budget,
         )
     reads: dict[str, list[TensorAccess]] = defaultdict(list)
     producer_of: dict[str, str] = {}
@@ -659,6 +643,45 @@ def external_reads(
                     reasons.add(exc.reason)
     if reasons:
         return ExternalReads(
-            AccessQuality.UNAVAILABLE, tuple(sorted(reasons)), budget
+            quality=AccessQuality.UNAVAILABLE,
+            reasons=tuple(sorted(reasons)),
+            budget=budget,
         )
     return _union_reads(reads, budget)
+
+
+def _einsum_read_reason(
+    semantic: Mapping[str, GraphValue],
+) -> AccessReason | None:
+    """Accept only complete static input dimension token sequences."""
+    equation = str(semantic.get("equation", ""))
+    inputs = equation.partition("->")[0].split(",")
+    try:
+        tokens = [parse_dim_tokens(term) for term in inputs]
+    except ValueError:
+        return AccessReason.UNKNOWN_READS
+    if inputs and all(
+        ranks
+        and "".join(ranks) == term.upper()
+        and all(rank[0].isalpha() for rank in ranks)
+        for term, ranks in zip(inputs, tokens, strict=True)
+    ):
+        return None
+    return AccessReason.UNKNOWN_READS
+
+
+def _static_view_read_reason(
+    layer: NodeDict, access: AccessDocument
+) -> AccessReason | None:
+    """Keep unresolved view output access reasons visible."""
+    reasons = {
+        access.reasons[name]
+        for name in (layer.get("tensor_names") or {}).get("outputs") or []
+    }
+    # Batch-2 spec: a resolved static logical remap reads exactly its
+    # tracked base (reads are attributed via base_id), so STATIC views
+    # pass like materialized ones; unsupported or dynamic reasons still
+    # block.
+    if reasons <= {AccessReason.MATERIALIZED, AccessReason.STATIC}:
+        return None
+    return next(iter(sorted(reasons)), AccessReason.UNSUPPORTED_VIEW)

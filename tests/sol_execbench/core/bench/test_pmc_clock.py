@@ -122,7 +122,8 @@ def test_owned_window_restores_auto_on_every_exit(tmp_path, control, failure):
     assert control["level"] == "AUTO"
     assert signal.getsignal(signal.SIGTERM) == previous
     observed = receipt(tmp_path)
-    assert observed.auto_verified and observed.peak_verified
+    assert observed.auto_verified
+    assert observed.peak_verified
     assert observed.collection_completed == (failure == "none")
     for command in control["calls"]:
         if "metric" in command:
@@ -270,7 +271,8 @@ def test_setup_readback_failure_restores_auto(tmp_path, control, monkeypatch):
 def test_nested_pmc_borrows_without_resetting_owner(tmp_path, control, fails):
     def inner():
         with pmc_clock.pmc_clock_window(tmp_path / "inner") as borrowed:
-            assert borrowed.locked and not borrowed.acquired
+            assert borrowed.locked
+            assert not borrowed.acquired
             if fails:
                 raise ValueError("inner failed")
 
@@ -287,7 +289,8 @@ def test_nested_pmc_borrows_without_resetting_owner(tmp_path, control, fails):
             borrowed_path.read_text()
         )
         assert borrowed.ownership == ClockOwnership.BORROWED
-        assert borrowed.borrow_ended and not borrowed.auto_verified
+        assert borrowed.borrow_ended
+        assert not borrowed.auto_verified
     assert control["level"] == "AUTO"
     assert borrowed.owner_lease_id is not None
     owner_path = clock_owner_path(tmp_path / "locks", borrowed.owner_lease_id)
@@ -349,8 +352,10 @@ def test_host_guard_owns_pmc_borrow_and_final_auto(
     def runner(command, environment):
         assert environment[pmc_clock.ENV_CLOCK_OWNER]
         with pmc_clock.pmc_clock_window(tmp_path / "profile") as borrowed:
-            assert borrowed.locked and not borrowed.acquired
-        assert restores == [] and control["level"] == "STABLE_PEAK"
+            assert borrowed.locked
+            assert not borrowed.acquired
+        assert restores == []
+        assert control["level"] == "STABLE_PEAK"
         return subprocess.CompletedProcess(command, 0)
 
     assert (
@@ -359,10 +364,12 @@ def test_host_guard_owns_pmc_borrow_and_final_auto(
         )
         == 0
     )
-    assert restores == ["host"] and control["level"] == "AUTO"
+    assert restores == ["host"]
+    assert control["level"] == "AUTO"
     observed = receipt(tmp_path)
     assert observed.ownership == ClockOwnership.BORROWED
-    assert observed.borrow_ended and not observed.auto_verified
+    assert observed.borrow_ended
+    assert not observed.auto_verified
 
 
 @pytest.mark.parametrize(

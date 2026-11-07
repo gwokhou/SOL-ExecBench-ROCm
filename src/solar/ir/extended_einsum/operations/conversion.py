@@ -32,7 +32,7 @@ REDUCTION_OPS_WITH_DIM = frozenset(
 )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class OperationRepresentation:
     """One handler-derived extended-einsum operation representation."""
 
@@ -58,7 +58,14 @@ class OperationRepresentation:
 
 def default_operation_representation() -> OperationRepresentation:
     """Return the conservative identity-like representation for pass-throughs."""
-    return OperationRepresentation("", {}, "none", "none", False, True)
+    return OperationRepresentation(
+        equation="",
+        operands={},
+        elementwise_op="none",
+        reduction_op="none",
+        is_real_einsum=False,
+        is_einsum_supportable=True,
+    )
 
 
 __all__ = [

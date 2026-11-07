@@ -18,12 +18,13 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from solar.artifacts import sha256_file
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
+from sol_execbench.core.integrity import sha256_file
 
-SCOPE_SCHEMA_VERSION = "sol_execbench.hip_torch_scope.v2"
 
-
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ScopeScheduleFeed:
     """One archive's verified schedule contribution, or its refusal."""
 
@@ -53,15 +54,10 @@ def load_scope_schedule_feed(
         document = json.loads((scope_path / "scope.json").read_text())
     except (OSError, ValueError) as error:
         return _refused(f"scope_archive_unreadable:{type(error).__name__}")
-    if document.get("schema_version") != SCOPE_SCHEMA_VERSION:
+    if document.get("schema_version") != ProfilerArtifactSchema.HIP_TORCH_SCOPE:
         return _refused("scope_schema_unsupported")
-    binding = document.get("artifact_sha256")
-    if not isinstance(binding, dict):
-        return _refused("scope_artifact_binding_missing")
-    for name, digest in sorted(binding.items()):
-        sibling = scope_path / str(name)
-        if not sibling.is_file() or sha256_file(sibling) != digest:
-            return _refused("scope_artifact_binding_mismatch")
+    if reason := _artifact_binding_reason(document, scope_path):
+        return _refused(reason)
     schedule = document.get("schedule") or {}
     if not schedule.get("schedule_complete"):
         return _refused("scope_schedule_incomplete")
@@ -86,10 +82,10 @@ def load_scope_schedule_feed(
         edges.append((str(predecessor), str(successor)))
     if not edges:
         return ScopeScheduleFeed(
-            False,
-            (),
-            workload_uuid,
-            ("scope_event_links_not_dispatch_bounded",),
+            cross_lane_verified=False,
+            event_edges=(),
+            workload_uuid=workload_uuid,
+            reasons=("scope_event_links_not_dispatch_bounded",),
         )
     unresolved = sorted(
         {
@@ -115,10 +111,10 @@ def load_scope_schedule_feed(
             return _refused("scope_workload_ambiguous")
         bound = covering[0]
     return ScopeScheduleFeed(
-        True,
-        tuple(edges),
-        bound,
-        ("schedule_feed_edges_verified",),
+        cross_lane_verified=True,
+        event_edges=tuple(edges),
+        workload_uuid=bound,
+        reasons=("schedule_feed_edges_verified",),
     )
 
 
@@ -149,11 +145,29 @@ def _lane(
 
 
 def _refused(reason: str) -> ScopeScheduleFeed:
-    return ScopeScheduleFeed(False, (), None, (reason,))
+    return ScopeScheduleFeed(
+        cross_lane_verified=False,
+        event_edges=(),
+        workload_uuid=None,
+        reasons=(reason,),
+    )
 
 
 __all__ = [
-    "SCOPE_SCHEMA_VERSION",
     "ScopeScheduleFeed",
     "load_scope_schedule_feed",
 ]
+
+
+def _artifact_binding_reason(
+    document: dict[str, object], scope_path: Path
+) -> str | None:
+    """Verify each sibling artifact named by the scope archive."""
+    binding = document.get("artifact_sha256")
+    if not isinstance(binding, dict):
+        return "scope_artifact_binding_missing"
+    for name, digest in sorted(binding.items()):
+        sibling = scope_path / str(name)
+        if not sibling.is_file() or sha256_file(sibling) != digest:
+            return "scope_artifact_binding_mismatch"
+    return None

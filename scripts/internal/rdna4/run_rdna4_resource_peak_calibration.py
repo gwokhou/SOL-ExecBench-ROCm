@@ -93,7 +93,7 @@ BOOTSTRAP_REPLICATES = 10_000
 BOOTSTRAP_SEED = 20_260_725
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class TuningSpec:
     """One bounded compile-time search space for an instruction probe."""
 
@@ -102,7 +102,7 @@ class TuningSpec:
     candidates: tuple[int, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SampleBatch:
     """Raw device-event samples from one fresh probe process."""
 
@@ -125,7 +125,7 @@ class SampleBatch:
         return payload
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class PreparedProbe:
     """A probe whose tuning configuration and executable are frozen."""
 
@@ -786,18 +786,40 @@ def _numeric_summary(values: tuple[float, ...]) -> dict[str, float] | None:
 
 # Instructions that distinguish every non-exempt native compute path on RDNA4.
 CALIBRATION_ISA_CHECKS: tuple[ISAInstructionRequirement, ...] = (
-    ISAInstructionRequirement("V_FMA_F32", "-"),
-    ISAInstructionRequirement("V_FMAAK_F32", "-"),
-    ISAInstructionRequirement("V_DUAL_FMAC_F32", "-"),
-    ISAInstructionRequirement("V_PK_FMA_F16", "-"),
-    ISAInstructionRequirement("V_PK_FMAC_F16", "-"),
-    ISAInstructionRequirement("V_PK_FMA_BF16", "-"),
-    ISAInstructionRequirement("V_PK_FMAC_BF16", "-"),
-    ISAInstructionRequirement("V_PK_FMA_F32", "-"),
-    ISAInstructionRequirement("V_WMMA_F32_16X16X16_F16", "WMMA"),
-    ISAInstructionRequirement("V_WMMA_F32_16X16X16_BF16", "WMMA"),
-    ISAInstructionRequirement("V_WMMA_F32_16X16X16_FP8_FP8", "WMMA"),
-    ISAInstructionRequirement("V_WMMA_I32_16X16X16_IU8", "WMMA"),
+    ISAInstructionRequirement(instruction="V_FMA_F32", functional_subgroup="-"),
+    ISAInstructionRequirement(
+        instruction="V_FMAAK_F32", functional_subgroup="-"
+    ),
+    ISAInstructionRequirement(
+        instruction="V_DUAL_FMAC_F32", functional_subgroup="-"
+    ),
+    ISAInstructionRequirement(
+        instruction="V_PK_FMA_F16", functional_subgroup="-"
+    ),
+    ISAInstructionRequirement(
+        instruction="V_PK_FMAC_F16", functional_subgroup="-"
+    ),
+    ISAInstructionRequirement(
+        instruction="V_PK_FMA_BF16", functional_subgroup="-"
+    ),
+    ISAInstructionRequirement(
+        instruction="V_PK_FMAC_BF16", functional_subgroup="-"
+    ),
+    ISAInstructionRequirement(
+        instruction="V_PK_FMA_F32", functional_subgroup="-"
+    ),
+    ISAInstructionRequirement(
+        instruction="V_WMMA_F32_16X16X16_F16", functional_subgroup="WMMA"
+    ),
+    ISAInstructionRequirement(
+        instruction="V_WMMA_F32_16X16X16_BF16", functional_subgroup="WMMA"
+    ),
+    ISAInstructionRequirement(
+        instruction="V_WMMA_F32_16X16X16_FP8_FP8", functional_subgroup="WMMA"
+    ),
+    ISAInstructionRequirement(
+        instruction="V_WMMA_I32_16X16X16_IU8", functional_subgroup="WMMA"
+    ),
 )
 CALIBRATION_INSTRUCTION_NAMES: tuple[str, ...] = tuple(
     requirement.instruction for requirement in CALIBRATION_ISA_CHECKS
@@ -1460,7 +1482,7 @@ def _write_artifact(args: argparse.Namespace, artifact: dict[str, Any]) -> None:
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CalibrationPreparation:
     """CPU-built binaries and ISA inputs for one invocation; never a disk cache."""
 
@@ -1485,14 +1507,14 @@ def _prepare_calibration(
         args.gfx, workdir, hipcc, compile_jobs=getattr(args, "compile_jobs", 1)
     )
     return CalibrationPreparation(
-        hipcc,
-        binaries,
-        {
+        hipcc=hipcc,
+        binaries=binaries,
+        binary_hashes={
             path: sha256_file(path)
             for group in binaries.values()
             for path in group.values()
         },
-        spec_evidence,
+        spec_evidence=spec_evidence,
     )
 
 

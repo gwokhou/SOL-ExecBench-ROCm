@@ -17,9 +17,12 @@ from sol_execbench.cli.commands.solar_exploration import (
     search_orders_cli,
 )
 from sol_execbench.cli.commands.solar_reuse import reprice_cli
+from sol_execbench.cli.error_translation import (
+    CliErrorRule,
+    translate_cli_errors,
+)
 from sol_execbench.cli.protocol import (
     CliExitCode,
-    CliFailure,
     CliResult,
     artifact,
 )
@@ -48,6 +51,43 @@ from sol_execbench.core.solar_bridge.path_comparison_models import (
 )
 from sol_execbench.core.solar_bridge.runner import run_solar_worker
 from sol_execbench.core.solar_bridge.views import load_outcome_views
+
+_SOLAR_ANALYSIS_VIEWS_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="solar_analysis_views_invalid",
+        exit_code=CliExitCode.RESULT_FAILED,
+        hint="Keep the complete accepted analysis artifact unchanged.",
+    ),
+)
+
+_SOLAR_PATH_COMPARISON_FAILED_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="solar_path_comparison_failed",
+        exit_code=CliExitCode.RESULT_FAILED,
+        hint="Use intact content-addressed outputs from both fixed paths.",
+    ),
+)
+
+_SOLAR_RELEASE_BUILD_FAILED_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, RuntimeError, ValueError),
+        code="solar_release_build_failed",
+        exit_code=CliExitCode.RESULT_FAILED,
+        hint="Use a safe --jobs value, the clean declared source revision, "
+        "and the reviewed Orojenesis artifact.",
+    ),
+)
+
+_SOLAR_QUALIFICATION_FAILED_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, RuntimeError, ValueError),
+        code="solar_qualification_failed",
+        exit_code=CliExitCode.RESULT_FAILED,
+        hint="Complete static, canary, and full qualification in order.",
+    ),
+)
 
 console = Console(stderr=True)
 _BACKEND_CHOICE = click.Choice(
@@ -87,19 +127,12 @@ def compare_paths_cli(
     output: Path,
 ) -> CliResult:
     """Compare dual-ready accounting without choosing a preferred path."""
-    try:
+    with translate_cli_errors(*_SOLAR_PATH_COMPARISON_FAILED_ERRORS):
         result = compare_solar_ir_paths(
             make_fx_root,
             torchview_root,
             output,
         )
-    except (OSError, ValueError) as exc:
-        raise CliFailure(
-            str(exc),
-            code="solar_path_comparison_failed",
-            exit_code=CliExitCode.RESULT_FAILED,
-            hint="Use intact content-addressed outputs from both fixed paths.",
-        ) from exc
     data = {
         "status": result.status,
         "coverage_complete": result.coverage_complete,
@@ -222,15 +255,8 @@ def analyze_cli(
 
 def _analyzed_result(outcome: SolarAnalysisOutcome, output: Path) -> CliResult:
     data = outcome.to_dict()
-    try:
+    with translate_cli_errors(*_SOLAR_ANALYSIS_VIEWS_ERRORS):
         data["views"] = load_outcome_views(outcome)
-    except (OSError, ValueError) as exc:
-        raise CliFailure(
-            str(exc),
-            code="solar_analysis_views_invalid",
-            exit_code=CliExitCode.RESULT_FAILED,
-            hint="Keep the complete accepted analysis artifact unchanged.",
-        ) from exc
     console.print(
         f"[green]Formal SOL bound: {outcome.lower_bound_seconds:.9g} s[/green]",
     )
@@ -303,7 +329,7 @@ def release_build_cli(
     qualification_root: Path,
 ) -> CliResult:
     """Generate the exact content-addressed release SOLAR denominator."""
-    try:
+    with translate_cli_errors(*_SOLAR_RELEASE_BUILD_FAILED_ERRORS):
         result = build_release_solar_manifests(
             workspace,
             corpus_manifest_path=manifest_path,
@@ -315,16 +341,6 @@ def release_build_cli(
             jobs=jobs,
             qualification_root=qualification_root,
         )
-    except (OSError, RuntimeError, ValueError) as exc:
-        raise CliFailure(
-            str(exc),
-            code="solar_release_build_failed",
-            exit_code=CliExitCode.RESULT_FAILED,
-            hint=(
-                "Use a safe --jobs value, the clean declared source revision, "
-                "and the reviewed Orojenesis artifact."
-            ),
-        ) from exc
     report = {
         "problems": result.problems,
         "workloads": result.workloads,
@@ -353,7 +369,7 @@ def _run_solar_qualification_cli(
     timeout_seconds: float,
     jobs: int,
 ) -> CliResult:
-    try:
+    with translate_cli_errors(*_SOLAR_QUALIFICATION_FAILED_ERRORS):
         gate = run_solar_release_qualification(
             workspace,
             corpus_manifest_path=manifest_path,
@@ -365,13 +381,6 @@ def _run_solar_qualification_cli(
             ir_path=backend,
             jobs=jobs,
         )
-    except (OSError, RuntimeError, ValueError) as exc:
-        raise CliFailure(
-            str(exc),
-            code="solar_qualification_failed",
-            exit_code=CliExitCode.RESULT_FAILED,
-            hint="Complete static, canary, and full qualification in order.",
-        ) from exc
     path = qualification_root.resolve() / stage.value / "gate.json"
     return CliResult(
         data={

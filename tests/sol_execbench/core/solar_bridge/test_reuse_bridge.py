@@ -205,7 +205,7 @@ def test_parent_rejects_response_from_another_job(
 
     monkeypatch.setattr(reuse, "run_in_process_group_bounded", changed)
     with pytest.raises(
-        reuse.ReuseWorkerError, match="job identity|schema is not current"
+        reuse.ReuseWorkerError, match=r"job identity|schema is not current"
     ):
         reuse.run_reuse_worker(job, timeout_seconds=30)
 
@@ -367,6 +367,6 @@ def test_scan_parent_rejects_wrong_response_and_binds_outer_budget(
     monkeypatch.setattr(scan, "run_in_process_group_bounded", wrong)
     with pytest.raises(
         scan.ScanWorkerError,
-        match="schema is not current|request identity differs",
+        match=r"schema is not current|request identity differs",
     ):
         scan.run_scan_worker(request)

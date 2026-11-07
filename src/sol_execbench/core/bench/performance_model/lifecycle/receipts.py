@@ -18,6 +18,10 @@ from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticEvidencePurpose,
     DiagnosticLifecycleStage,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.schema_versions import (
+    DiagnosticLifecycleSchema,
+    DiagnosticLifecycleStateKind,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
     DiagnosticLifecycleParent,
@@ -27,7 +31,6 @@ from sol_execbench.core.data.base_model import (
     FrozenArtifactModel,
 )
 from sol_execbench.core.integrity import SHA256Digest
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 class DiagnosticStageReceipt(CurrentFrozenSchemaModel):
@@ -38,10 +41,16 @@ class DiagnosticStageReceipt(CurrentFrozenSchemaModel):
     the cited values; no writer may stamp it without that re-check.
     """
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_STAGE_RECEIPT
+    current_schema_version = (
+        DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    )
+    current_artifact_kind = DiagnosticLifecycleStateKind.STAGE_RECEIPT
 
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_STAGE_RECEIPT] = (
-        SchemaVersion.DIAGNOSTIC_STAGE_RECEIPT
+    schema_version: Literal[
+        DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    ] = DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    artifact_kind: Literal[DiagnosticLifecycleStateKind.STAGE_RECEIPT] = (
+        DiagnosticLifecycleStateKind.STAGE_RECEIPT
     )
     stage: DiagnosticLifecycleStage
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION

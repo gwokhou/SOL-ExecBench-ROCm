@@ -44,7 +44,7 @@ def test_invalid_observations_reject_whole_comparison(damage: str) -> None:
         rows[0]["correct"] = False
     else:
         rows[0]["process_wall_ms"] = float("nan")
-    with pytest.raises(ValueError, match="incomplete|invalid"):
+    with pytest.raises(ValueError, match=r"incomplete|invalid"):
         report(rows)
 
 

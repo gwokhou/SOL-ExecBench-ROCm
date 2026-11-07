@@ -22,7 +22,7 @@ from solar.rocm.architecture import ArchitectureProfile
 MAX_PROFILE_BYTES = 2 * 1024 * 1024
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ProjectionConfiguration:
     """Validated profile, mapper and explicit behavior-changing inputs."""
 
@@ -82,12 +82,12 @@ def configure_projection(
         else None,
     }
     return ProjectionConfiguration(
-        profile,
-        runner,
-        requested_sha256,
-        scenario,
-        request.require_verified_audit,
-        identity,
+        profile=profile,
+        runner=runner,
+        requested_sha256=requested_sha256,
+        scenario=scenario,
+        audit_verified=request.require_verified_audit,
+        identity=identity,
     )
 
 

@@ -13,6 +13,9 @@ import torch
 from sol_execbench.core.bench.performance_model.corpus_preflight import (
     preflight,
 )
+from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
+    DiagnosticArtifactSchema,
+)
 from sol_execbench.core.bench.performance_model.lifecycle import (
     DiagnosticCorpusSnapshotManifest,
     DiagnosticLifecycleStage,
@@ -20,27 +23,13 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     DiagnosticStageStatus,
     import_artifact_tree,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 def test_aka_author_seed_helpers_and_coverage_inventory(load_script) -> None:
     author = load_script("scripts/internal/aka_author_seed.py")
 
-    assert author._ax_var("rows") == {"type": "var", "description": "rows"}
-    assert author._ax_const(4) == {
-        "type": "const",
-        "value": 4,
-        "description": "",
-    }
-    assert author._ax_expr("M * 2", "double") == {
-        "type": "expr",
-        "expression": "M * 2",
-        "description": "double",
-    }
-    assert author._wl({"M": 4}, {"x": "random"}) == {
-        "axes": {"M": 4},
-        "inputs": {"x": "random"},
-    }
+    assert len(author.SPECS) == 45
+    assert len({spec.name for spec in author.SPECS}) == len(author.SPECS)
 
     coverage = author._coverage_axes(author.SPECS[:3])
     assert set(coverage) == {
@@ -297,7 +286,10 @@ def test_rdna4_diagnostic_packaged_templates_prepare_full_corpus(
     corpus._prepare(tmp_path)
 
     summary = preflight(tmp_path)
-    assert summary.schema_version == SchemaVersion.DIAGNOSTIC_CORPUS_PREFLIGHT
+    assert (
+        summary.schema_version
+        == DiagnosticArtifactSchema.DIAGNOSTIC_CORPUS_DESIGN
+    )
     assert summary.cases == 660
     assert summary.families == 11
 
@@ -857,6 +849,21 @@ def test_rdna4_validation_helpers_and_verify_mode(
     assert validation._attestation() == {
         "kind": "local_unsigned",
         "trusted_execution": False,
+    }
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "owner/repository")
+    monkeypatch.setenv("GITHUB_WORKFLOW_REF", "owner/repository/workflow@main")
+    monkeypatch.setenv("GITHUB_WORKFLOW", "RDNA4 Hardware")
+    monkeypatch.setenv("GITHUB_RUN_ID", "123")
+    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "2")
+    assert validation._attestation() == {
+        "kind": "github_actions_self_hosted",
+        "trusted_execution": False,
+        "repository": "owner/repository",
+        "workflow_ref": "owner/repository/workflow@main",
+        "workflow_name": "RDNA4 Hardware",
+        "run_id": 123,
+        "run_attempt": 2,
     }
     assert validation.main(["--verify", str(output)]) == 0
     assert capsys.readouterr().out.strip().endswith("manifest.json")
