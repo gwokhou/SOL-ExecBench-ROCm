@@ -38,7 +38,6 @@ from solar.analysis.graph_context import (
 from solar.analysis.graph_models import (
     FusionPlan,
 )
-from solar.analysis.mixin_contract import AnalysisMixinContract
 from solar.analysis.operand_provenance import (
     contraction_external_source_dtypes,
     contraction_has_region_boundary_proof,
@@ -50,6 +49,7 @@ from solar.analysis.orojenesis.runner import (
     OrojenesisRunner,
     select_capacity_point,
 )
+from solar.composition import BoundComponent
 from solar.ir.contracts import layer_operation
 from solar.precision import (
     dtype_bytes,
@@ -99,7 +99,7 @@ def _is_zero_excess_compulsory_witness(
     )
 
 
-class OrojenesisEvidenceMixin(AnalysisMixinContract):
+class OrojenesisEvidenceEvaluator(BoundComponent):
     """Collect and audit layer, chain, and region evidence."""
 
     def _plan_fusion(

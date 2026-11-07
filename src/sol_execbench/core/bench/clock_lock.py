@@ -63,7 +63,7 @@ class ClockRestoreError(RuntimeError):
     """AUTO restoration is unverified; never continue as an unlocked run."""
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class ClockLockLease:
     """Owned STABLE_PEAK lease with idempotent, exception-aware release."""
 

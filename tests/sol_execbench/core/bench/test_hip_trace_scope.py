@@ -16,8 +16,10 @@ from sol_execbench.core.bench.rocm_profiler.hip_scope_models import (
     HIPScopeExpectation,
     HIPTraceScopeQualification,
 )
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
 from sol_execbench.core.integrity.checksums import sha256_file
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 APIS = [
     "hipDeviceSynchronize",
@@ -50,7 +52,7 @@ def evidence(tmp_path):
         str(tmp_path / "journal.json"),
         "a" * 32,
         sha256_file(binary),
-        str(SchemaVersion.HIP_TRACE_JOURNAL),
+        str(ProfilerArtifactSchema.HIP_TRACE_JOURNAL),
     )
     expected = HIPScopeExpectation(
         run_id="a" * 32,
@@ -160,7 +162,7 @@ def evidence(tmp_path):
         },
     }
     journal = {
-        "schema_version": SchemaVersion.HIP_TRACE_JOURNAL,
+        "schema_version": ProfilerArtifactSchema.HIP_TRACE_JOURNAL,
         "run_id": expected.run_id,
         "workload_id": expected.workload_id,
         "candidate_sha256": expected.candidate_sha256,
@@ -197,7 +199,8 @@ def test_all_dispatches_bound_to_controlled_scope(tmp_path, evidence):
     assert [d.dispatch_id for d in result.dispatches] == [2, 5]
     assert len(result.links) == 1
     assert result.scope.workload_id == "workload"
-    assert not result.performance_authority and not result.schedule_complete
+    assert not result.performance_authority
+    assert not result.schedule_complete
     assert (
         HIPTraceScopeQualification.model_validate_json(result.model_dump_json())
         == result

@@ -19,6 +19,7 @@ def _device(gfx_target: str = "gfx1150") -> RocmDeviceInfo:
         index=1,
         name="test GPU",
         gfx_target=gfx_target,
+        visible_compute_units=32,
         total_memory_bytes=32 * 1024**3,
         l2_cache_bytes=16 * 1024**2,
         torch_version="test",

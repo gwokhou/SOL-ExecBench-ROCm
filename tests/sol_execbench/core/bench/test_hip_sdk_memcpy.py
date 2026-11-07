@@ -204,8 +204,10 @@ def test_engine_copy_binds_lane_and_qualifies():
     assert not result.reason_codes
     assert len(result.copies) == 1
     copy = result.copies[0]
-    assert copy.in_scope and copy.queue_id == 5
-    assert copy.stream_ordinal == 2 and copy.stream_handle == 256
+    assert copy.in_scope
+    assert copy.queue_id == 5
+    assert copy.stream_ordinal == 2
+    assert copy.stream_handle == 256
     assert copy.direction == "MEMORY_COPY_DEVICE_TO_DEVICE"
     assert (
         HIPSDKCopyDomain.model_validate_json(result.model_dump_json()) == result
@@ -221,7 +223,8 @@ def test_zero_engine_copies_qualify_vacuously():
     ledger["records"] = rows
     ledger["row_count"] = len(rows)
     result = domain(ledger, capture)
-    assert result.qualified and not result.copies
+    assert result.qualified
+    assert not result.copies
 
 
 def test_chunked_large_copy_shares_correlation_and_qualifies():
@@ -264,7 +267,8 @@ def test_chunked_large_copy_shares_correlation_and_qualifies():
         }
     )
     result = domain(ledger, capture)
-    assert result.qualified and not result.reason_codes
+    assert result.qualified
+    assert not result.reason_codes
     assert [c.bytes for c in result.copies] == [768, 256]
     assert all(c.correlation_id == 10 for c in result.copies)
 
@@ -322,7 +326,8 @@ def test_outside_copy_is_retained_without_reasons():
     result = domain(ledger, capture)
     assert result.qualified
     assert result.outside_correlation_ids == (10,)
-    assert result.copies[0].queue_id is None and not result.copies[0].in_scope
+    assert result.copies[0].queue_id is None
+    assert not result.copies[0].in_scope
 
 
 @pytest.mark.parametrize(
@@ -398,7 +403,8 @@ def test_queue_unresolved_without_co_observation():
     capture["buffer_records"]["kernel_dispatch"] = []
     result = domain(ledger, capture)
     assert HIPSDKCopyDomainReason.QUEUE_UNRESOLVED in result.reason_codes
-    assert not result.qualified and result.copies[0].queue_id is None
+    assert not result.qualified
+    assert result.copies[0].queue_id is None
 
 
 def test_stream_conflict_rejects_domain():
@@ -422,7 +428,8 @@ def test_default_stream_copy_never_binds_a_lane():
     ]
     result = domain(ledger, capture)
     assert HIPSDKCopyDomainReason.DEFAULT_STREAM in result.reason_codes
-    assert result.copies[0].queue_id is None and result.copies[0].in_scope
+    assert result.copies[0].queue_id is None
+    assert result.copies[0].in_scope
     assert not result.qualified
 
 

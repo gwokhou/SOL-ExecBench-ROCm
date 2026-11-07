@@ -21,17 +21,16 @@ operation handlers to convert PyTorch operations to einsum notation.
 
 import re
 from collections.abc import Callable
-from typing import Any
 
 from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOp,
     compute_cost_from_equation,
 )
 from solar.ir.extended_einsum.operations.handlers.registry import (
-    EinsumOpRegistry,
-    get_global_registry,
+    ReadonlyEinsumOpRegistry,
+    builtin_einsum_registry,
 )
-from solar.types import TensorShape, TensorShapes
+from solar.types import DynamicValue, TensorShape, TensorShapes
 
 _CONVOLUTION_ALIASES = (
     (("convtranspose1d", "conv_transpose1d"), "convtranspose1d"),
@@ -228,7 +227,7 @@ class EinsumAnalyzer:
         self,
         debug: bool = False,
         *,
-        registry: EinsumOpRegistry | None = None,
+        registry: ReadonlyEinsumOpRegistry | None = None,
     ) -> None:
         """Initialize the EinsumAnalyzer.
 
@@ -239,14 +238,14 @@ class EinsumAnalyzer:
         """
         self.debug = debug
         self._registry = (
-            registry if registry is not None else get_global_registry()
+            registry if registry is not None else builtin_einsum_registry()
         )
 
     def get_compute_cost(
         self,
         op_name: str,
         shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> int:
         """Get compute cost for an operation.
 
@@ -292,7 +291,7 @@ class EinsumAnalyzer:
         self,
         op_name: str,
         shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Get an einsum operation for the given operation name.
 
@@ -327,7 +326,7 @@ class EinsumAnalyzer:
         op_norm: str,
         input_shape: TensorShape,
         weight_shape: TensorShape,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> TensorShape | None:
         """Infer output shape for conv ops when not provided."""
         try:

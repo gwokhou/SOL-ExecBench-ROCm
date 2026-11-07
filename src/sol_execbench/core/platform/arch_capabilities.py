@@ -13,10 +13,8 @@ from typing import Any, Literal
 from pydantic import ConfigDict, Field
 
 from sol_execbench.core.data.base_model import CurrentSchemaModel
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 from sol_execbench.core.platform.confidence import EstimateConfidence
+from sol_execbench.core.platform.schema_versions import PlatformArtifactSchema
 
 _BUILTIN_ARCH_BUDGETS = ("gfx942", "gfx1150", "gfx1200")
 
@@ -41,9 +39,9 @@ class ArchISABudget(CurrentSchemaModel):
     """Arch-level ISA resource budget; diagnostic only, never an authority."""
 
     model_config = _MODEL_CONFIG
-    current_schema_version = SchemaVersion.ARCH_CAPABILITY_BUDGET
+    current_schema_version = PlatformArtifactSchema.ARCH_CAPABILITY_BUDGET
 
-    schema_version: Literal[SchemaVersion.ARCH_CAPABILITY_BUDGET]
+    schema_version: Literal[PlatformArtifactSchema.ARCH_CAPABILITY_BUDGET]
     """Capability budget schema version."""
     architecture: str
     """AMD gfx architecture identifier such as ``gfx942`` or ``gfx1150``."""

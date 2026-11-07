@@ -11,8 +11,6 @@ from enum import StrEnum
 from statistics import median
 from typing import Any
 
-MEASUREMENT_SCHEMA = "sol_execbench.solar_l3a_measurement.v1"
-PILOT_SCHEMA = "sol_execbench.solar_l3a_pilot.v1"
 EXPECTED_R08_TORCHVIEW = "R08:torchview_extended_einsum"
 EXPECTED_R08_MAKE_FX = "R08:make_fx_aten"
 MAPPER_SAMPLE_SECONDS = 0.05
@@ -467,28 +465,13 @@ def timed_orojenesis_runner(monitor: MapperMonitor) -> type:
     return _TimedOrojenesisRunner
 
 
-def install_stage_probes(
-    collector: StageCollector, gpu: GpuPeakMonitor
-) -> Callable[[], None]:
-    """Wrap production stage entry points; return a restore callable."""
+def _stage_probe_targets() -> tuple[tuple[Any, str, MeasuredStage], ...]:
+    """Identify the production stage entry points measured by this campaign."""
     import solar.api as solar_api
     import solar.pipeline.analysis as pipeline_analysis
-    from solar.graph import make_fx_backend
     from solar.rocm import architecture
 
-    replacements: list[tuple[Any, str, Any]] = []
-
-    def wrap[**P, R](module: Any, name: str, stage: MeasuredStage) -> None:
-        original = getattr(module, name)
-        replacements.append((module, name, original))
-
-        def wrapped(*args: P.args, **kwargs: P.kwargs) -> R:
-            with stage_probe(collector, stage, gpu):
-                return original(*args, **kwargs)
-
-        setattr(module, name, wrapped)
-
-    for module, name, stage in (
+    return (
         (
             pipeline_analysis,
             "extract_request_graph",
@@ -534,7 +517,28 @@ def install_stage_probes(
             "load",
             MeasuredStage.ARCHITECTURE_LOAD,
         ),
-    ):
+    )
+
+
+def install_stage_probes(
+    collector: StageCollector, gpu: GpuPeakMonitor
+) -> Callable[[], None]:
+    """Wrap production stage entry points; return a restore callable."""
+    from solar.graph import make_fx_backend
+
+    replacements: list[tuple[Any, str, Any]] = []
+
+    def wrap[**P, R](module: Any, name: str, stage: MeasuredStage) -> None:
+        original = getattr(module, name)
+        replacements.append((module, name, original))
+
+        def wrapped(*args: P.args, **kwargs: P.kwargs) -> R:
+            with stage_probe(collector, stage, gpu):
+                return original(*args, **kwargs)
+
+        setattr(module, name, wrapped)
+
+    for module, name, stage in _stage_probe_targets():
         wrap(module, name, stage)
 
     component = make_fx_backend.trace_make_fx_reference
@@ -566,8 +570,6 @@ __all__ = [
     "EXPECTED_R08_TORCHVIEW",
     "MAPPER_COMM_PREFIX",
     "MAPPER_SAMPLE_SECONDS",
-    "MEASUREMENT_SCHEMA",
-    "PILOT_SCHEMA",
     "PIPELINE_STAGES",
     "GpuPeakMonitor",
     "MapperMonitor",

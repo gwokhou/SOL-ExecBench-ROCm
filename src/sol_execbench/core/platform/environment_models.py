@@ -15,12 +15,13 @@ from sol_execbench.core.data.base_model import (
     CurrentSchemaModel,
     FrozenArtifactModel,
 )
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 from sol_execbench.core.platform.arch_capabilities import (
     ArchCapabilityBudgetStatus,
     ArchISABudget,
+)
+from sol_execbench.core.platform.schema_versions import (
+    EnvironmentEvidenceArtifactKind,
+    PlatformArtifactSchema,
 )
 
 DEFAULT_PROBE_TIMEOUT_SECONDS = 3.0
@@ -124,10 +125,14 @@ class EnvironmentCapabilityBudget(FrozenArtifactModel):
 class EnvironmentSnapshot(CurrentSchemaModel):
     """Optional ROCm environment evidence snapshot."""
 
-    current_schema_version = SchemaVersion.ENVIRONMENT_SNAPSHOT
+    current_schema_version = PlatformArtifactSchema.ENVIRONMENT_EVIDENCE
+    current_artifact_kind = EnvironmentEvidenceArtifactKind.SNAPSHOT
 
-    schema_version: Literal[SchemaVersion.ENVIRONMENT_SNAPSHOT] = (
-        SchemaVersion.ENVIRONMENT_SNAPSHOT
+    schema_version: Literal[PlatformArtifactSchema.ENVIRONMENT_EVIDENCE] = (
+        PlatformArtifactSchema.ENVIRONMENT_EVIDENCE
+    )
+    artifact_kind: Literal[EnvironmentEvidenceArtifactKind.SNAPSHOT] = (
+        EnvironmentEvidenceArtifactKind.SNAPSHOT
     )
     """Environment snapshot schema version."""
     generated_at: str
@@ -168,10 +173,14 @@ class EnvironmentCheckResult(BaseModelWithDocstrings):
 class EnvironmentDiagnostics(CurrentSchemaModel):
     """Standalone environment diagnostic payload."""
 
-    current_schema_version = SchemaVersion.ENVIRONMENT_DIAGNOSTICS
+    current_schema_version = PlatformArtifactSchema.ENVIRONMENT_EVIDENCE
+    current_artifact_kind = EnvironmentEvidenceArtifactKind.DIAGNOSTICS
 
-    schema_version: Literal[SchemaVersion.ENVIRONMENT_DIAGNOSTICS] = (
-        SchemaVersion.ENVIRONMENT_DIAGNOSTICS
+    schema_version: Literal[PlatformArtifactSchema.ENVIRONMENT_EVIDENCE] = (
+        PlatformArtifactSchema.ENVIRONMENT_EVIDENCE
+    )
+    artifact_kind: Literal[EnvironmentEvidenceArtifactKind.DIAGNOSTICS] = (
+        EnvironmentEvidenceArtifactKind.DIAGNOSTICS
     )
     """Diagnostics schema version."""
     generated_at: str

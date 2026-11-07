@@ -9,10 +9,10 @@ from pathlib import Path
 
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.json_utils import atomic_write_json_value
+from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
 from sol_execbench.core.data.solution_instance import Solution
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 SOURCE_ROOT = Path("problems/AMD_AKA/torch2hip")
 SEED = 20261011
@@ -52,7 +52,7 @@ def _candidate(definition: dict) -> dict:
     source += "\nrun = torch.compile(run, fullgraph=True, dynamic=False)\n"
     return Solution.model_validate(
         {
-            "schema_version": SchemaVersion.SOLUTION,
+            "schema_version": BenchmarkArtifactSchema.SOLUTION,
             "name": f"upgrade_compile_{definition['name']}",
             "definition": definition["name"],
             "author": "stack-upgrade-development",
@@ -101,8 +101,9 @@ def _freeze_family(
         if line.strip()
     ]
     if boundary is not None:
-        rows = rows[:3] + [
-            {**rows[0], "axes": boundary, "uuid": f"upgrade-{name}-nonaligned"}
+        rows = [
+            *rows[:3],
+            {**rows[0], "axes": boundary, "uuid": f"upgrade-{name}-nonaligned"},
         ]
     if len(rows) != 4:
         raise ValueError(f"expected four cases for {name}")

@@ -39,14 +39,16 @@ def test_spill_detected_is_inferred_high():
         GFX942,
     )
     spill = _cls(hints, DecisionBottleneckClass.SPILL_DETECTED)
-    assert spill and spill[0].confidence is DecisionConfidence.INFERRED_HIGH
+    assert spill
+    assert spill[0].confidence is DecisionConfidence.INFERRED_HIGH
     assert spill[0].identity.artifact_id == "k0"
 
 
 def test_register_pressure_medium_under_ratio():
     hints = derive_decision_hints([_fp(vgpr_used=250, scratch_bytes=0)], GFX942)
     reg = _cls(hints, DecisionBottleneckClass.REGISTER_PRESSURE_HIGH)
-    assert reg and reg[0].confidence is DecisionConfidence.INFERRED_MEDIUM
+    assert reg
+    assert reg[0].confidence is DecisionConfidence.INFERRED_MEDIUM
 
 
 def test_register_pressure_high_at_limit():
@@ -135,7 +137,8 @@ def test_dynamic_budget_still_emits_spill():
         dynamic,
     )
     spill = _cls(hints, DecisionBottleneckClass.SPILL_DETECTED)
-    assert spill and spill[0].confidence is DecisionConfidence.INFERRED_HIGH
+    assert spill
+    assert spill[0].confidence is DecisionConfidence.INFERRED_HIGH
     # register pressure is suppressed on dynamic budgets even though vgpr(250)
     # would otherwise cross the ratio threshold.
     assert _cls(hints, DecisionBottleneckClass.REGISTER_PRESSURE_HIGH) == []

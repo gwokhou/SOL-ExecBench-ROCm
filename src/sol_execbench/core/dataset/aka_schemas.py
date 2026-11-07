@@ -30,7 +30,7 @@ from sol_execbench.core.dataset.aka_contract import (
     AKASourceFamily,
     AKASuite,
 )
-from sol_execbench.core.integrity.schema_versions import (
+from sol_execbench.core.dataset.schema_versions import (
     AKA_CORPUS_MANIFEST_SCHEMA_VERSION,
     AKA_MATERIALIZATION_MANIFEST_SCHEMA_VERSION,
 )

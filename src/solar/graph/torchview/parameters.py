@@ -38,11 +38,11 @@ from typing import Any
 
 from torch import nn
 
+from solar.composition import BoundComponent
 from solar.graph.torchview.models import NodeInfo
-from solar.graph.torchview.processor_contract import TorchviewProcessorContract
 
 
-class TorchviewParametersMixin(TorchviewProcessorContract):
+class ParameterBinder(BoundComponent):
     """Apply concrete model parameters to extracted nodes."""
 
     def _apply_model_parameters(

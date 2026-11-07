@@ -10,6 +10,9 @@ from typing import Literal, cast
 
 from pydantic import ConfigDict, Field, model_validator
 
+from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
+    DiagnosticArtifactSchema,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticEvidencePurpose,
 )
@@ -20,7 +23,6 @@ from sol_execbench.core.data.base_model import (
     CurrentSchemaModel,
     NonEmptyString,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 MIB = 1 << 20
 GIB = 1 << 30
@@ -49,11 +51,13 @@ class DiagnosticVRAMWorkingSetPolicy(CurrentSchemaModel):
     """Immutable capacity class selected before successor design."""
 
     model_config = _CONFIG
-    current_schema_version = SchemaVersion.DIAGNOSTIC_VRAM_WORKING_SET_POLICY
+    current_schema_version = (
+        DiagnosticArtifactSchema.DIAGNOSTIC_VRAM_WORKING_SET_POLICY
+    )
 
     schema_version: Literal[
-        SchemaVersion.DIAGNOSTIC_VRAM_WORKING_SET_POLICY
-    ] = SchemaVersion.DIAGNOSTIC_VRAM_WORKING_SET_POLICY
+        DiagnosticArtifactSchema.DIAGNOSTIC_VRAM_WORKING_SET_POLICY
+    ] = DiagnosticArtifactSchema.DIAGNOSTIC_VRAM_WORKING_SET_POLICY
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     gpu_architecture: SupportedDiagnosticArchitecture
     gpu_id: NonEmptyString

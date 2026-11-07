@@ -17,6 +17,7 @@ from typing import Any
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.timestamps import utc_timestamp
 from solar.artifacts import sha256_file
+from solar.schema_versions import SchemaVersion
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 G4_FLOOR = 40
@@ -61,7 +62,7 @@ def run_slot(args: argparse.Namespace) -> None:
     shutil.rmtree(args.output / "analysis", ignore_errors=True)
     result = analyze(request)
     record: dict[str, Any] = {
-        "schema_version": "sol_execbench.solar_l3e_analysis.v1",
+        "schema_version": SchemaVersion.SOLAR_L3E_ANALYSIS,
         "item": item,
         "ir_path": ir_path,
         "status": result.status.value,
@@ -81,6 +82,56 @@ def run_slot(args: argparse.Namespace) -> None:
 
 def main() -> int:
     """Analyze all flipped slots and evaluate the pre-fixed G4 gate."""
+    args = _parse_args()
+    if args.item is not None:
+        run_slot(args)
+        return 0
+    records = _run_campaign_slots(args)
+    analyzed = [
+        key
+        for key, record in records.items()
+        if record.get("status") == "analyzed" and record.get("totals")
+    ]
+    misses = [
+        {
+            "item": key,
+            "status": record.get("status"),
+            "reason": record.get("reason_code") or record.get("worker_error"),
+        }
+        for key, record in sorted(records.items())
+        if key not in set(analyzed)
+    ]
+    revision = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    summary = {
+        "schema_version": SchemaVersion.SOLAR_L3E_SUMMARY,
+        "generated_at": utc_timestamp(),
+        "identity": {
+            "git_commit": revision,
+            "mapper_sha256": sha256_file(
+                args.orojenesis_home / "bin" / "timeloop-mapper"
+            ),
+            "flipped_sha256": sha256_file(args.flipped),
+        },
+        "g4": {
+            "analyzed": len(analyzed),
+            "total": len(records),
+            "floor": args.floor or len(records),
+            "passed": len(analyzed) >= (args.floor or len(records)),
+            "misses": misses,
+        },
+    }
+    atomic_write_json_value(args.output_root / "l3e-g4-summary.json", summary)
+    print(json.dumps(summary["g4"], indent=1)[:800])
+    return 0 if summary["g4"]["passed"] else 1
+
+
+def _parse_args() -> argparse.Namespace:
+    """Parse campaign inputs and optional single-slot execution."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--flipped", type=Path)
     parser.add_argument("--output-root", type=Path)
@@ -103,10 +154,11 @@ def main() -> int:
     )
     parser.add_argument("--item", help="single-slot worker mode item")
     parser.add_argument("--output", type=Path, help="single-slot output dir")
-    args = parser.parse_args()
-    if args.item is not None:
-        run_slot(args)
-        return 0
+    return parser.parse_args()
+
+
+def _run_campaign_slots(args: argparse.Namespace) -> dict[str, Any]:
+    """Collect each flipped slot with the existing bounded worker protocol."""
     from sol_execbench.core.process.subprocesses import (
         run_in_process_group_to_files,
     )
@@ -155,47 +207,7 @@ def main() -> int:
             f"{records[key].get('status')}",
             flush=True,
         )
-    analyzed = [
-        key
-        for key, record in records.items()
-        if record.get("status") == "analyzed" and record.get("totals")
-    ]
-    misses = [
-        {
-            "item": key,
-            "status": record.get("status"),
-            "reason": record.get("reason_code") or record.get("worker_error"),
-        }
-        for key, record in sorted(records.items())
-        if key not in set(analyzed)
-    ]
-    revision = subprocess.run(
-        ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.strip()
-    summary = {
-        "schema_version": "sol_execbench.solar_l3e_summary.v1",
-        "generated_at": utc_timestamp(),
-        "identity": {
-            "git_commit": revision,
-            "mapper_sha256": sha256_file(
-                args.orojenesis_home / "bin" / "timeloop-mapper"
-            ),
-            "flipped_sha256": sha256_file(args.flipped),
-        },
-        "g4": {
-            "analyzed": len(analyzed),
-            "total": len(records),
-            "floor": args.floor or len(records),
-            "passed": len(analyzed) >= (args.floor or len(records)),
-            "misses": misses,
-        },
-    }
-    atomic_write_json_value(args.output_root / "l3e-g4-summary.json", summary)
-    print(json.dumps(summary["g4"], indent=1)[:800])
-    return 0 if summary["g4"]["passed"] else 1
+    return records
 
 
 if __name__ == "__main__":

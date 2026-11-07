@@ -10,7 +10,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class TimingCallbacks:
     """Per-invocation argument generation and post-run validation."""
 

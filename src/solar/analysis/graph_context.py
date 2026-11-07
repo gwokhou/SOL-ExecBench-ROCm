@@ -33,7 +33,7 @@ def product(shape: list[DynamicValue]) -> int:
     return int(result)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AnalysisJob:
     """Inputs controlling one graph-analysis run."""
 
@@ -48,7 +48,7 @@ class AnalysisJob:
     access_budget: AccessBudget = DEFAULT_ACCESS_BUDGET
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class PreparedAnalysis:
     """Validated graph inputs and resolved analysis configuration."""
 
@@ -68,7 +68,7 @@ class PreparedAnalysis:
     access: AccessDocument | None = None
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class IntrinsicGraph:
     """Owned analysis facts reused before any architecture resource attribution."""
 
@@ -78,7 +78,7 @@ class IntrinsicGraph:
     external_reads: ExternalReads
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class GraphTopology:
     """Producer, consumer, and layer classifications for an IR graph."""
 

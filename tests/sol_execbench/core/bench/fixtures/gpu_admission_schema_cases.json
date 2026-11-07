@@ -1,0 +1,370 @@
+[
+  {
+    "name": "ready-with-migration-reference",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "ready",
+      "owner": null,
+      "record_ref": "/fixture/migration/approved-baseline.json",
+      "reason": null
+    },
+    "valid": true
+  },
+  {
+    "name": "held-sol",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "held",
+      "owner": {
+        "project": "sol",
+        "lease_id": "sol-owner-001"
+      },
+      "record_ref": "/fixture/sol/private-owner-001.json",
+      "reason": null
+    },
+    "valid": true
+  },
+  {
+    "name": "held-kernel",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "held",
+      "owner": {
+        "project": "kernel-cause",
+        "lease_id": "kernel-owner-001"
+      },
+      "record_ref": "/fixture/kernel/private-owner-001.json",
+      "reason": null
+    },
+    "valid": true
+  },
+  {
+    "name": "blocked-known-owner",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "blocked",
+      "owner": {
+        "project": "kernel-cause",
+        "lease_id": "kernel-owner-001"
+      },
+      "record_ref": "/fixture/kernel/private-owner-001.json",
+      "reason": "owned container absence is unknown"
+    },
+    "valid": true
+  },
+  {
+    "name": "blocked-unknown-owner",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "blocked",
+      "owner": null,
+      "record_ref": null,
+      "reason": "legacy owner is unknown; operator attribution required"
+    },
+    "valid": true
+  },
+  {
+    "name": "unknown-schema",
+    "record": {
+      "schema_version": "unknown",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "ready",
+      "owner": null,
+      "record_ref": "/fixture/migration/approved-baseline.json",
+      "reason": null
+    },
+    "valid": false
+  },
+  {
+    "name": "unknown-state",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "expired",
+      "owner": null,
+      "record_ref": "/fixture/migration/approved-baseline.json",
+      "reason": null
+    },
+    "valid": false
+  },
+  {
+    "name": "ready-without-reference",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "ready",
+      "owner": null,
+      "record_ref": null,
+      "reason": null
+    },
+    "valid": false
+  },
+  {
+    "name": "ready-retains-owner",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "ready",
+      "owner": {
+        "project": "sol",
+        "lease_id": "sol-owner-001"
+      },
+      "record_ref": "/fixture/migration/approved-baseline.json",
+      "reason": null
+    },
+    "valid": false
+  },
+  {
+    "name": "ready-has-blocker",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "ready",
+      "owner": null,
+      "record_ref": "/fixture/migration/approved-baseline.json",
+      "reason": "not yet clean"
+    },
+    "valid": false
+  },
+  {
+    "name": "held-without-owner",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "held",
+      "owner": null,
+      "record_ref": "/fixture/sol/private-owner-001.json",
+      "reason": null
+    },
+    "valid": false
+  },
+  {
+    "name": "held-without-private-reference",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "held",
+      "owner": {
+        "project": "sol",
+        "lease_id": "sol-owner-001"
+      },
+      "record_ref": null,
+      "reason": null
+    },
+    "valid": false
+  },
+  {
+    "name": "relative-private-reference",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "held",
+      "owner": {
+        "project": "sol",
+        "lease_id": "sol-owner-001"
+      },
+      "record_ref": "relative/private.json",
+      "reason": null
+    },
+    "valid": false
+  },
+  {
+    "name": "nul-private-reference",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "held",
+      "owner": {
+        "project": "sol",
+        "lease_id": "sol-owner-001"
+      },
+      "record_ref": "/fixture/\u0000record.json",
+      "reason": null
+    },
+    "valid": false
+  },
+  {
+    "name": "blocked-without-reason",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "blocked",
+      "owner": {
+        "project": "kernel-cause",
+        "lease_id": "kernel-owner-001"
+      },
+      "record_ref": "/fixture/kernel/private-owner-001.json",
+      "reason": null
+    },
+    "valid": false
+  },
+  {
+    "name": "blocked-empty-reason",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "blocked",
+      "owner": {
+        "project": "kernel-cause",
+        "lease_id": "kernel-owner-001"
+      },
+      "record_ref": "/fixture/kernel/private-owner-001.json",
+      "reason": "   "
+    },
+    "valid": false
+  },
+  {
+    "name": "known-blocked-without-reference",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "blocked",
+      "owner": {
+        "project": "kernel-cause",
+        "lease_id": "kernel-owner-001"
+      },
+      "record_ref": null,
+      "reason": "owned container absence is unknown"
+    },
+    "valid": false
+  },
+  {
+    "name": "device-visible-index-is-not-bdf",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "held",
+      "owner": {
+        "project": "sol",
+        "lease_id": "sol-owner-001"
+      },
+      "record_ref": "/fixture/sol/private-owner-001.json",
+      "reason": null
+    },
+    "valid": false
+  },
+  {
+    "name": "rocr-selector-is-not-smi-uuid",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "GPU-a30fa29c1cca1511"
+      },
+      "state": "held",
+      "owner": {
+        "project": "sol",
+        "lease_id": "sol-owner-001"
+      },
+      "record_ref": "/fixture/sol/private-owner-001.json",
+      "reason": null
+    },
+    "valid": false
+  },
+  {
+    "name": "missing-lease-id",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "held",
+      "owner": {
+        "project": "sol"
+      },
+      "record_ref": "/fixture/sol/private-owner-001.json",
+      "reason": null
+    },
+    "valid": false
+  },
+  {
+    "name": "unexpected-scheduler-field",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "device": {
+        "pci_bdf": "0000:05:00.0",
+        "smi_uuid": "a3007590-0000-1000-800f-a29c1cca1511"
+      },
+      "state": "held",
+      "owner": {
+        "project": "sol",
+        "lease_id": "sol-owner-001"
+      },
+      "record_ref": "/fixture/sol/private-owner-001.json",
+      "reason": null,
+      "scheduler_job_id": 123
+    },
+    "valid": false
+  },
+  {
+    "name": "missing-device",
+    "record": {
+      "schema_version": "gpu-admission.v1",
+      "state": "ready",
+      "owner": null,
+      "record_ref": "/fixture/migration/approved-baseline.json",
+      "reason": null
+    },
+    "valid": false
+  }
+]

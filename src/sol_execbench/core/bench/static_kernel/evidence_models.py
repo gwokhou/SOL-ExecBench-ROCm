@@ -14,10 +14,11 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     CurrentDiagnosticSidecarAuthority,
     DiagnosticSidecarAuthority,
 )
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+    PerformanceEvidenceComponentKind,
 )
+from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 
 _STATIC_MODEL_CONFIG = ConfigDict(
     extra="forbid",
@@ -311,10 +312,16 @@ class StaticKernelEvidenceSidecar(CurrentDiagnosticSidecarAuthority):
     """Strict diagnostic-only static kernel evidence sidecar."""
 
     model_config = _STATIC_MODEL_CONFIG
-    current_schema_version = SchemaVersion.STATIC_KERNEL_EVIDENCE
+    current_schema_version = (
+        PerformanceArtifactSchema.PERFORMANCE_EVIDENCE_COMPONENT
+    )
+    current_artifact_kind = PerformanceEvidenceComponentKind.STATIC_KERNEL
 
-    schema_version: Literal[SchemaVersion.STATIC_KERNEL_EVIDENCE] = (
-        SchemaVersion.STATIC_KERNEL_EVIDENCE
+    schema_version: Literal[
+        PerformanceArtifactSchema.PERFORMANCE_EVIDENCE_COMPONENT
+    ] = PerformanceArtifactSchema.PERFORMANCE_EVIDENCE_COMPONENT
+    artifact_kind: Literal[PerformanceEvidenceComponentKind.STATIC_KERNEL] = (
+        PerformanceEvidenceComponentKind.STATIC_KERNEL
     )
     """Static kernel evidence schema version."""
     status: StaticKernelEvidenceStatusField

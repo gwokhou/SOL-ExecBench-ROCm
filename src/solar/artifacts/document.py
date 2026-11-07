@@ -25,7 +25,7 @@ MAX_ARTIFACT_VALUES = 1_000_000
 MAX_ARTIFACT_DEPTH = 64
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ArtifactDocument(Mapping[str, ArtifactValue]):
     """One validated mapping-shaped YAML artifact and its source path."""
 
@@ -107,12 +107,12 @@ def parse_yaml_artifact(
         loaded = {}
     if not isinstance(loaded, Mapping):
         raise ValueError(f"artifact {artifact_path.name!r} is not a mapping")
-    budget = _ValueBudget(max_values, max_depth)
+    budget = _ValueBudget(remaining=max_values, max_depth=max_depth)
     data = _artifact_mapping(loaded, location="$", budget=budget, depth=0)
-    return ArtifactDocument(artifact_path, data)
+    return ArtifactDocument(path=artifact_path, data=data)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class _ValueBudget:
     remaining: int
     max_depth: int
@@ -129,7 +129,9 @@ class _BoundedLoader(yaml.SafeLoader):
     """Limit parser recursion and node construction before YAML allocation."""
 
     def __init__(self, payload: bytes, max_values: int, max_depth: int) -> None:
-        self._value_budget = _ValueBudget(max_values, max_depth)
+        self._value_budget = _ValueBudget(
+            remaining=max_values, max_depth=max_depth
+        )
         self._node_depth = 0
         super().__init__(payload)
 

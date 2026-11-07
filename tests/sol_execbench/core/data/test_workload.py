@@ -20,6 +20,7 @@
 import pytest
 from pydantic import ValidationError
 
+from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
 from sol_execbench.core.data.workload import (
     CodeDistanceCheck,
     GeneratedInput,
@@ -29,7 +30,6 @@ from sol_execbench.core.data.workload import (
     TopKRoutingCheck,
     Workload,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 def _wkl(**inputs):
@@ -106,7 +106,7 @@ class TestOutputChecks:
         with pytest.raises(ValidationError, match="extra_forbidden"):
             Workload.model_validate(
                 {
-                    "schema_version": SchemaVersion.WORKLOAD,
+                    "schema_version": BenchmarkArtifactSchema.WORKLOAD,
                     "uuid": "test-uuid",
                     "axes": {},
                     "inputs": {"x": {"type": "random"}},

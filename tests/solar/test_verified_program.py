@@ -102,7 +102,7 @@ def test_changed_or_incomplete_bundle_is_rejected(bundle, damage):
         (root / "partial.tmp").write_text("unfinished")
     else:
         (root / "link").symlink_to(root / ANALYSIS_FILENAME)
-    with pytest.raises(ValueError, match="SHA-256|inventory|symbolic"):
+    with pytest.raises(ValueError, match=r"SHA-256|inventory|symbolic"):
         load_verified_program(bundle)
 
 
@@ -125,7 +125,7 @@ def test_caller_identity_changes_are_not_silently_reused(bundle, damage):
         )
     else:
         update["verification"] = replace(bundle.verification, seeds=(3, 5, 7))
-    with pytest.raises(ValueError, match="identity|policy"):
+    with pytest.raises(ValueError, match=r"identity|policy"):
         load_verified_program(bundle.model_copy(update=update))
 
 
@@ -211,6 +211,6 @@ def test_resealed_receipt_still_requires_current_complete_semantic_proof(
     )
     with pytest.raises(
         ValueError,
-        match="schema|subjects|incomplete|case policy|runtime|gradient|execution",
+        match=r"schema|subjects|incomplete|case policy|runtime|gradient|execution",
     ):
         load_verified_program(changed)

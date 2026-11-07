@@ -152,7 +152,7 @@ class ReuseRecord(BaseModel):
         return self
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ReuseResult:
     """Owned analysis and its sealed reuse record at a new output directory."""
 

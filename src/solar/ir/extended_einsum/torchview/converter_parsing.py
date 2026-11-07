@@ -48,16 +48,14 @@ from typing import Any
 
 PathLike = str | Path
 
-from solar.ir.extended_einsum.torchview.converter_contract import (
-    ConverterMixinContract,
-)
+from solar.composition import BoundComponent
 from solar.ir.extended_einsum.torchview.quirk_repair import (
     TorchviewRepairContext,
     repair_torchview_quirks,
 )
 
 
-class ConverterParsingMixin(ConverterMixinContract):
+class TorchviewGraphParser(BoundComponent):
     """Parse raw Torchview attributes and repair metadata quirks."""
 
     def _parse_einsum_from_raw_attributes(
@@ -256,11 +254,10 @@ class ConverterParsingMixin(ConverterMixinContract):
             )
         ]
 
-    @classmethod
-    def _bits_of_dtype(cls, dtype_str: str | None) -> int:
+    def _bits_of_dtype(self, dtype_str: str | None) -> int:
         if not dtype_str:
             return 32
-        return cls._DTYPE_BITS.get(
+        return self._DTYPE_BITS.get(
             str(dtype_str).replace("torch.", "").lower(), 32
         )
 

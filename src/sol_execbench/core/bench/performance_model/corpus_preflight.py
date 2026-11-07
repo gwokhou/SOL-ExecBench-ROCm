@@ -10,6 +10,10 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
+from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
+    DiagnosticArtifactSchema,
+    DiagnosticCorpusDesignArtifactKind,
+)
 from sol_execbench.core.data.base_model import (
     CurrentSchemaModel,
     NonEmptyString,
@@ -23,7 +27,6 @@ from sol_execbench.core.data.json_utils import (
 from sol_execbench.core.data.solution_instance import Solution
 from sol_execbench.core.data.workload import TopKRoutingCheck, Workload
 from sol_execbench.core.integrity import SHA256Digest, sha256_file
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 DESIGN_KIND = "adjacent_shape_stratified_three_way_rotation"
 CASES_PER_BATCH = 20
@@ -128,9 +131,13 @@ class DiagnosticCorpusDesign(CurrentSchemaModel):
     """Frozen 11-family, three-phase diagnostic corpus design."""
 
     model_config = _CONFIG
-    current_schema_version = SchemaVersion.RDNA4_DIAGNOSTIC_CORPUS_DESIGN
+    current_schema_version = DiagnosticArtifactSchema.DIAGNOSTIC_CORPUS_DESIGN
+    current_artifact_kind = DiagnosticCorpusDesignArtifactKind.DESIGN
 
-    schema_version: Literal[SchemaVersion.RDNA4_DIAGNOSTIC_CORPUS_DESIGN]
+    schema_version: Literal[DiagnosticArtifactSchema.DIAGNOSTIC_CORPUS_DESIGN]
+    artifact_kind: Literal[DiagnosticCorpusDesignArtifactKind.DESIGN] = (
+        DiagnosticCorpusDesignArtifactKind.DESIGN
+    )
     design: Literal["adjacent_shape_stratified_three_way_rotation"]
     cases_per_family: DiagnosticPhaseCaseCounts
     universe_cases_per_family: Literal[60]
@@ -224,10 +231,14 @@ class PreflightSummary(CurrentSchemaModel):
     """Machine-readable result of the complete CPU preflight."""
 
     model_config = _CONFIG
-    current_schema_version = SchemaVersion.DIAGNOSTIC_CORPUS_PREFLIGHT
+    current_schema_version = DiagnosticArtifactSchema.DIAGNOSTIC_CORPUS_DESIGN
+    current_artifact_kind = DiagnosticCorpusDesignArtifactKind.PREFLIGHT
 
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_CORPUS_PREFLIGHT] = (
-        SchemaVersion.DIAGNOSTIC_CORPUS_PREFLIGHT
+    schema_version: Literal[
+        DiagnosticArtifactSchema.DIAGNOSTIC_CORPUS_DESIGN
+    ] = DiagnosticArtifactSchema.DIAGNOSTIC_CORPUS_DESIGN
+    artifact_kind: Literal[DiagnosticCorpusDesignArtifactKind.PREFLIGHT] = (
+        DiagnosticCorpusDesignArtifactKind.PREFLIGHT
     )
     ok: Literal[True] = True
     design_sha256: str

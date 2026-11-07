@@ -18,10 +18,12 @@ from sol_execbench.core.bench.gpu_lock import (
     require_evaluation_gpu_lock,
     require_supervised_gpu_execution,
 )
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+)
 from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeGPUTelemetry,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.process.environment import ENV_PYTORCH_ALLOC_CONF
 
 
@@ -300,7 +302,10 @@ def test_no_trace_diagnostics_sidecar_records_bounded_failure_output(
     assert written == tmp_path / "traces.jsonl.no-trace-diagnostics.json"
     assert written is not None
     payload = json.loads(written.read_text())
-    assert payload["schema_version"] == SchemaVersion.NO_TRACE_DIAGNOSTICS
+    assert (
+        payload["schema_version"]
+        == PerformanceArtifactSchema.PERFORMANCE_DIAGNOSTIC
+    )
     assert payload["diagnostic_only"] is True
     assert payload["canonical_trace_jsonl"] is False
     assert payload["reason"] == "no_parseable_traces"

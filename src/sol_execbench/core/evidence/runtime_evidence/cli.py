@@ -37,7 +37,6 @@ from sol_execbench.core.platform.dependency_matrix import (
     PytorchDependencyObservation,
 )
 from sol_execbench.core.platform.docker_matrix import (
-    DEFAULT_DOCKER_TARGET_MANIFEST,
     select_docker_target,
 )
 
@@ -56,7 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
     collect.add_argument(
         "--manifest",
         type=Path,
-        default=DEFAULT_DOCKER_TARGET_MANIFEST,
+        default=None,
     )
     collect.add_argument("--target")
     collect.add_argument("--output", type=Path, required=True)

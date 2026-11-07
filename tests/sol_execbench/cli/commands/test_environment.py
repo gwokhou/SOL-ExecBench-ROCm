@@ -4,11 +4,11 @@ import json
 from pathlib import Path
 
 from sol_execbench.cli.commands import environment as cli_environment
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.platform.environment import (
     EnvironmentEvidenceStatus,
     EnvironmentSnapshot,
 )
+from sol_execbench.core.platform.schema_versions import PlatformArtifactSchema
 
 
 def _snapshot() -> EnvironmentSnapshot:
@@ -50,7 +50,9 @@ def test_environment_snapshot_sidecar_uses_explicit_path(
 
     assert written == sidecar
     payload = json.loads(sidecar.read_text())
-    assert payload["schema_version"] == SchemaVersion.ENVIRONMENT_SNAPSHOT
+    assert (
+        payload["schema_version"] == PlatformArtifactSchema.ENVIRONMENT_EVIDENCE
+    )
     assert payload["collection_status"] == "available"
 
 

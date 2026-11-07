@@ -50,7 +50,8 @@ def load_script() -> Iterator[ScriptLoader]:
             module_name,
             repository_root / relative_path,
         )
-        assert spec is not None and spec.loader is not None
+        assert spec is not None
+        assert spec.loader is not None
         module = module_from_spec(spec)
         sys.modules[module_name] = module
         try:
@@ -148,12 +149,21 @@ def _is_cdna3(gfx_arch: str) -> bool:
     return gfx_arch.startswith("gfx94")
 
 
+@pytest.hookimpl(tryfirst=True, specname="pytest_collection_modifyitems")
+def pytest_assign_gpu_groups(items: list[pytest.Item]) -> None:
+    """Assign shared hardware groups before xdist reads their markers."""
+    for item in items:
+        _assign_real_gpu_xdist_group(item)
+
+
+@pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(
     config: pytest.Config,
     items: list[pytest.Item],
 ) -> None:
     """Skip tests based on hardware availability.
 
+    Probe only after -m/-k deselection, so CPU runs need no GPU lease.
     Also skips serial-only native/timing tests unless explicitly selected with -m.
     """
     rocm_available, gfx_arch, rocm_skip_reason = (

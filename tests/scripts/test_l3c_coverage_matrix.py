@@ -78,7 +78,8 @@ def test_matrix_row_ready_analyzed_carries_all_dimensions() -> None:
     assert row["formal_analysis"] == "analyzed"
     assert row["ops"] == ["mm", "softmax"]
     assert row["effects_alias"] is True
-    assert "matmul" in row["families"] and "normalization" in row["families"]
+    assert "matmul" in row["families"]
+    assert "normalization" in row["families"]
 
 
 def test_matrix_row_keeps_stage_specific_gaps() -> None:

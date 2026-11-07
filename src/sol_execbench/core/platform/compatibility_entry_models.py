@@ -13,9 +13,6 @@ from sol_execbench.core.data.base_model import (
     BaseModelWithDocstrings,
     CurrentSchemaModel,
 )
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 from sol_execbench.core.platform.compatibility_enums import (
     MATRIX_MODEL_CONFIG,
     MatrixCompatibilityReasonCodeField,
@@ -28,6 +25,7 @@ from sol_execbench.core.platform.compatibility_evidence_models import (
     MatrixObservedEvidence,
     MatrixTarget,
 )
+from sol_execbench.core.platform.schema_versions import PlatformArtifactSchema
 
 
 class MatrixClaimBoundary(BaseModelWithDocstrings):
@@ -55,11 +53,11 @@ class MatrixEntry(CurrentSchemaModel):
     """Strict diagnostic compatibility Matrix Entry."""
 
     model_config = MATRIX_MODEL_CONFIG
-    current_schema_version = SchemaVersion.ROCM_COMPATIBILITY_MATRIX
+    current_schema_version = PlatformArtifactSchema.ROCM_COMPATIBILITY_MATRIX
 
-    schema_version: Literal[SchemaVersion.ROCM_COMPATIBILITY_MATRIX] = (
-        SchemaVersion.ROCM_COMPATIBILITY_MATRIX
-    )
+    schema_version: Literal[
+        PlatformArtifactSchema.ROCM_COMPATIBILITY_MATRIX
+    ] = PlatformArtifactSchema.ROCM_COMPATIBILITY_MATRIX
     """Compatibility Matrix Entry schema version."""
     target: MatrixTarget
     """Requested Target values for this Matrix Entry."""
@@ -226,11 +224,11 @@ class RocmCompatibilityMatrixReport(CurrentSchemaModel):
     """Aggregate ROCm compatibility matrix report."""
 
     model_config = MATRIX_MODEL_CONFIG
-    current_schema_version = SchemaVersion.ROCM_COMPATIBILITY_MATRIX
+    current_schema_version = PlatformArtifactSchema.ROCM_COMPATIBILITY_MATRIX
 
-    schema_version: Literal[SchemaVersion.ROCM_COMPATIBILITY_MATRIX] = (
-        SchemaVersion.ROCM_COMPATIBILITY_MATRIX
-    )
+    schema_version: Literal[
+        PlatformArtifactSchema.ROCM_COMPATIBILITY_MATRIX
+    ] = PlatformArtifactSchema.ROCM_COMPATIBILITY_MATRIX
     """Compatibility matrix report schema version."""
     generated_at: str
     """UTC timestamp when the report was generated."""

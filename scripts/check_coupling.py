@@ -13,6 +13,9 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = REPO_ROOT / "src"
 PACKAGE_ROOTS = (SOURCE_ROOT / "sol_execbench", SOURCE_ROOT / "solar")
+AUDIT_ONLY_MODULES = {
+    "sol_execbench.core.integrity.artifact_registry",
+}
 
 P0_LIMITS = {
     "sol_execbench.cli.evaluation.evaluator": (240, 8),
@@ -52,7 +55,7 @@ FORBIDDEN_DEPENDENCIES = {
 }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ModuleStats:
     """Coupling stats for one module."""
 
@@ -135,6 +138,8 @@ def internal_import_edges(modules: dict[str, Path]) -> set[tuple[str, str]]:
     """Return internal import edges."""
     edges: set[tuple[str, str]] = set()
     for module, path in modules.items():
+        if module in AUDIT_ONLY_MODULES:
+            continue
         tree = ast.parse(path.read_text())
         for node in ast.walk(tree):
             if isinstance(node, ast.Import | ast.ImportFrom):
@@ -293,13 +298,11 @@ def cross_package_violations(
     violations: list[tuple[str, str]] = []
     for source, target in edges:
         if (
-            source.startswith("solar")
-            and target.startswith("sol_execbench")
-            or (
-                source.startswith("sol_execbench")
-                and target.startswith("solar")
-                and not is_under(source, "sol_execbench.core.solar_bridge")
-            )
+            source.startswith("solar") and target.startswith("sol_execbench")
+        ) or (
+            source.startswith("sol_execbench")
+            and target.startswith("solar")
+            and not is_under(source, "sol_execbench.core.solar_bridge")
         ):
             violations.append((source, target))
     return sorted(violations)

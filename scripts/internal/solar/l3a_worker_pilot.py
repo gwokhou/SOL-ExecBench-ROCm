@@ -10,7 +10,6 @@ from typing import Any
 import yaml
 
 from scripts.internal.solar.l3a_measure import (
-    PILOT_SCHEMA,
     GpuPeakMonitor,
     peak_rss_kb,
     projection_diff,
@@ -21,6 +20,7 @@ from scripts.internal.solar.l3a_samples import FOCUSED_SAMPLES
 from solar.artifacts import sha256_file
 from solar.graph.extraction import extract_operator_graph
 from solar.ir.contracts import IRPath
+from solar.schema_versions import SchemaVersion
 
 
 def _trace_one(
@@ -123,7 +123,7 @@ def run_pilot(args: argparse.Namespace, torch_seconds: float) -> None:
         )
     inputs = context.input_factory(200)
     record: dict[str, Any] = {
-        "schema_version": PILOT_SCHEMA,
+        "schema_version": SchemaVersion.SOLAR_L3A_PILOT,
         "slot": args.slot,
         "device": device,
         "torch_import_seconds": torch_seconds,
@@ -190,7 +190,7 @@ def _focused_record(
     scratch: Path,
 ) -> dict[str, Any]:
     record: dict[str, Any] = {
-        "schema_version": PILOT_SCHEMA,
+        "schema_version": SchemaVersion.SOLAR_L3A_PILOT,
         "sample": sample.sample_id,
         "device": device,
     }

@@ -72,18 +72,18 @@ def model_from_projection(
     computation: ComputationScenario = ComputationScenario.DENSE,
 ) -> FixedModel:
     """Adapt an owned, accepted result; bound the modes before building new objects."""
-    document = ArtifactDocument(result.output_dir, result.analysis)
+    document = ArtifactDocument(path=result.output_dir, data=result.analysis)
     metadata = ArtifactDocument(
-        result.output_dir, document.require_mapping("metadata")
+        path=result.output_dir, data=document.require_mapping("metadata")
     )
     profile = ArchitectureProfile.load(metadata.require_mapping("architecture"))
     views = projection_views(result, computation)
     total = ArtifactDocument(
-        result.output_dir, document.require_mapping("total")
+        path=result.output_dir, data=document.require_mapping("total")
     )
     raw = ArtifactDocument(
-        result.output_dir,
-        cast(ArtifactMap, result.restricted.resource_work)
+        path=result.output_dir,
+        data=cast(ArtifactMap, result.restricted.resource_work)
         if computation is ComputationScenario.RESTRICTED
         and result.restricted is not None
         else total.require_mapping("resource_work"),
@@ -119,7 +119,7 @@ def projection_views(
     """Select explicitly without replacing an unavailable restricted view with dense."""
     if computation is ComputationScenario.DENSE:
         metadata = ArtifactDocument(
-            result.output_dir, result.analysis
+            path=result.output_dir, data=result.analysis
         ).require_mapping("metadata")
         return read_analysis_views(metadata.get("views"))
     restricted = result.restricted

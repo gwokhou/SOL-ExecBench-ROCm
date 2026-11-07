@@ -35,7 +35,7 @@ from sol_execbench.core.platform.toolchain import (
 from sol_execbench.core.process.subprocesses import ProbeRunner
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ExtractorCommandSpec:
     """Declarative command strategy for one supported static extractor."""
 
@@ -50,11 +50,15 @@ class ExtractorCommandSpec:
 _EXTRACTOR_COMMAND_SPECS = {
     spec.tool_id: spec
     for spec in (
-        ExtractorCommandSpec("llvm-objdump", ("--disassemble",)),
-        ExtractorCommandSpec("readelf", ("--headers", "--wide")),
         ExtractorCommandSpec(
-            "roc-objdump",
-            ("--disassemble", "--resource-usage"),
+            tool_id="llvm-objdump", arguments=("--disassemble",)
+        ),
+        ExtractorCommandSpec(
+            tool_id="readelf", arguments=("--headers", "--wide")
+        ),
+        ExtractorCommandSpec(
+            tool_id="roc-objdump",
+            arguments=("--disassemble", "--resource-usage"),
         ),
     )
 }

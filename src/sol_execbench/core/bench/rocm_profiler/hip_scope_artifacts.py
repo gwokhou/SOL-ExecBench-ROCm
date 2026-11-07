@@ -18,8 +18,10 @@ from sol_execbench.core.bench.rocm_profiler.hip_scope_models import (
     HIPScopeReason,
     HIPTraceJournal,
 )
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
 from sol_execbench.core.integrity.checksums import sha256_bytes
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 class HIPScopeError(ValueError):
@@ -107,7 +109,7 @@ def scope_agent(
         != (
             expected.run_id,
             expected.candidate_sha256,
-            SchemaVersion.HIP_TRACE_JOURNAL,
+            ProfilerArtifactSchema.HIP_TRACE_JOURNAL,
         )
         or tuple(capture.metadata.command) != expected.application_command
         or capture.metadata.pid != journal.process_id

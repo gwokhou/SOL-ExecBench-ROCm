@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from sol_execbench.core.bench.performance_model.acceptance import (
+    DiagnosticAcceptanceArtifactKind,
     DiagnosticAcceptanceCase,
     DiagnosticAcceptanceManifest,
     evaluate_diagnostic_acceptance,
@@ -76,6 +77,7 @@ def _case(kind: WorkloadKind, index: int) -> DiagnosticAcceptanceCase:
 
 def _manifest() -> DiagnosticAcceptanceManifest:
     return DiagnosticAcceptanceManifest(
+        artifact_kind=DiagnosticAcceptanceArtifactKind.MANIFEST,
         model_identity=_model_identity(),
         calibration_profile_sha256="a" * 64,
         calibration_identity=_identity(),
@@ -96,6 +98,22 @@ def test_frozen_acceptance_requires_twenty_cases_per_family() -> None:
     assert set(result.family_empirical_coverage.values()) == {1.0}
     assert result.median_absolute_percentage_error <= 15.0
     assert result.p90_absolute_percentage_error <= 30.0
+    assert (
+        _manifest().artifact_kind is DiagnosticAcceptanceArtifactKind.MANIFEST
+    )
+    assert result.artifact_kind is DiagnosticAcceptanceArtifactKind.RESULT
+
+
+def test_acceptance_family_requires_explicit_artifact_kind() -> None:
+    payload = _manifest().model_dump(mode="json")
+    payload.pop("artifact_kind")
+
+    with pytest.raises(ValueError, match="artifact_kind"):
+        DiagnosticAcceptanceManifest.model_validate(payload)
+
+    payload["artifact_kind"] = DiagnosticAcceptanceArtifactKind.RESULT
+    with pytest.raises(ValueError, match="manifest"):
+        DiagnosticAcceptanceManifest.model_validate(payload)
 
 
 def test_supplied_prediction_field_is_rejected_by_corpus_contract() -> None:

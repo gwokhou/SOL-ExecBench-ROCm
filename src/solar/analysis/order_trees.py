@@ -18,7 +18,7 @@ MATMUL_TOKEN = -1
 type OrderTree = tuple[int, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class OrderCost:
     """Exact arithmetic work and materialized output sizes for one tree."""
 
@@ -69,10 +69,10 @@ def tree_cost(tree: OrderTree, dimensions: tuple[int, ...]) -> OrderCost:
         raise ValueError("association must use every ordered operand once")
     inputs = sum(a * b for a, b in pairwise(dimensions))
     return OrderCost(
-        macs,
-        (dimensions[0], dimensions[-1]),
-        tuple(outputs[:-1]),
-        inputs + sum(outputs),
+        macs=macs,
+        output_shape=(dimensions[0], dimensions[-1]),
+        intermediate_elements=tuple(outputs[:-1]),
+        allocated_elements=inputs + sum(outputs),
     )
 
 

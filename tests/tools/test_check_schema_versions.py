@@ -3,14 +3,20 @@ from __future__ import annotations
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
+    DiagnosticArtifactSchema,
+)
+from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
+from sol_execbench.core.integrity.protocol_versions import WireProtocol
+from sol_execbench.core.platform.schema_versions import PlatformArtifactSchema
 from solar.schema_versions import SchemaVersion as SolarSchemaVersion
 
 SCRIPT_PATH = (
     Path(__file__).resolve().parents[2] / "scripts/check_schema_versions.py"
 )
 SPEC = spec_from_file_location("check_schema_versions", SCRIPT_PATH)
-assert SPEC is not None and SPEC.loader is not None
+assert SPEC is not None
+assert SPEC.loader is not None
 MODULE = module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 audit_text = MODULE.audit_text
@@ -19,13 +25,13 @@ audit_text = MODULE.audit_text
 def test_accepts_current_schema_identifier():
     findings, families = audit_text(
         Path("example.json"),
-        f'{{"schema_version": "{SchemaVersion.ENVIRONMENT_SNAPSHOT}"}}',
+        f'{{"schema_version": "{PlatformArtifactSchema.ENVIRONMENT_EVIDENCE}"}}',
     )
 
     assert findings == []
     assert families == {
-        "sol_execbench.environment_snapshot": {
-            SchemaVersion.ENVIRONMENT_SNAPSHOT,
+        "sol_execbench.environment_evidence": {
+            PlatformArtifactSchema.ENVIRONMENT_EVIDENCE,
         },
     }
 
@@ -36,8 +42,22 @@ def test_rejects_unregistered_schema_identifier():
     findings, _ = audit_text(Path("example.json"), retired)
 
     assert findings == [
-        f"example.json: unsupported schema identifier {retired}",
+        f"example.json: unsupported versioned wire identifier {retired}",
     ]
+
+
+def test_accepts_current_protocol_identifier():
+    findings, families = audit_text(
+        Path("trace.json"),
+        f'{{"timing_protocol": "{WireProtocol.ROCM_EVENT_TIMING_CUSTOM}"}}',
+    )
+
+    assert findings == []
+    assert families == {
+        "sol_execbench.rocm_event_timing.custom": {
+            WireProtocol.ROCM_EVENT_TIMING_CUSTOM,
+        },
+    }
 
 
 def test_accepts_current_solar_schema_identifier():
@@ -57,8 +77,8 @@ def test_accepts_current_solar_schema_identifier():
     }
 
 
-def test_accepts_current_non_namespaced_schema_identifier():
-    version = SchemaVersion.RDNA4_DIAGNOSTIC_CORPUS_DESIGN.value
+def test_accepts_current_diagnostic_design_schema_identifier():
+    version = DiagnosticArtifactSchema.DIAGNOSTIC_CORPUS_DESIGN.value
 
     findings, families = audit_text(
         Path("design.json"),
@@ -66,7 +86,7 @@ def test_accepts_current_non_namespaced_schema_identifier():
     )
 
     assert findings == []
-    assert families == {"rdna4_diagnostic_corpus_design": {version}}
+    assert families == {"sol_execbench.diagnostic_corpus_design": {version}}
 
 
 def test_accepts_current_numeric_schema_prose():
@@ -127,6 +147,18 @@ def test_rejects_raw_numeric_schema_in_production_python():
     ]
 
 
+def test_accepts_local_cache_format_version():
+    findings, _ = audit_text(
+        Path("src/cache.py"),
+        (
+            "CACHE_FORMAT_VERSION = 1\n"
+            'payload = {"format_version": CACHE_FORMAT_VERSION}\n'
+        ),
+    )
+
+    assert findings == []
+
+
 def test_rejects_raw_numeric_schema_in_all_python_contract_positions():
     samples = (
         "def load(schema_version: int = 2):\n    return schema_version\n",
@@ -162,12 +194,12 @@ def test_rejects_string_keyed_schema_registry_access():
 def test_rejects_schema_enum_member_relay_constant():
     findings, _ = audit_text(
         Path("src/example.py"),
-        "EXAMPLE_SCHEMA_VERSION = SchemaVersion.WORKLOAD\n",
+        "EXAMPLE_SCHEMA_VERSION = BenchmarkArtifactSchema.WORKLOAD\n",
     )
 
     assert findings == [
         (
-            "src/example.py:1: use SchemaVersion.WORKLOAD directly instead "
+            "src/example.py:1: use BenchmarkArtifactSchema.WORKLOAD directly instead "
             "of relaying it through EXAMPLE_SCHEMA_VERSION"
         ),
     ]
@@ -176,13 +208,29 @@ def test_rejects_schema_enum_member_relay_constant():
 def test_rejects_schema_identifier_literal_outside_registry():
     findings, _ = audit_text(
         Path("src/example.py"),
-        f'SCHEMA = "{SchemaVersion.WORKLOAD}"\n',
+        f'SCHEMA = "{BenchmarkArtifactSchema.WORKLOAD}"\n',
     )
 
     assert findings == [
         (
-            f"src/example.py: schema identifier {SchemaVersion.WORKLOAD} "
-            "must be referenced through SchemaVersion"
+            f"src/example.py: versioned wire identifier "
+            f"{BenchmarkArtifactSchema.WORKLOAD} must be referenced through "
+            "BenchmarkArtifactSchema"
+        ),
+    ]
+
+
+def test_rejects_protocol_identifier_literal_outside_registry():
+    findings, _ = audit_text(
+        Path("src/example.py"),
+        f'PROTOCOL = "{WireProtocol.REFERENCE_IPC}"\n',
+    )
+
+    assert findings == [
+        (
+            f"src/example.py: versioned wire identifier "
+            f"{WireProtocol.REFERENCE_IPC} must be referenced through "
+            "WireProtocol"
         ),
     ]
 
@@ -206,13 +254,17 @@ def test_current_schema_registries_are_read_only():
     assert MODULE.registry_findings() == []
 
 
+def test_current_registries_have_non_test_owners():
+    assert MODULE.registry_usage_findings(MODULE.first_party_paths()) == []
+
+
 def test_rejects_retired_solar_schema_identifier():
     retired = "solar.verification.ir." + "v1"
 
     findings, _ = audit_text(Path("attestation.yaml"), retired)
 
     assert findings == [
-        f"attestation.yaml: unsupported schema identifier {retired}",
+        f"attestation.yaml: unsupported versioned wire identifier {retired}",
     ]
 
 

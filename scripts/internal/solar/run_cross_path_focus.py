@@ -62,7 +62,7 @@ FOCUS_WORKLOADS = sum(FOCUS_WORKLOAD_COUNTS.values())
 IR_PATHS = (IRPath.MAKE_FX_ATEN, IRPath.TORCHVIEW_EXTENDED_EINSUM)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class FocusRunResult:
     """Summary of one complete focused dual-path execution."""
 

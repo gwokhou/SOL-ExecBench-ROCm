@@ -17,9 +17,9 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
 
 from solar.artifacts import stable_json_checksum
+from solar.types import GraphValue
 
 
 class ShapeReasonCode(StrEnum):
@@ -49,7 +49,7 @@ class TensorRole(StrEnum):
     OUTPUT = "output"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ShapeSymbol:
     """One integer dimension symbol with range, divisibility, provenance."""
 
@@ -67,7 +67,7 @@ class ShapeSymbol:
             return ShapeReasonCode.DIVISIBILITY_VIOLATED
         return None
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, GraphValue]:
         """Return the canonical serialization of this symbol."""
         return {
             "name": self.name,
@@ -78,7 +78,7 @@ class ShapeSymbol:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class DimExpr:
     """An integer affine expression over named symbols."""
 
@@ -88,18 +88,20 @@ class DimExpr:
     @classmethod
     def symbol(cls, name: str) -> DimExpr:
         """Bind one symbol with unit coefficient."""
-        return cls(((name, 1),))
+        return cls(terms=((name, 1),))
 
     @classmethod
     def fixed(cls, value: int) -> DimExpr:
         """Return one fixed integer dimension."""
-        return cls((), value)
+        return cls(constant=value)
 
     def scaled(self, coefficient: int) -> DimExpr:
         """Multiply the whole expression by one integer coefficient."""
         return DimExpr(
-            tuple((name, value * coefficient) for name, value in self.terms),
-            self.constant * coefficient,
+            terms=tuple(
+                (name, value * coefficient) for name, value in self.terms
+            ),
+            constant=self.constant * coefficient,
         )
 
     @property
@@ -116,7 +118,7 @@ class DimExpr:
             total += coefficient * value
         return total
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, GraphValue]:
         """Return the canonical serialization of this expression."""
         return {
             "terms": [
@@ -126,17 +128,17 @@ class DimExpr:
         }
 
 
-def _expr_from_dict(payload: Mapping[str, Any]) -> DimExpr:
+def _expr_from_dict(payload: Mapping[str, GraphValue]) -> DimExpr:
     return DimExpr(
-        tuple(
+        terms=tuple(
             (item["symbol"], int(item["coefficient"]))
             for item in payload.get("terms", ())
         ),
-        int(payload.get("constant", 0)),
+        constant=int(payload.get("constant", 0)),
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Assumption:
     """A relational constraint between affine expressions."""
 
@@ -152,7 +154,7 @@ class Assumption:
             return False
         return left <= right if self.op is AssumptionOp.LE else left == right
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, GraphValue]:
         """Return the canonical serialization of this assumption."""
         return {
             "left": self.left.to_dict(),
@@ -161,7 +163,7 @@ class Assumption:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class IntervalDim:
     """A dimension known only between affine bounds (nonzero-style)."""
 
@@ -180,7 +182,7 @@ class IntervalDim:
             return ShapeReasonCode.INTERVAL_EXCEEDED
         return None
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, GraphValue]:
         """Return the canonical serialization of this interval dimension."""
         return {
             "symbol": self.symbol,
@@ -190,7 +192,7 @@ class IntervalDim:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class TensorBinding:
     """Per-axis dimension expressions for one named tensor."""
 
@@ -198,7 +200,7 @@ class TensorBinding:
     role: TensorRole
     dims: tuple[DimExpr | int, ...]
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, GraphValue]:
         """Return the canonical serialization of this tensor binding."""
         return {
             "tensor": self.tensor,
@@ -210,7 +212,7 @@ class TensorBinding:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ShapeVerdict:
     """One validation outcome with a stable reason code."""
 
@@ -224,7 +226,7 @@ class ShapeVerdict:
         return self.status is ShapeReasonCode.VALIDATED
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ShapeDomain:
     """A complete stage-1 shape-domain declaration."""
 
@@ -238,7 +240,7 @@ class ShapeDomain:
         """Return the canonical checksum of this domain declaration."""
         return stable_json_checksum(self.to_dict())
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, GraphValue]:
         """Return the canonical serialization of the whole domain."""
         return {
             "domain_id": self.domain_id,
@@ -255,7 +257,7 @@ class ShapeDomain:
         }
 
     @classmethod
-    def from_dict(cls, payload: Mapping[str, Any]) -> ShapeDomain:
+    def from_dict(cls, payload: Mapping[str, GraphValue]) -> ShapeDomain:
         """Rebuild one domain from its canonical serialization."""
         symbols = {
             name: ShapeSymbol(
@@ -310,8 +312,8 @@ class ShapeDomain:
         expected = set(self.symbols) | {item.symbol for item in self.intervals}
         if set(assignment) != expected:
             return ShapeVerdict(
-                ShapeReasonCode.UNKNOWN_SYMBOL,
-                f"assignment keys {sorted(set(assignment))} != {sorted(expected)}",
+                status=ShapeReasonCode.UNKNOWN_SYMBOL,
+                detail=f"assignment keys {sorted(set(assignment))} != {sorted(expected)}",
             )
         for name, value in sorted(assignment.items()):
             symbol = self.symbols.get(name)
@@ -319,23 +321,23 @@ class ShapeDomain:
                 continue
             violation = symbol.check(value)
             if violation is not None:
-                return ShapeVerdict(violation, f"{name}={value}")
+                return ShapeVerdict(status=violation, detail=f"{name}={value}")
         for assumption in self.assumptions:
             if not assumption.holds(assignment):
                 return ShapeVerdict(
-                    ShapeReasonCode.ASSUMPTION_VIOLATED,
-                    f"{assumption.left.to_dict()} {assumption.op.value} "
+                    status=ShapeReasonCode.ASSUMPTION_VIOLATED,
+                    detail=f"{assumption.left.to_dict()} {assumption.op.value} "
                     f"{assumption.right.to_dict()} under {dict(assignment)}",
                 )
         for interval in self.intervals:
             violation = interval.check(assignment[interval.symbol], assignment)
             if violation is not None:
                 return ShapeVerdict(
-                    violation,
-                    f"{interval.symbol}={assignment[interval.symbol]}",
+                    status=violation,
+                    detail=f"{interval.symbol}={assignment[interval.symbol]}",
                 )
         return ShapeVerdict(
-            ShapeReasonCode.VALIDATED, assignment=dict(assignment)
+            status=ShapeReasonCode.VALIDATED, assignment=dict(assignment)
         )
 
 
@@ -353,8 +355,8 @@ def bind_tensors(
         concrete = shapes.get(name)
         if concrete is None or len(concrete) != len(binding.dims):
             return ShapeVerdict(
-                ShapeReasonCode.SHAPE_MISMATCH,
-                f"tensor {name}: arity"
+                status=ShapeReasonCode.SHAPE_MISMATCH,
+                detail=f"tensor {name}: arity"
                 f" {None if concrete is None else len(concrete)}"
                 f" != {len(binding.dims)}",
             )
@@ -364,23 +366,23 @@ def bind_tensors(
             if isinstance(expr, int):
                 if expr != value:
                     return ShapeVerdict(
-                        ShapeReasonCode.SHAPE_MISMATCH,
-                        f"tensor {name} axis {axis}: fixed {expr} != {value}",
+                        status=ShapeReasonCode.SHAPE_MISMATCH,
+                        detail=f"tensor {name} axis {axis}: fixed {expr} != {value}",
                     )
                 continue
             unsolved = [n for n, _ in expr.terms if n not in solved]
             if not unsolved:
                 if expr.evaluate(solved) != value:
                     return ShapeVerdict(
-                        ShapeReasonCode.SHAPE_MISMATCH,
-                        f"tensor {name} axis {axis}: {expr.to_dict()}"
+                        status=ShapeReasonCode.SHAPE_MISMATCH,
+                        detail=f"tensor {name} axis {axis}: {expr.to_dict()}"
                         f" != {value}",
                     )
                 continue
             if len(unsolved) > 1:
                 return ShapeVerdict(
-                    ShapeReasonCode.SHAPE_MISMATCH,
-                    f"tensor {name} axis {axis}: stage-1 solver needs all"
+                    status=ShapeReasonCode.SHAPE_MISMATCH,
+                    detail=f"tensor {name} axis {axis}: stage-1 solver needs all"
                     f" but one symbol bound, unsolved {unsolved}",
                 )
             symbol = unsolved[0]
@@ -391,17 +393,19 @@ def bind_tensors(
             remainder = value - others
             if coefficient == 0 or remainder % coefficient:
                 return ShapeVerdict(
-                    ShapeReasonCode.SHAPE_MISMATCH,
-                    f"tensor {name} axis {axis}: {expr.to_dict()} does not"
+                    status=ShapeReasonCode.SHAPE_MISMATCH,
+                    detail=f"tensor {name} axis {axis}: {expr.to_dict()} does not"
                     f" divide onto {value}",
                 )
             solved[symbol] = remainder // coefficient
     return domain.validate_assignment(solved)
 
 
-def structural_projection(graph: Mapping[str, Any]) -> list[dict[str, Any]]:
+def structural_projection(
+    graph: Mapping[str, GraphValue],
+) -> list[dict[str, GraphValue]]:
     """Project one operator graph onto its shape-independent structure."""
-    projection: list[dict[str, Any]] = []
+    projection: list[dict[str, GraphValue]] = []
     for name in graph.get("layers", {}):
         layer = graph["layers"][name]
         semantic = layer.get("semantic_op", {})
@@ -420,7 +424,7 @@ def structural_projection(graph: Mapping[str, Any]) -> list[dict[str, Any]]:
     return projection
 
 
-def _constant_arguments(value: Any) -> Any:
+def _constant_arguments(value: GraphValue) -> GraphValue:
     """Drop tensor references, keeping every serialized constant argument."""
     if isinstance(value, Mapping):
         if set(value) == {"tensor"}:
@@ -436,14 +440,14 @@ def _constant_arguments(value: Any) -> Any:
 
 
 def certify_structure(
-    projections: Mapping[str, list[dict[str, Any]]],
+    projections: Mapping[str, list[dict[str, GraphValue]]],
     assignments: Mapping[str, Mapping[str, int]],
 ) -> ShapeVerdict:
     """Certify domain-wide structural stability across concrete instances."""
     keys = sorted(projections)
     reference_key = keys[0]
     reference = projections[reference_key]
-    divergences: list[dict[str, Any]] = []
+    divergences: list[dict[str, GraphValue]] = []
     for key in keys[1:]:
         other = projections[key]
         if len(other) != len(reference):
@@ -493,15 +497,17 @@ def certify_structure(
                     )
     if divergences:
         return ShapeVerdict(
-            ShapeReasonCode.SHAPE_BRANCH_REJECTED,
-            f"unexplained divergences: {divergences[:16]}",
+            status=ShapeReasonCode.SHAPE_BRANCH_REJECTED,
+            detail=f"unexplained divergences: {divergences[:16]}",
         )
-    return ShapeVerdict(ShapeReasonCode.VALIDATED, "structure_stable")
+    return ShapeVerdict(
+        status=ShapeReasonCode.VALIDATED, detail="structure_stable"
+    )
 
 
 def _explained_by_symbol(
-    left: Any,
-    right: Any,
+    left: GraphValue,
+    right: GraphValue,
     assignments: Mapping[str, Mapping[str, int]],
     left_key: str,
     right_key: str,
@@ -522,7 +528,7 @@ def _explained_by_symbol(
     return None
 
 
-def _mark(value: Any, expected: int) -> Any:
+def _mark(value: GraphValue, expected: int) -> GraphValue:
     """Replace integer leaves equal to one symbol value with a marker."""
     if isinstance(value, bool):
         return value

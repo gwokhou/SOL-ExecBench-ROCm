@@ -14,7 +14,7 @@ from solar.analysis.order_contracts import (
 from solar.analysis.views import AnalysisView, ViewAvailability
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class OrderSelection:
     """A best known candidate, its coverage boundary and exact missing denominator."""
 
@@ -77,8 +77,8 @@ def select_order(
         )
     )
     return OrderSelection(
-        selected,
-        reason,
-        complete,
-        total - sum(item.attempted for item in candidates),
+        candidate_id=selected,
+        reason=reason,
+        exhaustive_verified_domain=complete,
+        unexplored=total - sum(item.attempted for item in candidates),
     )

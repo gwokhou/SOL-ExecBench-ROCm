@@ -35,7 +35,7 @@ class SemanticValueDecodeError(ValueError):
         self.detail = detail
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SemanticValuePolicy:
     """Dialect choices for otherwise shared semantic value decoding."""
 

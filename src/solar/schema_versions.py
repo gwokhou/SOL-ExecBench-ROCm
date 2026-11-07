@@ -12,6 +12,17 @@ from typing import Final
 class SchemaVersion(StrEnum):
     """Current string-valued SOLAR wire-schema identifiers."""
 
+    SOLAR_CURATED_GATE = "sol_execbench.solar_curated_gate.v1"
+    SOLAR_L3A_MEASUREMENT = "sol_execbench.solar_l3a_measurement.v1"
+    SOLAR_L3A_PILOT = "sol_execbench.solar_l3a_pilot.v1"
+    SOLAR_L3A_PILOT_SUMMARY = "sol_execbench.solar_l3a_pilot_summary.v1"
+    SOLAR_L3B_SUMMARY = "sol_execbench.solar_l3b_summary.v1"
+    SOLAR_L3C_ANALYSIS = "sol_execbench.solar_l3c_analysis.v1"
+    SOLAR_L3C_SUMMARY = "sol_execbench.solar_l3c_summary.v1"
+    SOLAR_L3E_ANALYSIS = "sol_execbench.solar_l3e_analysis.v1"
+    SOLAR_L3E_SUMMARY = "sol_execbench.solar_l3e_summary.v1"
+    SOLAR_LINEB_EQUALITY = "sol_execbench.solar_lineb_equality.v1"
+
     IR_VERIFICATION = "solar.verification.ir.v8"
     RESOURCE_PEAK_CALIBRATION = "solar.resource_peak_calibration.v4"
 

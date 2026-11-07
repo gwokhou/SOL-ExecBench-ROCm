@@ -37,10 +37,12 @@ from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
     DiagnosticRunManifest,
     diagnostic_lifecycle_plan_payload,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.schema_versions import (
+    DiagnosticLifecycleSchema,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
     DiagnosticLifecycleParent,
-    GpuLifecycleIdentity,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
     designs_dir,
@@ -56,7 +58,11 @@ from sol_execbench.core.bench.performance_model.vram_policy import (
 )
 from sol_execbench.core.data.json_utils import load_json_file
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.platform.hardware import HardwareExecutionIdentity
+from sol_execbench.core.platform.rdna4_validation import (
+    HardwareValidationBinding,
+    verify_validation_receipt,
+)
 from sol_execbench.core.platform.source_state import (
     GitSourceState,
     capture_git_source_state,
@@ -65,7 +71,7 @@ from sol_execbench.core.platform.source_state import (
 _SOURCE_PATHS = ("src", "scripts", "pyproject.toml", "uv.lock")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class LifecyclePlanInputs:
     """Operator-selected inputs for one immutable lifecycle plan."""
 
@@ -78,6 +84,8 @@ class LifecyclePlanInputs:
     output_root: Path
     model_version: str
     max_attempts: int
+    hardware_validation_receipt_path: Path | None = None
+    hardware_validation_evidence_dir: Path | None = None
     vram_policy_path: Path | None = None
     frozen_inference_profile_path: Path | None = None
 
@@ -189,7 +197,7 @@ def _plan_gpu_identity(
     inputs: LifecyclePlanInputs,
     design: DiagnosticDesignManifest,
     collection: Path,
-) -> GpuLifecycleIdentity:
+) -> HardwareExecutionIdentity:
     gpu_identity = load_calibration_gpu_identity(
         inputs.calibration_profile_path,
         inputs.calibration_audit_path,
@@ -233,8 +241,11 @@ def _build_plan(
         source_revision=source.revision,
         purpose=design.purpose,
     )
+    receipt_path, evidence_dir, hardware_validation = (
+        _hardware_validation_inputs(inputs, source.revision)
+    )
     provisional = DiagnosticLifecyclePlan.model_construct(
-        schema_version=SchemaVersion.DIAGNOSTIC_LIFECYCLE_PLAN,
+        schema_version=DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE,
         plan_id="0" * 64,
         design=_parent(DiagnosticLifecycleStage.DESIGN, design, design_path),
         development_snapshot=_parent(
@@ -263,6 +274,9 @@ def _build_plan(
         purpose=design.purpose,
         model_version=inputs.model_version,
         max_attempts=inputs.max_attempts,
+        hardware_validation_receipt_path=receipt_path,
+        hardware_validation_evidence_dir=evidence_dir,
+        hardware_validation=hardware_validation,
         vram_policy_path=(
             str(inputs.vram_policy_path.resolve())
             if inputs.vram_policy_path is not None
@@ -277,6 +291,24 @@ def _build_plan(
         frozen_inference_profile=frozen_inference_artifact,
     )
     return _finalize_plan(provisional)
+
+
+def _hardware_validation_inputs(
+    inputs: LifecyclePlanInputs,
+    source_revision: str,
+) -> tuple[str | None, str | None, HardwareValidationBinding | None]:
+    receipt = inputs.hardware_validation_receipt_path
+    evidence = inputs.hardware_validation_evidence_dir
+    if receipt is None and evidence is None:
+        return None, None, None
+    if receipt is None or evidence is None:
+        raise ValueError("hardware validation inputs must be provided together")
+    binding = verify_validation_receipt(
+        receipt,
+        evidence,
+        expected_source_revision=source_revision,
+    )
+    return str(receipt.resolve()), str(evidence.resolve()), binding
 
 
 def _pre_frozen_inputs(

@@ -193,6 +193,7 @@ class TestValidateGPUDeviceIsolation:
             result = validate_gpu_device_isolation()
             assert result["isolated"] is True
             assert result["gpu_count"] == 1
+            assert "schema_version" not in result
 
     def test_multi_gpu_with_restriction_is_isolated(self):
         """Multi-GPU with ROCR_VISIBLE_DEVICES set is isolated."""

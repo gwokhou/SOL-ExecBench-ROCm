@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, cast
 
 import networkx as nx
 
+from solar.composition import BoundComponent
 from solar.types import NodeDict
 
 type Layer = NodeDict
@@ -27,7 +28,7 @@ class OperationExpansionRequest:
     source_node_ids: dict[str, str]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class OperationExpansion:
     """Normalized output from one successful expansion rule."""
 
@@ -152,7 +153,9 @@ def _subgraph_expansion(
         request.source_nodes,
         request.source_node_ids,
     )
-    return OperationExpansion(layers, final_node_id, input_mapping)
+    return OperationExpansion(
+        layers=layers, final_node_id=final_node_id, input_mapping=input_mapping
+    )
 
 
 def _groupwise_conv_rule(
@@ -221,8 +224,23 @@ def expand_operation(
     return None
 
 
+class OperationExpansionEngine(BoundComponent):
+    """Apply the ordered complex-operation rule chain for one façade."""
+
+    def _expand_operation(
+        self,
+        request: OperationExpansionRequest,
+    ) -> OperationExpansion | None:
+        """Expand one operation using the host's composed strategies."""
+        return expand_operation(
+            cast("OperationExpansionHost", self._host),
+            request,
+        )
+
+
 __all__ = [
     "OperationExpansion",
+    "OperationExpansionEngine",
     "OperationExpansionRequest",
     "expand_operation",
 ]

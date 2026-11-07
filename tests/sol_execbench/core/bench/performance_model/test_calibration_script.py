@@ -152,11 +152,13 @@ _FROZEN = {
 
 def _metrics(scale: float) -> tuple[MetricSample, ...]:
     base = tuple(
-        MetricSample(name, variant, value * scale, unit)
+        MetricSample(name=name, variant=variant, value=value * scale, unit=unit)
         for name, variant, value, unit in _METRICS
     )
     reduction = tuple(
-        MetricSample(name, f"width{width}", value * scale, unit)
+        MetricSample(
+            name=name, variant=f"width{width}", value=value * scale, unit=unit
+        )
         for width in (32, 64, 128, 256, 512, 1024)
         for name, value, unit in (
             ("reduction_op_per_ms", 600.0 + width, "item/ms"),
@@ -170,7 +172,11 @@ def test_calibration_metric_parser_and_frozen_parameter_build() -> None:
     parsed = parse_probe_metrics(
         "ignored\nMETRIC dispatch_floor_ms device 0.01 ms\n",
     )
-    assert parsed == [MetricSample("dispatch_floor_ms", "device", 0.01, "ms")]
+    assert parsed == [
+        MetricSample(
+            name="dispatch_floor_ms", variant="device", value=0.01, unit="ms"
+        )
+    ]
     held_out = [
         ProbeBatch(
             phase="parameter_estimation_after_configuration_freeze",

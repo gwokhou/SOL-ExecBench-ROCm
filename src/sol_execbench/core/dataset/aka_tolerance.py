@@ -24,14 +24,14 @@ from sol_execbench.core.data.workload import (
     Workload,
 )
 from sol_execbench.core.dataset.aka_contract import AKACorpusRole
+from sol_execbench.core.dataset.schema_versions import (
+    AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION,
+)
 from sol_execbench.core.integrity import (
     sha256_file,
     stable_json_checksum,
     validate_relative_artifact_path,
     validate_sha256,
-)
-from sol_execbench.core.integrity.schema_versions import (
-    AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION,
 )
 
 CALIBRATION_METHOD = "repeated_reference_runs"

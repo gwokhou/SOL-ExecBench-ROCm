@@ -1,0 +1,47 @@
+schema_version: sol_execbench.static_target_descriptor.v3
+hardware:
+  target_id: amd-mi300x-spx-192gb-configuration-declared
+  vendor: AMD
+  device_model: AMD Instinct MI300X
+  product_sku: mi300x-oam
+  gfx_target: gfx942
+  isa_features: []
+  kind: configuration_template
+  visible_compute_units: 304
+  visible_memory_bytes: 206158430208
+  l2_cache_bytes: 33554432
+  partition: spx
+  virtualization: bare_metal
+  isolation: dedicated
+  gpu_id: null
+  gpu_bdf: null
+  pcie_topology: null
+  nominal_profile_digest: null
+qualification_status: declared
+declaration_source: Configuration-tier AMD MI300X SPX 192 GiB declaration; runtime identity and resource visibility must still be verified
+max_tensor_bytes: 1072693248
+reference_ipc_limit_bytes: 1072693248
+supported_dtypes:
+  - bfloat16
+  - float16
+  - float32
+  - float8_e4m3fn
+  - float8_e5m2
+  - int8
+  - int32
+  - int64
+  - uint8
+  - bool
+supported_quantization:
+  - fp8_per_tensor
+  - fp8_per_token
+  - mxfp8_block
+  - int8_per_tensor
+  - int8_per_token
+  - int8_weight_only
+capabilities:
+  - dense_tensor
+  - grouped_gemm
+  - paged_memory
+  - sparse_attention
+  - indexed_attention

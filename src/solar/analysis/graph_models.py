@@ -10,7 +10,7 @@ from solar.analysis.external_reads import ExternalReads
 from solar.types import GraphValue, NodeDict
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class LayerData:
     """Normalized metadata for one graph layer."""
 
@@ -33,7 +33,7 @@ class LayerData:
     output_sizes: list[int]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class LayerCompute:
     """Computed operation counts for one layer."""
 
@@ -43,7 +43,7 @@ class LayerCompute:
     flops: int
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class MemoryElements:
     """Element-level memory accounting for one layer."""
 
@@ -53,7 +53,7 @@ class MemoryElements:
     orphaned: bool
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class MemoryBytes:
     """Byte-level memory accounting for one layer."""
 
@@ -66,7 +66,7 @@ class MemoryBytes:
     used_dtype_fallback: bool
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class IntrinsicLayer:
     """Profile-independent work and memory for one validated graph layer."""
 
@@ -76,7 +76,7 @@ class IntrinsicLayer:
     byte_counts: MemoryBytes
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ResourceAccounting:
     """Per-resource work attributed to one layer."""
 
@@ -84,7 +84,7 @@ class ResourceAccounting:
     resources: NodeDict
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class InputIo:
     """Classified input traffic for one layer."""
 
@@ -94,7 +94,7 @@ class InputIo:
     model_bytes: float
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class OutputIo:
     """Classified output traffic for one layer."""
 
@@ -105,7 +105,7 @@ class OutputIo:
     is_intermediate: bool
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class LayerIo:
     """Combined input and output traffic for one layer."""
 
@@ -117,7 +117,7 @@ class LayerIo:
     output_is_intermediate: bool
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AnalyzedLayer:
     """Completed accounting result for one layer."""
 
@@ -131,7 +131,7 @@ class AnalyzedLayer:
     intermediate_bytes: float
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class AnalysisAccumulator:
     """Mutable totals accumulated while traversing a graph."""
 
@@ -170,7 +170,7 @@ class AnalysisAccumulator:
         self.total_intermediate_bytes += analyzed.intermediate_bytes
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class GraphIoTotals:
     """Graph-level fused and model-I/O totals."""
 
@@ -180,7 +180,7 @@ class GraphIoTotals:
     model_io_bytes: float
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class FusionPlan:
     """Fusion regions, chains, and supporting proof layers."""
 
@@ -191,7 +191,7 @@ class FusionPlan:
     unsupported_contraction_layers: tuple[str, ...] = ()
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class FormalAnalysis:
     """Audited fusion evidence and tile-aware analysis status."""
 
@@ -202,7 +202,7 @@ class FormalAnalysis:
     tile_aware_bound: bool
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class LowerBound:
     """Computed lower bound and its resource components."""
 

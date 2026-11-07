@@ -13,7 +13,7 @@ from sol_execbench.cli.sidecars.mode import SidecarMode
 from sol_execbench.core.data.workload import Workload
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class EvaluationRequest:
     """Complete, immutable configuration for one CLI evaluation lifecycle."""
 

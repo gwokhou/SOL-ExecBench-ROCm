@@ -48,16 +48,7 @@ def build_schedule_evidence(
         reasons.append("cross_lane_event_dependencies_unverified")
     if order_reason := _lane_order_reason(dispatches):
         reasons.append(order_reason)
-    predecessors = schedule_predecessor_indices(dispatches)
-    edges = [
-        DispatchScheduleEdge(
-            predecessor_dispatch_id=dispatches[predecessor].dispatch_id,
-            successor_dispatch_id=dispatches[successor].dispatch_id,
-            reason="same_lane",
-        )
-        for successor, parents in predecessors.items()
-        for predecessor in sorted(parents)
-    ]
+    edges = _same_lane_edges(dispatches)
     if scope_verified and concurrent and cross_lane_verified:
         known = {item.dispatch_id for item in dispatches}
         if any(
@@ -195,3 +186,19 @@ __all__ = [
     "dispatch_lane",
     "schedule_predecessor_indices",
 ]
+
+
+def _same_lane_edges(
+    dispatches: Sequence[DispatchEvidence],
+) -> list[DispatchScheduleEdge]:
+    """Serialize only established same-lane predecessors."""
+    predecessors = schedule_predecessor_indices(dispatches)
+    return [
+        DispatchScheduleEdge(
+            predecessor_dispatch_id=dispatches[predecessor].dispatch_id,
+            successor_dispatch_id=dispatches[successor].dispatch_id,
+            reason="same_lane",
+        )
+        for successor, parents in predecessors.items()
+        for predecessor in sorted(parents)
+    ]

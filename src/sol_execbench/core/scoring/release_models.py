@@ -19,8 +19,9 @@ from sol_execbench.core.integrity import (
     validate_relative_artifact_path,
     validate_sha256,
 )
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
+from sol_execbench.core.scoring.schema_versions import (
+    ReleaseArtifactSchema,
+    ReleaseComponentKind,
 )
 from sol_execbench.core.solar_bridge.models import DEFAULT_IR_PATH, IRPath
 from sol_execbench.core.timestamps import validate_utc_timestamp
@@ -109,10 +110,16 @@ class ExecutionPlanProblem(ReleaseModel):
 class ReleaseExecutionPlan(CurrentSchemaMixin, ReleaseModel):
     """Exact full-corpus plan consumed by the trusted release runner."""
 
-    current_schema_version: ClassVar[str] = SchemaVersion.RELEASE_EXECUTION_PLAN
+    current_schema_version: ClassVar[str] = (
+        ReleaseArtifactSchema.RELEASE_COMPONENT
+    )
+    current_artifact_kind: ClassVar[str] = ReleaseComponentKind.EXECUTION_PLAN
 
-    schema_version: Literal[SchemaVersion.RELEASE_EXECUTION_PLAN] = (
-        SchemaVersion.RELEASE_EXECUTION_PLAN
+    schema_version: Literal[ReleaseArtifactSchema.RELEASE_COMPONENT] = (
+        ReleaseArtifactSchema.RELEASE_COMPONENT
+    )
+    artifact_kind: Literal[ReleaseComponentKind.EXECUTION_PLAN] = (
+        ReleaseComponentKind.EXECUTION_PLAN
     )
     generated_at: str
     source_revision: str
@@ -184,22 +191,36 @@ class ReleaseRunStatement(ReleaseModel):
 class BaselineStatement(CurrentSchemaMixin, ReleaseRunStatement):
     """Release-defined scoring baseline execution."""
 
-    current_schema_version: ClassVar[str] = SchemaVersion.RELEASE_BASELINE
-
-    schema_version: Literal[SchemaVersion.RELEASE_BASELINE] = (
-        SchemaVersion.RELEASE_BASELINE
+    current_schema_version: ClassVar[str] = (
+        ReleaseArtifactSchema.RELEASE_COMPONENT
     )
+    current_artifact_kind: ClassVar[str] = ReleaseComponentKind.RUN_STATEMENT
+
+    schema_version: Literal[ReleaseArtifactSchema.RELEASE_COMPONENT] = (
+        ReleaseArtifactSchema.RELEASE_COMPONENT
+    )
+    artifact_kind: Literal[ReleaseComponentKind.RUN_STATEMENT] = (
+        ReleaseComponentKind.RUN_STATEMENT
+    )
+    role: Literal[ReleaseRunKind.BASELINE]
     baseline_id: str = Field(min_length=1)
 
 
 class CandidateStatement(CurrentSchemaMixin, ReleaseRunStatement):
     """Trusted execution evidence for one full-corpus candidate."""
 
-    current_schema_version: ClassVar[str] = SchemaVersion.RELEASE_CANDIDATE
-
-    schema_version: Literal[SchemaVersion.RELEASE_CANDIDATE] = (
-        SchemaVersion.RELEASE_CANDIDATE
+    current_schema_version: ClassVar[str] = (
+        ReleaseArtifactSchema.RELEASE_COMPONENT
     )
+    current_artifact_kind: ClassVar[str] = ReleaseComponentKind.RUN_STATEMENT
+
+    schema_version: Literal[ReleaseArtifactSchema.RELEASE_COMPONENT] = (
+        ReleaseArtifactSchema.RELEASE_COMPONENT
+    )
+    artifact_kind: Literal[ReleaseComponentKind.RUN_STATEMENT] = (
+        ReleaseComponentKind.RUN_STATEMENT
+    )
+    role: Literal[ReleaseRunKind.CANDIDATE]
     candidate_id: str = Field(min_length=1)
 
 
@@ -219,10 +240,16 @@ class SolarManifestEvidence(ReleaseModel):
 class SolarIndexStatement(CurrentSchemaMixin, ReleaseModel):
     """Exact formal-bound manifest inventory for the scoring denominator."""
 
-    current_schema_version: ClassVar[str] = SchemaVersion.RELEASE_SOLAR_INDEX
+    current_schema_version: ClassVar[str] = (
+        ReleaseArtifactSchema.RELEASE_COMPONENT
+    )
+    current_artifact_kind: ClassVar[str] = ReleaseComponentKind.SOLAR_INDEX
 
-    schema_version: Literal[SchemaVersion.RELEASE_SOLAR_INDEX] = (
-        SchemaVersion.RELEASE_SOLAR_INDEX
+    schema_version: Literal[ReleaseArtifactSchema.RELEASE_COMPONENT] = (
+        ReleaseArtifactSchema.RELEASE_COMPONENT
+    )
+    artifact_kind: Literal[ReleaseComponentKind.SOLAR_INDEX] = (
+        ReleaseComponentKind.SOLAR_INDEX
     )
     generated_at: str
     source_revision: str
@@ -255,10 +282,10 @@ class SolarIndexStatement(CurrentSchemaMixin, ReleaseModel):
 class ReleaseBundle(CurrentSchemaMixin, ReleaseModel):
     """Publisher-authored content-addressed evidence for one official score."""
 
-    current_schema_version: ClassVar[str] = SchemaVersion.RELEASE_BUNDLE
+    current_schema_version: ClassVar[str] = ReleaseArtifactSchema.RELEASE_BUNDLE
 
-    schema_version: Literal[SchemaVersion.RELEASE_BUNDLE] = (
-        SchemaVersion.RELEASE_BUNDLE
+    schema_version: Literal[ReleaseArtifactSchema.RELEASE_BUNDLE] = (
+        ReleaseArtifactSchema.RELEASE_BUNDLE
     )
     corpus_manifest: ArtifactReference
     baseline: ArtifactReference

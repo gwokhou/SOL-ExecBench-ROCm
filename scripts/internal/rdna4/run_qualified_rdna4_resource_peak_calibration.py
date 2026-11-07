@@ -297,7 +297,7 @@ def _require_clock(arguments: argparse.Namespace) -> None:
         raise RuntimeError("resource qualification requires locked clocks")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class QualificationIdentity:
     """Invocation-local CPU identity, recomputed on every CLI call."""
 
@@ -311,11 +311,11 @@ class QualificationIdentity:
 def _identity(arguments: argparse.Namespace) -> QualificationIdentity:
     hipcc = _legacy()["_required_rocm_tool"]("hipcc")
     return QualificationIdentity(
-        hipcc,
-        _subject(hipcc),
-        sha256_file(Path(__file__)),
-        _configuration(arguments),
-        _legacy()["_git_revision"](),
+        hipcc=hipcc,
+        subject=_subject(hipcc),
+        runner=sha256_file(Path(__file__)),
+        configuration=_configuration(arguments),
+        revision=_legacy()["_git_revision"](),
     )
 
 
@@ -505,10 +505,10 @@ def _prepare_qualified_calibration(
     if any(path.resolve() not in expected for path in paths):
         raise ValueError("static qualification is missing a calibration binary")
     prepared = legacy["CalibrationPreparation"](
-        legacy["_required_rocm_tool"]("hipcc"),
-        binaries,
-        {path: expected[path.resolve()] for path in paths},
-        legacy["_isa_spec_evidence"](arguments.gfx),
+        hipcc=legacy["_required_rocm_tool"]("hipcc"),
+        binaries=binaries,
+        binary_hashes={path: expected[path.resolve()] for path in paths},
+        spec_evidence=legacy["_isa_spec_evidence"](arguments.gfx),
     )
     prepared.verify()
     return prepared

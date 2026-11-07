@@ -150,14 +150,20 @@ def test_serialization_round_trip_keeps_identity() -> None:
 def test_domain_identity_is_order_insensitive() -> None:
     """Declaration insertion order never changes the domain identity."""
     left = ShapeDomain(
-        "d",
-        {"B": ShapeSymbol("B", 1, 8), "N": ShapeSymbol("N", 2, 16, 2)},
-        {},
+        domain_id="d",
+        symbols={
+            "B": ShapeSymbol(name="B", lower=1, upper=8),
+            "N": ShapeSymbol(name="N", lower=2, upper=16, divisibility=2),
+        },
+        tensors={},
     )
     right = ShapeDomain(
-        "d",
-        {"N": ShapeSymbol("N", 2, 16, 2), "B": ShapeSymbol("B", 1, 8)},
-        {},
+        domain_id="d",
+        symbols={
+            "N": ShapeSymbol(name="N", lower=2, upper=16, divisibility=2),
+            "B": ShapeSymbol(name="B", lower=1, upper=8),
+        },
+        tensors={},
     )
     assert left.stable_identity() == right.stable_identity()
 
@@ -244,19 +250,24 @@ def test_alias_mutation_domain_validates_and_conversion_passes(
 def test_interval_dim_and_assumption_serialization_round_trip() -> None:
     """Interval and assumption declarations survive canonical rebuild."""
     domain = ShapeDomain(
-        "probe",
-        {"N": ShapeSymbol("N", 1, 32, provenance="probe:N")},
-        {},
+        domain_id="probe",
+        symbols={
+            "N": ShapeSymbol(name="N", lower=1, upper=32, provenance="probe:N")
+        },
+        tensors={},
         assumptions=(
             Assumption(
-                DimExpr.symbol("N"),
-                AssumptionOp.EQ,
-                DimExpr.symbol("N"),
+                left=DimExpr.symbol("N"),
+                op=AssumptionOp.EQ,
+                right=DimExpr.symbol("N"),
             ),
         ),
         intervals=(
             IntervalDim(
-                "nnz", DimExpr.fixed(0), DimExpr.symbol("N"), "probe:nnz"
+                symbol="nnz",
+                lower=DimExpr.fixed(0),
+                upper=DimExpr.symbol("N"),
+                provenance="probe:nnz",
             ),
         ),
     )

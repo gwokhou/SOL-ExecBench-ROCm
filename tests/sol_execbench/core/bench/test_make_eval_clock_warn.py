@@ -24,7 +24,7 @@ The eval driver now:
 """
 
 from sol_execbench.core.bench.config.benchmark_config import BenchmarkConfig
-from sol_execbench.core.bench.utils import make_eval
+from sol_execbench.core.bench.evaluation import make_eval
 from sol_execbench.core.data.trace import EvaluationStatus
 
 _DEVICE = "cpu"
@@ -76,7 +76,8 @@ class TestClockLockValidation:
         clocks_locked = (
             os.environ.get("SOL_EXECBENCH_CLOCKS_LOCKED", "0") == "1"
         )
-        assert cfg.lock_clocks and not clocks_locked
+        assert cfg.lock_clocks
+        assert not clocks_locked
 
     def test_lock_clocks_true_locked_proceeds(self, monkeypatch):
         """lock_clocks=True + SOL_EXECBENCH_CLOCKS_LOCKED=1 → should proceed."""

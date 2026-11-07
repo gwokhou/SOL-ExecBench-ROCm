@@ -34,15 +34,15 @@ from sol_execbench.core.scoring.release_builders import load_execution_plan
 from sol_execbench.core.scoring.release_environment import (
     verify_release_source_state,
 )
-from sol_execbench.core.solar_bridge.analyzer import (
-    formal_architecture_profile_hash,
-)
 from sol_execbench.core.solar_bridge.corpus_readiness import (
     CorpusReadinessRecord,
     CorpusReadinessStatus,
     CorpusReadinessSummary,
     audit_corpus_stage_readiness,
     verify_readiness_receipt,
+)
+from sol_execbench.core.solar_bridge.formal_device import (
+    formal_architecture_profile_hash,
 )
 from sol_execbench.core.solar_bridge.models import (
     DEFAULT_IR_PATH,
@@ -58,7 +58,7 @@ from sol_execbench.core.solar_bridge.workload_context import (
 from sol_execbench.core.timestamps import utc_timestamp
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _SolarQualificationContext:
     workspace: Path
     corpus: AKACorpusManifest
@@ -162,16 +162,16 @@ def _context(
         qualification_root, root
     )
     return _SolarQualificationContext(
-        root,
-        corpus,
-        plan.source_revision,
-        qualification,
-        orojenesis_home.resolve(),
-        device,
-        selected_path,
-        timeout_seconds,
-        f"{plan.run_id}:{selected_path.value}",
-        jobs,
+        workspace=root,
+        corpus=corpus,
+        source_revision=plan.source_revision,
+        root=qualification,
+        orojenesis_home=orojenesis_home.resolve(),
+        device=device,
+        ir_path=selected_path,
+        timeout_seconds=timeout_seconds,
+        scope_id=f"{plan.run_id}:{selected_path.value}",
+        jobs=jobs,
     )
 
 

@@ -245,11 +245,11 @@ def test_memory_level_and_profile_load_normalize_all_fields(tmp_path: Path):
     assert profile.name == "test_amd"
     assert profile.clock_hz == 2_000_000_000
     assert profile.memory_hierarchy[0] == MemoryLevel(
-        "l1",
-        "cu",
-        32,
-        50.0,
-        "spec",
+        name="l1",
+        scope="cu",
+        capacity_bytes=32,
+        bandwidth_bytes_per_second=50.0,
+        source="spec",
     )
     assert profile.to_dict()["memory_hierarchy"][0]["name"] == "l1"
 
@@ -441,8 +441,33 @@ def _without_raw_throttle_capture(node: ast.FunctionDef) -> ast.FunctionDef:
     return node
 
 
+def _normalize_dataclass_syntax(tree: ast.Module) -> ast.Module:
+    """Ignore constructor syntax changes while preserving field values."""
+    tree = deepcopy(tree)
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(
+            node.func, ast.Name
+        ):
+            continue
+        if node.func.id == "dataclass":
+            node.keywords = [
+                keyword
+                for keyword in node.keywords
+                if keyword.arg not in {"slots", "kw_only"}
+            ]
+        elif node.func.id == "ISAInstructionRequirement" and node.args:
+            fields = ("instruction", "functional_subgroup")
+            node.keywords = [
+                ast.keyword(arg=name, value=value)
+                for name, value in zip(fields, node.args, strict=True)
+            ] + node.keywords
+            node.args = []
+    return tree
+
+
 def _measurement_ast(tree: ast.Module) -> dict[str, str]:
     """Extract audited math and ordering, excluding explicitly changed CPU plumbing."""
+    tree = _normalize_dataclass_syntax(tree)
     runtime = {"main", "_compile_probe", "_isa_spec_evidence"}
     split = {
         "_tune_probe",

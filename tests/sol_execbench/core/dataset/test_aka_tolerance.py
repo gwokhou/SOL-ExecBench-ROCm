@@ -6,21 +6,19 @@
 from __future__ import annotations
 
 from sol_execbench.core.data.definition import Definition
+from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
 from sol_execbench.core.data.workload import NumericCheck, Workload
 from sol_execbench.core.dataset.aka_tolerance import (
     calibrate_tolerance,
     dtype_default_tolerance,
     workload_contract_sha256,
 )
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 
 
 def _definition() -> Definition:
     return Definition.model_validate(
         {
-            "schema_version": SchemaVersion.DEFINITION,
+            "schema_version": BenchmarkArtifactSchema.DEFINITION,
             "name": "two_outputs",
             "op_type": "test",
             "axes": {"N": {"type": "var", "description": "elements"}},
@@ -51,7 +49,7 @@ def _definition() -> Definition:
 def _workload(max_atol: float, max_rtol: float) -> Workload:
     return Workload.model_validate(
         {
-            "schema_version": SchemaVersion.WORKLOAD,
+            "schema_version": BenchmarkArtifactSchema.WORKLOAD,
             "axes": {"N": 8},
             "inputs": {"x": {"type": "random"}},
             "uuid": "calibration-test",

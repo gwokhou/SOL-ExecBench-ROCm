@@ -13,6 +13,11 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
+from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
+    DiagnosticAcceptanceArtifactKind,
+    DiagnosticArtifactSchema,
+    DiagnosticCaseReuseArtifactKind,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.blob_store import (
     BlobStore,
 )
@@ -41,7 +46,6 @@ from sol_execbench.core.integrity import (
     sha256_file,
     stable_json_checksum,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 CASE_REUSE_MANIFEST_NAME = "case-reuse-manifest.json"
 EXPOSURE_RECEIPT_NAME = "acceptance-exposure.json"
@@ -95,10 +99,14 @@ class DiagnosticAcceptanceExposureReceipt(CurrentSchemaModel):
     """Exact information released by a pre-verdict acceptance failure."""
 
     model_config = _CONFIG
-    current_schema_version = SchemaVersion.DIAGNOSTIC_ACCEPTANCE_EXPOSURE
+    current_schema_version = DiagnosticArtifactSchema.DIAGNOSTIC_ACCEPTANCE
+    current_artifact_kind = DiagnosticAcceptanceArtifactKind.EXPOSURE
 
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_ACCEPTANCE_EXPOSURE] = (
-        SchemaVersion.DIAGNOSTIC_ACCEPTANCE_EXPOSURE
+    schema_version: Literal[DiagnosticArtifactSchema.DIAGNOSTIC_ACCEPTANCE] = (
+        DiagnosticArtifactSchema.DIAGNOSTIC_ACCEPTANCE
+    )
+    artifact_kind: Literal[DiagnosticAcceptanceArtifactKind.EXPOSURE] = (
+        DiagnosticAcceptanceArtifactKind.EXPOSURE
     )
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     run_id: SHA256Digest
@@ -137,11 +145,15 @@ class DiagnosticHeldOutCorpusFragment(CurrentSchemaModel):
     """Fresh cases collected only for impact-classified held-out strata."""
 
     model_config = _CONFIG
-    current_schema_version = SchemaVersion.DIAGNOSTIC_HELD_OUT_FRAGMENT
+    current_schema_version = DiagnosticArtifactSchema.DIAGNOSTIC_CASE_REUSE
+    current_artifact_kind = DiagnosticCaseReuseArtifactKind.HELD_OUT_FRAGMENT
 
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_HELD_OUT_FRAGMENT] = (
-        SchemaVersion.DIAGNOSTIC_HELD_OUT_FRAGMENT
+    schema_version: Literal[DiagnosticArtifactSchema.DIAGNOSTIC_CASE_REUSE] = (
+        DiagnosticArtifactSchema.DIAGNOSTIC_CASE_REUSE
     )
+    artifact_kind: Literal[
+        DiagnosticCaseReuseArtifactKind.HELD_OUT_FRAGMENT
+    ] = DiagnosticCaseReuseArtifactKind.HELD_OUT_FRAGMENT
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     role: Literal["held_out"] = "held_out"
     design_sha256: SHA256Digest
@@ -212,10 +224,14 @@ class DiagnosticCaseReuseManifest(CurrentSchemaModel):
     """Reviewed impact proof for composing old and freshly collected cases."""
 
     model_config = _CONFIG
-    current_schema_version = SchemaVersion.DIAGNOSTIC_CASE_REUSE
+    current_schema_version = DiagnosticArtifactSchema.DIAGNOSTIC_CASE_REUSE
+    current_artifact_kind = DiagnosticCaseReuseArtifactKind.MANIFEST
 
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_CASE_REUSE] = (
-        SchemaVersion.DIAGNOSTIC_CASE_REUSE
+    schema_version: Literal[DiagnosticArtifactSchema.DIAGNOSTIC_CASE_REUSE] = (
+        DiagnosticArtifactSchema.DIAGNOSTIC_CASE_REUSE
+    )
+    artifact_kind: Literal[DiagnosticCaseReuseArtifactKind.MANIFEST] = (
+        DiagnosticCaseReuseArtifactKind.MANIFEST
     )
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     source_corpus_sha256: SHA256Digest

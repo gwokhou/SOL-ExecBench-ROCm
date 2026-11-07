@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, model_validator
@@ -11,9 +10,6 @@ from sol_execbench.core.data.base_model import (
     BaseModelWithDocstrings,
     CurrentSchemaModel,
 )
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 from sol_execbench.core.platform.compatibility import (
     MatrixCompatibilityStatus,
     MatrixEntry,
@@ -21,11 +17,10 @@ from sol_execbench.core.platform.compatibility import (
     MatrixValidationScope,
     MatrixValidationScopeField,
 )
-
-DEFAULT_DOCKER_TARGET_MANIFEST = (
-    Path(__file__).resolve().parents[3] / "docker" / "rocm-targets.json"
+from sol_execbench.core.platform.schema_versions import (
+    PlatformArtifactSchema,
+    PlatformPreflightArtifactKind,
 )
-
 
 _MODEL_CONFIG = ConfigDict(
     extra="forbid",
@@ -73,9 +68,9 @@ class DockerTargetManifest(CurrentSchemaModel):
     """Repository-owned declared Docker Target manifest."""
 
     model_config = _MODEL_CONFIG
-    current_schema_version = SchemaVersion.ROCM_DOCKER_TARGETS
+    current_schema_version = PlatformArtifactSchema.ROCM_DOCKER_TARGETS
 
-    schema_version: Literal[SchemaVersion.ROCM_DOCKER_TARGETS]
+    schema_version: Literal[PlatformArtifactSchema.ROCM_DOCKER_TARGETS]
     """Docker Target manifest schema version."""
     default_target_id: str
     """Target id selected when the user does not pass a Target."""
@@ -170,7 +165,8 @@ class DockerPreflightResult(BaseModelWithDocstrings):
         target_payload = entry_payload["target"]
         container_payload = entry_payload["observed"]["container"]
         return {
-            "schema_version": SchemaVersion.DOCKER_PREFLIGHT,
+            "schema_version": PlatformArtifactSchema.PLATFORM_PREFLIGHT,
+            "artifact_kind": PlatformPreflightArtifactKind.DOCKER,
             "target_id": target_payload["target_id"],
             "validation_scope": target_payload["validation_scope"],
             "image_repository": container_payload["image_repository"],

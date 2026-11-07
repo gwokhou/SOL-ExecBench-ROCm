@@ -42,7 +42,7 @@ from sol_execbench.core.scoring.release_traces import (
 )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class OfficialScoreResult:
     """Publication-grade score plus its verified evidence identities."""
 
@@ -234,11 +234,15 @@ def _score_workload(
     if baseline_latency is None:
         raise ValueError(f"baseline has no latency for {identity}")
     if not candidate_passed:
-        return WorkloadScore(identity[0], identity[1], 0.0)
+        return WorkloadScore(
+            problem=identity[0], workload_uuid=identity[1], score=0.0
+        )
     if candidate_latency is None:
         raise ValueError(f"passing candidate has no latency for {identity}")
     score = sol_score(candidate_latency, baseline_latency, sol_latency)
-    return WorkloadScore(identity[0], identity[1], score)
+    return WorkloadScore(
+        problem=identity[0], workload_uuid=identity[1], score=score
+    )
 
 
 def _load_model[Statement: ReleaseModel](

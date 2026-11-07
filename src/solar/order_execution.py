@@ -46,7 +46,7 @@ from solar.types import DynamicValue
 from solar.verification.policy import verification_policy_record
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class OrderContext:
     """One owned source, immutable domain and common pricing configuration."""
 

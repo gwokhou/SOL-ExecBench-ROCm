@@ -92,7 +92,7 @@ REFERENCES: dict[Family, Reference] = {
 }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Sample:
     """One concrete CPU program instance with fresh inputs per invocation."""
 
@@ -149,24 +149,68 @@ class Sample:
 
 
 SAMPLES = (
-    Sample(Family.MATMUL, Role.DEVELOPMENT, ((3, 5), (5, 4))),
-    Sample(Family.MATMUL, Role.REGRESSION, ((7, 11), (11, 5))),
-    Sample(Family.REDUCTION, Role.DEVELOPMENT, ((3, 5),)),
-    Sample(Family.REDUCTION, Role.REGRESSION, ((7, 11),)),
-    Sample(Family.CHAIN, Role.DEVELOPMENT, ((3, 5), (5, 4), (4, 2))),
-    Sample(Family.CHAIN, Role.REGRESSION, ((5, 7), (7, 3), (3, 4))),
-    Sample(Family.SLICES, Role.DEVELOPMENT, ((128,),), (64, 32, 96)),
-    Sample(Family.SLICES, Role.REGRESSION, ((192,),), (96, 64, 160)),
-    Sample(Family.MIXED, Role.DEVELOPMENT, ((4, 8), (4, 8))),
-    Sample(Family.MIXED, Role.REGRESSION, ((3, 7), (3, 7))),
-    Sample(Family.TRIANGULAR, Role.DEVELOPMENT, ((4, 4), (4, 3))),
-    Sample(Family.TRIANGULAR, Role.REGRESSION, ((5, 7), (7, 2))),
-    Sample(Family.INDEXED, Role.DEVELOPMENT, ((32, 4),), indices=(0, 7, 7, 31)),
     Sample(
-        Family.INDEXED, Role.REGRESSION, ((48, 3),), indices=(47, 0, 12, 12, 1)
+        family=Family.MATMUL, role=Role.DEVELOPMENT, shapes=((3, 5), (5, 4))
     ),
-    Sample(Family.MUTATION, Role.DEVELOPMENT, ((16,),), (8, 4, 12)),
-    Sample(Family.MUTATION, Role.REGRESSION, ((24,),), (12, 6, 18)),
+    Sample(
+        family=Family.MATMUL, role=Role.REGRESSION, shapes=((7, 11), (11, 5))
+    ),
+    Sample(family=Family.REDUCTION, role=Role.DEVELOPMENT, shapes=((3, 5),)),
+    Sample(family=Family.REDUCTION, role=Role.REGRESSION, shapes=((7, 11),)),
+    Sample(
+        family=Family.CHAIN,
+        role=Role.DEVELOPMENT,
+        shapes=((3, 5), (5, 4), (4, 2)),
+    ),
+    Sample(
+        family=Family.CHAIN,
+        role=Role.REGRESSION,
+        shapes=((5, 7), (7, 3), (3, 4)),
+    ),
+    Sample(
+        family=Family.SLICES,
+        role=Role.DEVELOPMENT,
+        shapes=((128,),),
+        bounds=(64, 32, 96),
+    ),
+    Sample(
+        family=Family.SLICES,
+        role=Role.REGRESSION,
+        shapes=((192,),),
+        bounds=(96, 64, 160),
+    ),
+    Sample(family=Family.MIXED, role=Role.DEVELOPMENT, shapes=((4, 8), (4, 8))),
+    Sample(family=Family.MIXED, role=Role.REGRESSION, shapes=((3, 7), (3, 7))),
+    Sample(
+        family=Family.TRIANGULAR, role=Role.DEVELOPMENT, shapes=((4, 4), (4, 3))
+    ),
+    Sample(
+        family=Family.TRIANGULAR, role=Role.REGRESSION, shapes=((5, 7), (7, 2))
+    ),
+    Sample(
+        family=Family.INDEXED,
+        role=Role.DEVELOPMENT,
+        shapes=((32, 4),),
+        indices=(0, 7, 7, 31),
+    ),
+    Sample(
+        family=Family.INDEXED,
+        role=Role.REGRESSION,
+        shapes=((48, 3),),
+        indices=(47, 0, 12, 12, 1),
+    ),
+    Sample(
+        family=Family.MUTATION,
+        role=Role.DEVELOPMENT,
+        shapes=((16,),),
+        bounds=(8, 4, 12),
+    ),
+    Sample(
+        family=Family.MUTATION,
+        role=Role.REGRESSION,
+        shapes=((24,),),
+        bounds=(12, 6, 18),
+    ),
 )
 
 

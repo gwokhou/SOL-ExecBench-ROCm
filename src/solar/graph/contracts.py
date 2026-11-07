@@ -8,7 +8,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
-from functools import cached_property
+from functools import cache
+from hashlib import sha256
 from pathlib import Path
 
 from solar.artifacts import ArtifactDocument, load_yaml_artifact
@@ -27,7 +28,7 @@ DEFAULT_EXTRACTION_KIND = ExtractionKind.TORCHVIEW
 OPERATOR_GRAPH_FILENAME = "operator_graph.yaml"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class TensorSignature:
     """Shape and dtype evidence needed by the conversion boundary."""
 
@@ -35,7 +36,7 @@ class TensorSignature:
     dtype: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class OperatorGraphArtifact:
     """Operator graph plus exact source/output binding evidence."""
 
@@ -45,16 +46,13 @@ class OperatorGraphArtifact:
     reference_outputs: tuple[TensorSignature, ...]
     source_storage: SourceStorage | None = None
 
-    @cached_property
+    @property
     def document(self) -> ArtifactDocument:
         """Load and cache the validated operator-graph document."""
-        document = load_yaml_artifact(self.path)
-        if document.data.get("schema_version") != OPERATOR_GRAPH_SCHEMA_VERSION:
-            raise ValueError(
-                "operator graph must use current "
-                f"schema_version={OPERATOR_GRAPH_SCHEMA_VERSION}",
-            )
-        return document
+        return _load_operator_document(
+            self.path,
+            sha256(self.path.read_bytes()).digest(),
+        )
 
     @property
     def extraction_kind(self) -> ExtractionKind:
@@ -64,12 +62,27 @@ class OperatorGraphArtifact:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class GraphBackend:
     """Uniform graph-extraction backend contract."""
 
     kind: ExtractionKind
     extract: Callable[..., OperatorGraphArtifact]
+
+
+@cache
+def _load_operator_document(
+    path: Path,
+    _content_sha256: bytes,
+) -> ArtifactDocument:
+    """Load one immutable operator document by its complete cache key."""
+    document = load_yaml_artifact(path)
+    if document.data.get("schema_version") != OPERATOR_GRAPH_SCHEMA_VERSION:
+        raise ValueError(
+            "operator graph must use current "
+            f"schema_version={OPERATOR_GRAPH_SCHEMA_VERSION}",
+        )
+    return document
 
 
 def normalize_extraction_kind(

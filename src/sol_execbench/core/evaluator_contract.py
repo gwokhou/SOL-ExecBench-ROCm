@@ -5,15 +5,13 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import ConfigDict, Field
 
 from sol_execbench.core.data.base_model import CurrentSchemaModel
+from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
 from sol_execbench.core.data.trace import EvaluationStatus
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 
 SOL_EXECBENCH_CONTRACT_VERSION = "4.0"
 SOL_EXECBENCH_RELEASE = "unreleased-v4"
@@ -23,20 +21,20 @@ class EvaluatorContract(CurrentSchemaModel):
     """Current evaluator, corpus, SOLAR, and scoring ownership contract."""
 
     model_config = ConfigDict(frozen=True, use_attribute_docstrings=True)
-    current_schema_version = SchemaVersion.EVALUATOR_CONTRACT
+    current_schema_version = BenchmarkArtifactSchema.EVALUATOR_CONTRACT
 
-    schema_version: Literal[SchemaVersion.EVALUATOR_CONTRACT] = (
-        SchemaVersion.EVALUATOR_CONTRACT
+    schema_version: Literal[BenchmarkArtifactSchema.EVALUATOR_CONTRACT] = (
+        BenchmarkArtifactSchema.EVALUATOR_CONTRACT
     )
     contract_version: Literal["4.0"] = SOL_EXECBENCH_CONTRACT_VERSION
     release: Literal["unreleased-v4"] = SOL_EXECBENCH_RELEASE
     capabilities: dict[str, str] = Field(default_factory=dict)
     evaluation_statuses: list[str]
-    corpus: dict[str, Any]
-    scoring: dict[str, Any]
-    boundaries: list[dict[str, Any]]
+    corpus: dict[str, object]
+    scoring: dict[str, object]
+    boundaries: list[dict[str, object]]
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """Return the JSON-compatible contract payload."""
         return self.model_dump(mode="json")
 
@@ -44,7 +42,7 @@ class EvaluatorContract(CurrentSchemaModel):
 def build_evaluator_contract() -> EvaluatorContract:
     """Build the single current public contract."""
     return EvaluatorContract(
-        schema_version=SchemaVersion.EVALUATOR_CONTRACT,
+        schema_version=BenchmarkArtifactSchema.EVALUATOR_CONTRACT,
         contract_version=SOL_EXECBENCH_CONTRACT_VERSION,
         release=SOL_EXECBENCH_RELEASE,
         capabilities=_capabilities(),
@@ -82,7 +80,7 @@ def _capabilities() -> dict[str, str]:
     }
 
 
-def _corpus_contract() -> dict[str, Any]:
+def _corpus_contract() -> dict[str, object]:
     """Return corpus identity and coverage facts in the public contract."""
     return {
         "manifest": "problems/AMD_AKA/manifest.yaml",
@@ -96,7 +94,7 @@ def _corpus_contract() -> dict[str, Any]:
     }
 
 
-def _scoring_contract() -> dict[str, Any]:
+def _scoring_contract() -> dict[str, object]:
     """Return the formula, prerequisites, and prohibited scoring behavior."""
     return {
         "formula": "1 / (1 + (T_k - T_SOL) / (T_b - T_SOL))",
@@ -122,7 +120,7 @@ def _scoring_contract() -> dict[str, Any]:
     }
 
 
-def _ownership_boundaries() -> list[dict[str, Any]]:
+def _ownership_boundaries() -> list[dict[str, object]]:
     """Return the explicit SOLAR and evaluator responsibility boundary."""
     return [
         {

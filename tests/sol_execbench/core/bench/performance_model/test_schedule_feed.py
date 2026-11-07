@@ -155,7 +155,12 @@ def test_builder_feed_seam_default_is_empty() -> None:
         output_path=Path("o.json"),
     )
     feed = _load_schedule_feed(request, SimpleNamespace(dispatches=()))
-    assert feed == feed.__class__(False, (), None, ())
+    assert feed == feed.__class__(
+        cross_lane_verified=False,
+        event_edges=(),
+        workload_uuid=None,
+        reasons=(),
+    )
 
 
 def test_builder_feed_seam_bridges_real_archive() -> None:

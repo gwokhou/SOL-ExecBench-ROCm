@@ -113,7 +113,8 @@ def test_actual_f03_candidates_reprice_verify_and_resume(
     sample_id, conversion, source = chain_source
     request = order_request(source, tmp_path / "search")
     result = search_contractions(conversion, request)
-    assert result.total_candidates == 2 and result.unexplored_candidates == 0
+    assert result.total_candidates == 2
+    assert result.unexplored_candidates == 0
     assert result.exhaustive_verified_domain
     expected = [84, 70] if sample_id == "F03-D" else [165, 224]
     assert [item.cost.macs for item in result.candidates] == expected
@@ -124,9 +125,11 @@ def test_actual_f03_candidates_reprice_verify_and_resume(
         result.selected_candidate_id
         == result.candidates[expected.index(min(expected))].candidate_id
     )
-    assert not result.performance_authority and not result.publication_eligible
+    assert not result.performance_authority
+    assert not result.publication_eligible
     for item in result.candidates:
-        assert item.views is not None and item.bundle is not None
+        assert item.views is not None
+        assert item.bundle is not None
         assert item.views[request.view].seconds == pytest.approx(
             2 * item.cost.macs / 100
         )
@@ -171,7 +174,8 @@ def test_candidate_budget_retains_full_denominator(chain_source, tmp_path):
             source, tmp_path / "limited", budget=OrderBudget(max_candidates=1)
         ),
     )
-    assert result.total_candidates == 2 and result.unexplored_candidates == 1
+    assert result.total_candidates == 2
+    assert result.unexplored_candidates == 1
     assert not result.exhaustive_verified_domain
     assert result.candidates[0].original
 
@@ -251,8 +255,10 @@ def test_reassociation_failure_retains_original_numerical_policy(
     original, changed = result.candidates
     assert original.status is CandidateStatus.ANALYZED
     assert changed.status is CandidateStatus.VERIFICATION_FAILED
-    assert changed.views is None and changed.projection is None
-    assert changed.bundle is not None and changed.message
+    assert changed.views is None
+    assert changed.projection is None
+    assert changed.bundle is not None
+    assert changed.message
     assert result.selected_candidate_id == original.candidate_id
     assert not (changed.bundle.directory / "full" / MANIFEST_FILENAME).exists()
 
@@ -384,7 +390,8 @@ def test_four_matrix_search_matches_five_independent_costs(path, tmp_path):
     result = search_contractions(
         conversion, order_request(source, tmp_path / "four-search")
     )
-    assert result.total_candidates == 5 and result.exhaustive_verified_domain
+    assert result.total_candidates == 5
+    assert result.exhaustive_verified_domain
     assert sorted(item.cost.macs for item in result.candidates) == [
         76,
         80,
@@ -517,7 +524,8 @@ def test_total_budget_after_preparation_preserves_every_unrun_candidate(
     assert all(
         item.status is CandidateStatus.NOT_RUN for item in result.candidates
     )
-    assert result.baseline is not None and result.selected_candidate_id is None
+    assert result.baseline is not None
+    assert result.selected_candidate_id is None
 
 
 def test_rules_drift_cannot_finish_an_unexecuted_search(

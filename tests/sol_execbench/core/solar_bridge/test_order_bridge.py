@@ -128,9 +128,8 @@ def test_cli_actual_search_retains_original_and_uses_stable_ties(
         report["selected_candidate_id"]
         == report["candidates"][0]["candidate_id"]
     )
-    assert (
-        not report["publication_eligible"] and not report["sol_score_eligible"]
-    )
+    assert not report["publication_eligible"]
+    assert not report["sol_score_eligible"]
 
 
 def test_cli_oracle_drift_fails_before_source_execution(worker_job, tmp_path):

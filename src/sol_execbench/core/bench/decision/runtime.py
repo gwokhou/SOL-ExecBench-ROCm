@@ -22,7 +22,7 @@ from sol_execbench.core.bench.rocm_profiler import (
 )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class RuntimeDecisionPrecedence:
     """Validated runtime classifications and the static classes they supersede."""
 

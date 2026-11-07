@@ -169,7 +169,7 @@ def test_bounded_runner_cleans_up_on_keyboard_interrupt(tmp_path, monkeypatch):
         f"pathlib.Path({str(pid_path)!r}).write_text(str(os.getpid())); "
         "time.sleep(60)"
     )
-    real_wait = subprocesses._wait_for_exit_without_reaping
+    real_wait = subprocesses.wait_for_exit_without_reaping
     first_wait = True
 
     def interrupt_once(process, timeout):
@@ -184,7 +184,7 @@ def test_bounded_runner_cleans_up_on_keyboard_interrupt(tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         subprocesses,
-        "_wait_for_exit_without_reaping",
+        "wait_for_exit_without_reaping",
         interrupt_once,
     )
 
@@ -230,7 +230,7 @@ def test_file_runner_cleans_up_on_keyboard_interrupt(tmp_path, monkeypatch):
         f"pathlib.Path({str(pid_path)!r}).write_text(str(os.getpid())); "
         "time.sleep(60)"
     )
-    real_wait = subprocesses._wait_for_exit_without_reaping
+    real_wait = subprocesses.wait_for_exit_without_reaping
     first_wait = True
 
     def interrupt_once(process, timeout):
@@ -245,7 +245,7 @@ def test_file_runner_cleans_up_on_keyboard_interrupt(tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         subprocesses,
-        "_wait_for_exit_without_reaping",
+        "wait_for_exit_without_reaping",
         interrupt_once,
     )
 
@@ -294,7 +294,7 @@ def test_process_group_scan_tolerates_proc_entry_exit_race(monkeypatch):
 
     monkeypatch.setattr(Path, "read_text", raced_read_text)
 
-    assert subprocesses._process_group_has_live_members(-1) is False
+    assert subprocesses.process_group_has_live_members(-1) is False
 
 
 def _wait_for_process_exit(pid: int) -> bool:

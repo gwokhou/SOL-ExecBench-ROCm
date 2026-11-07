@@ -118,7 +118,8 @@ def test_both_paths_dense_and_restricted_f06_match_coordinate_oracle(
         )
     )
     report = result.restricted
-    assert report is not None and report.status is DemandStatus.AVAILABLE
+    assert report is not None
+    assert report.status is DemandStatus.AVAILABLE
     rows, width = sample.shapes[0]
     columns = sample.shapes[1][1]
     terms = [
@@ -132,9 +133,9 @@ def test_both_paths_dense_and_restricted_f06_match_coordinate_oracle(
         {(k, j) for _, j, k in terms}
     )
     assert (
-        ArtifactDocument(result.output_dir, result.analysis).require_mapping(
-            "total"
-        )["macs"]
+        ArtifactDocument(
+            path=result.output_dir, data=result.analysis
+        ).require_mapping("total")["macs"]
         == rows * width * columns
     )
     assert report.dense_macs == rows * width * columns
@@ -205,9 +206,9 @@ def test_declined_scenarios_retain_dense_without_fake_restricted_zero(
     assert result.restricted.reason is reason
     assert result.restricted.macs is None
     assert not result.restricted.views
-    assert ArtifactDocument(result.output_dir, result.analysis).require_mapping(
-        "total"
-    )["macs"] in (48, 70)
+    assert ArtifactDocument(
+        path=result.output_dir, data=result.analysis
+    ).require_mapping("total")["macs"] in (48, 70)
 
 
 def _intrinsic(
@@ -365,7 +366,7 @@ def test_invalid_budget_is_not_an_unsupported_result():
 def test_time_checked_inside_enumeration_and_empty_huge_axis_is_cheap(
     monkeypatch,
 ):
-    work = DemandWork(DemandBudget(), deadline=10.0)
+    work = DemandWork(budget=DemandBudget(), deadline=10.0)
     assert list(coordinates((0, 10**100), work)) == []
     calls = iter((0.0, 100.0))
     monkeypatch.setattr(
@@ -401,7 +402,8 @@ def test_restricted_scan_inverse_and_resume_keep_constraints(
     assert all(point.status is PointStatus.ANALYZED for point in result.points)
     assert result.identity_inputs["computation"] == "restricted"
     point = result.points[0]
-    assert point.result is not None and point.estimate is not None
+    assert point.result is not None
+    assert point.estimate is not None
     assert point.estimate.seconds is not None
     inverse = query_resources(
         InverseRequest(
@@ -687,9 +689,8 @@ def test_returned_external_alias_does_not_claim_materialization_traffic(
         ArchitectureProfile.load(PROFILE),
     )
     assert report.read_reasons == (DemandReason.OUTPUT_ALIAS,)
-    assert (
-        report.external_read_bytes is None and report.output_write_bytes is None
-    )
+    assert report.external_read_bytes is None
+    assert report.output_write_bytes is None
     assert (
         report.views[AnalysisView.IDEAL_FUSED].status
         is ViewAvailability.UNAVAILABLE

@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from sol_execbench_type_helpers import make_hardware_validation_binding
 
 from sol_execbench.core.bench.performance_model.lifecycle import (
     BlobStore,
@@ -117,6 +118,7 @@ def _assets(
         source_revision="a" * 40,
         producer_version="4.0.0",
         archive_size_bytes=archive.stat().st_size,
+        hardware_validation_receipt_sha256="c" * 64,
         purpose=purpose,
     )
     attestation = DiagnosticReleaseAttestation(
@@ -134,6 +136,7 @@ def _assets(
         case_count=440,
         inventory_sha256="4" * 64,
         source_revision="a" * 40,
+        hardware_validation=make_hardware_validation_binding(),
         created_at="2026-08-09T00:00:00+00:00",
     )
     atomic_write_json_value(
@@ -185,6 +188,9 @@ def _seed_local_candidate(
         archive_sha256=attestation.archive.sha256,
         archive_size_bytes=attestation.archive.size_bytes,
         attestation_sha256=sha256_file(attestation_path),
+        hardware_validation_receipt_sha256=(
+            attestation.hardware_validation.receipt_sha256
+        ),
     )
     destination = releases_dir(store) / attestation.release_id / "manifest.json"
     destination.parent.mkdir(parents=True)

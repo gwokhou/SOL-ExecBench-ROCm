@@ -58,7 +58,8 @@ def hardware(monkeypatch, tmp_path):
         state["commands"].append(command)
         if "set" in command:
             assert command[:4] == ["sudo", "-n", "/opt/rocm/bin/amd-smi", "set"]
-            assert command[4] == "-l" and command[6:] == ["-g", TARGET_UUID]
+            assert command[4] == "-l"
+            assert command[6:] == ["-g", TARGET_UUID]
             level = command[5]
             records = list((tmp_path / "clock-leases").glob("*.json"))
             assert len(records) == 1

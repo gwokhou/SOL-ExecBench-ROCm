@@ -24,9 +24,8 @@ from sol_execbench.core.bench.performance_model.attribution import (
     calculate_ratios,
     derive_attributions,
 )
-from sol_execbench.core.bench.performance_model.calibration_audit import (
-    DiagnosticCalibrationAudit,
-    calibration_probe_identity_payload,
+from sol_execbench.core.bench.performance_model.calibration_loader import (
+    load_calibration_profile,
 )
 from sol_execbench.core.bench.performance_model.evidence_manifest import (
     PerformanceEvidenceArtifactKind,
@@ -147,7 +146,7 @@ class _BuildEvidence:
     dispatch_reasons: list[str]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _BuildArtifactPaths:
     trace: Path
     timing: Path
@@ -277,7 +276,7 @@ def _load_build_evidence(
         static,
         paths.static,
     )
-    calibration = _load_calibration(request.calibration_profile_path)
+    calibration = load_calibration_profile(request.calibration_profile_path)
     inference = _load_inference_profile(
         request.inference_profile_path,
         request.calibration_profile_path,
@@ -501,7 +500,7 @@ def _manifest_dispatch_evidence(
         pass_index = counter_pass_index(path)
         if pass_index is None:
             raise ValueError(f"counter_csv_pass_identity_missing:{path.name}")
-        passes.append(CounterPassCSV(pass_index, path))
+        passes.append(CounterPassCSV(pass_index=pass_index, path=path))
     dispatches = parse_and_align_counter_passes(
         passes,
         workload_uuid=trace.workload.uuid,
@@ -752,20 +751,6 @@ def _compiled_kernel(
     )
 
 
-def _load_calibration(
-    path: Path | None,
-) -> DiagnosticCalibrationProfile | None:
-    if path is None:
-        return None
-    profile = load_json_file(DiagnosticCalibrationProfile, path)
-    audit_path = path.with_name(f"{path.stem}.audit.json")
-    if not audit_path.is_file():
-        raise ValueError("calibration_audit_missing")
-    audit = load_json_file(DiagnosticCalibrationAudit, audit_path)
-    _verify_calibration_audit(profile, audit, audit_path)
-    return profile
-
-
 def _load_inference_profile(
     path: Path | None,
     calibration_path: Path | None,
@@ -788,58 +773,6 @@ def _load_inference_profile(
     if profile.calibration_audit_sha256 != sha256_file(audit_path):
         raise ValueError("inference_profile_calibration_audit_sha256_mismatch")
     return profile
-
-
-def _verify_calibration_audit(
-    profile: DiagnosticCalibrationProfile,
-    audit: DiagnosticCalibrationAudit,
-    audit_path: Path,
-) -> None:
-    probe = audit.probe_identity
-    protocol = audit.protocol
-    tuning = [item.model_dump(mode="json") for item in audit.tuning_evidence]
-    estimation = [
-        item.model_dump(mode="json")
-        for item in audit.parameter_estimation_evidence
-    ]
-    estimation_hashes = {
-        stable_json_checksum(estimation),
-        sha256_file(audit_path),
-    }
-    if not estimation_hashes <= set(
-        profile.parameter_estimation_evidence_sha256
-    ):
-        raise ValueError("calibration_parameter_estimation_sha256_mismatch")
-    if stable_json_checksum(tuning) not in profile.tuning_evidence_sha256:
-        raise ValueError("calibration_tuning_evidence_sha256_mismatch")
-    if (
-        stable_json_checksum(calibration_probe_identity_payload(probe))
-        not in profile.probe_evidence_sha256
-    ):
-        raise ValueError("calibration_probe_evidence_sha256_mismatch")
-    if (
-        probe.architecture != profile.identity.gpu_architecture
-        or probe.rocm_version != profile.identity.rocm_version
-        or probe.gpu_id != profile.identity.gpu_id
-        or probe.gpu_bdf != profile.identity.gpu_bdf
-        or probe.compiler_version != profile.identity.compiler_version
-    ):
-        raise ValueError("calibration_audit_identity_mismatch")
-    if not protocol.configuration_frozen_before_parameter_estimation or any(
-        batch.get("phase") != "parameter_estimation_after_configuration_freeze"
-        or batch.get("clocks_locked") is not True
-        for batch in estimation
-    ):
-        raise ValueError("calibration_parameter_estimation_protocol_invalid")
-    if (
-        protocol.bootstrap_seed != profile.bootstrap_seed
-        or protocol.bootstrap_replicates != profile.bootstrap_replicates
-    ):
-        raise ValueError("calibration_bootstrap_protocol_mismatch")
-    if protocol.parameter_estimation_process_batches < 5:
-        raise ValueError(
-            "calibration_parameter_estimation_processes_insufficient"
-        )
 
 
 def _rocm_version(trace: Trace) -> str | None:
@@ -1042,7 +975,12 @@ def _load_schedule_feed(
     )
 
     if request.schedule_scope_path is None:
-        return ScopeScheduleFeed(False, (), None, ())
+        return ScopeScheduleFeed(
+            cross_lane_verified=False,
+            event_edges=(),
+            workload_uuid=None,
+            reasons=(),
+        )
     dispatches = getattr(evidence, "dispatches", ())
     uuid = dispatches[0].workload_uuid if dispatches else None
     known: dict[str, frozenset[str]] = {

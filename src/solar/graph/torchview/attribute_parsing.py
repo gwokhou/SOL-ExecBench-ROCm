@@ -46,7 +46,7 @@ _REDUCTION_OPERATIONS = frozenset(
 )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class SemanticArgumentEncoder:
     """Encode ordered Torchview arguments into executable semantic values."""
 

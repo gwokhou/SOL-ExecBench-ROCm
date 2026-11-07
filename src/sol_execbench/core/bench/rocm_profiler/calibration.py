@@ -7,12 +7,12 @@ from typing import Any, Literal
 
 from pydantic import Field
 
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
 from sol_execbench.core.data.base_model import (
     CurrentSchemaModel,
     StrictArtifactModel,
-)
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
 )
 
 
@@ -27,11 +27,13 @@ class CalibrationClockSetup(StrictArtifactModel):
 class Rocprofv3OverheadCalibration(CurrentSchemaModel):
     """One current profiler-overhead calibration artifact."""
 
-    current_schema_version = SchemaVersion.ROCPROFV3_OVERHEAD_CALIBRATION
-
-    schema_version: Literal[SchemaVersion.ROCPROFV3_OVERHEAD_CALIBRATION] = (
-        SchemaVersion.ROCPROFV3_OVERHEAD_CALIBRATION
+    current_schema_version = (
+        ProfilerArtifactSchema.ROCPROFV3_OVERHEAD_CALIBRATION
     )
+
+    schema_version: Literal[
+        ProfilerArtifactSchema.ROCPROFV3_OVERHEAD_CALIBRATION
+    ] = ProfilerArtifactSchema.ROCPROFV3_OVERHEAD_CALIBRATION
     generated_at: str
     baseline_median_ms: float
     profiler_median_ms: float

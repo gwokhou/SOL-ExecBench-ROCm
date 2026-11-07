@@ -101,7 +101,6 @@ def test_canonical_reader_rejects_missing_or_wrong_schema_version(
         EnvironmentSnapshot,
         EvaluatorContract,
         MatrixEntry,
-        PerformanceScheduleEvidence,
         ProfileSummarySidecar,
         ReleaseBundle,
         ReleaseExecutionPlan,
@@ -118,3 +117,7 @@ def test_all_top_level_artifact_readers_require_explicit_schema_version(
 ) -> None:
     with pytest.raises(ValueError, match="requires schema_version"):
         model.model_validate({})
+
+
+def test_nested_schedule_inherits_diagnostic_envelope_schema() -> None:
+    assert "schema_version" not in PerformanceScheduleEvidence.model_fields

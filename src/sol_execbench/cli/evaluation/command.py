@@ -74,7 +74,7 @@ EnvironmentBuilder = Callable[[Mapping[str, str]], dict[str, str]]
 ProfileApplicationPreparer = Callable[[], None]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ProfileLifecycle:
     """Injected clock and replay-restaging lifecycle hooks."""
 

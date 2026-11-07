@@ -87,7 +87,9 @@ class ProblemPackager:
         """Stage a definition, workloads, solution, and configuration."""
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self._lifecycle = ProblemPackagerLifecycle(output_dir, keep_output_dir)
+        self._lifecycle = ProblemPackagerLifecycle(
+            output_dir=output_dir, keep_output_dir=keep_output_dir
+        )
         self.definition = definition
         self.workloads = workloads
         self.solution = solution

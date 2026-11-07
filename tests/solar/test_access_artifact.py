@@ -92,7 +92,7 @@ def test_damaged_access_claims_cannot_enter_analysis(access_files, damage):
     path.write_text(json.dumps(payload))
     with pytest.raises(
         (ValueError, SourceInputBindingError),
-        match="schema version|SHA-256|claims disagree|logical source",
+        match=r"schema version|SHA-256|claims disagree|logical source",
     ):
         load_access_document(graph).require_graph(
             yaml.safe_load(graph.read_text())

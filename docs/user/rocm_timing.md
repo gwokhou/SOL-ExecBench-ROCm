@@ -103,7 +103,8 @@ uv run sol-execbench evaluate <problem_dir> --solution solution.json \
 ```
 
 This path is separate from benchmark timing authority. It records a
-`sol_execbench.rocprofv3_profile.v1` sidecar next to the trace output, prefers
+the `profile` variant of the `sol_execbench.rocprofv3_session.v1` sidecar next
+to the trace output, prefers
 `rocpd` output for full-fidelity inspection, and recursively discovers filtered
 profiler artifacts under the requested output directory. Discovery registers
 files that match the requested output-file prefix or recognized `rocprofv3`

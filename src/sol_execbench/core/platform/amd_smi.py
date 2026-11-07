@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict, RootModel
 
 type MetricJSON = (
-    str | int | float | bool | None | list[MetricJSON] | dict[str, MetricJSON]
+    str | int | float | bool | list[MetricJSON] | dict[str, MetricJSON] | None
 )
 
 
@@ -72,7 +72,7 @@ class AMDSMIMetricPayload(RootModel[dict[str, MetricJSON] | list[MetricJSON]]):
     """Version-tolerant root validated before metric field extraction."""
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AMDSMIMetricObservation:
     """Normalized numeric telemetry for one GPU."""
 

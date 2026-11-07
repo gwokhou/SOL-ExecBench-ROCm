@@ -275,7 +275,9 @@ sol-execbench --format json diagnostics release package \
   data/publications/microarchitecture-diagnostics-v7-cycle3.tar.zst \
   --attestation-output \
   data/publications/microarchitecture-diagnostics-v7-cycle3.attestation.json \
-  --source-revision <source revision>
+  --source-revision <40-character source revision> \
+  --hardware-validation-receipt <downloaded evidence>/receipt.json \
+  --hardware-evidence-dir <downloaded evidence>
 ```
 
 After download, verify the externally published archive SHA-256 and unpack it
@@ -351,10 +353,12 @@ counter-pass misalignment, missing queue identity, or unverified overlap scope p
 `partial`/`unavailable` reason codes. No representative shape, achieved-rate,
 profiler-duration, or measured-runtime fallback is permitted.
 
-The output contract is `sol_execbench.performance_diagnostic.v7` using model
+The output contract is `sol_execbench.performance_diagnostic.v9` using model
 `gfx1200_diagnostic.v7`. It contains `T_pred(IR)`, `T_pred(HW)`, the canonical
 measured confidence interval, optional trusted frontier, uncertainty-aware
-`L/C/R`, bounded attribution, and stable action codes.
+`L/C/R`, bounded attribution, and stable action codes. Dispatch schedule data
+is a nested value object governed by this envelope rather than an independently
+versioned artifact.
 
 ## Govern Agent feedback
 
@@ -656,6 +660,8 @@ uv run sol-execbench --format json diagnostics lifecycle plan \
   --calibration-audit <calibration_profile.audit.json> \
   --vram-policy <frozen_vram_policy.json> \
   --frozen-inference-profile <development_only_inference.json> \
+  --hardware-validation-receipt <downloaded evidence>/receipt.json \
+  --hardware-evidence-dir <downloaded evidence> \
   --output-root <lifecycle_output_root> \
   --model-version <model_version> \
   --max-attempts 3 \
@@ -670,7 +676,8 @@ uv run sol-execbench --format json diagnostics lifecycle run \
 `PLAN.json` uses the current `sol_execbench.diagnostic_lifecycle_plan` schema
 and binds the registered design, promoted development snapshot, exact collection
 tree, held-out corpus, calibration profile and audit, output root, source
-revision, evidence purpose, model version, and bounded attempt count. The design,
+revision, exact-SHA hardware validation, evidence purpose, model version, and
+bounded attempt count. The design,
 development snapshot, and plan purposes must match. The command also verifies
 both registry identities and that the selected source revision matches the
 current `src/`, `scripts/`, `pyproject.toml`, and `uv.lock` state. Plan creation

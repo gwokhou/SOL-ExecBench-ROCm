@@ -14,7 +14,9 @@ from solar.analysis.exploration_contracts import (
     InverseRequest,
     ProjectionReference,
 )
+from solar.analysis.formal_analysis import FormalBoundAnalyzer
 from solar.analysis.graph_analyzer import IRGraphAnalyzer
+from solar.analysis.graph_loading import GraphLoader
 from solar.analysis.identity import RuleGroup, analysis_rules_identity
 from solar.analysis.views import AnalysisView, read_analysis_views
 from solar.api import AnalysisRequest, AnalysisResult, analyze
@@ -96,9 +98,9 @@ def test_full_and_public_reuse_match_without_execution_or_reloading(
     )
     monkeypatch.setattr("solar.verification.verify._run_cases", forbidden)
     monkeypatch.setattr("solar.verification.verify._load_module", forbidden)
-    monkeypatch.setattr(IRGraphAnalyzer, "_load_graph", forbidden)
+    monkeypatch.setattr(GraphLoader, "_load_graph", forbidden)
     session = ReuseSession(identity)
-    monkeypatch.setattr(IRGraphAnalyzer, "_compute_layer", forbidden)
+    monkeypatch.setattr(GraphLoader, "_compute_layer", forbidden)
     result = session.project(
         ProjectionRequest(architecture=PROFILE, output_dir=tmp_path / "same")
     )
@@ -107,7 +109,7 @@ def test_full_and_public_reuse_match_without_execution_or_reloading(
     assert result.record.sol_score_eligible
     assert not result.record.publication_eligible
     totals = ArtifactDocument(
-        result.output_dir, result.analysis
+        path=result.output_dir, data=result.analysis
     ).require_mapping("total")
     for name, expected in f_expectations()[sample_id].items():
         assert totals[name] == expected
@@ -137,7 +139,7 @@ def test_rate_change_reuses_counts_and_drops_inherited_audit(
     def forbidden(*args, **kwargs):
         pytest.fail("rate projection must not recount intrinsic work")
 
-    monkeypatch.setattr(IRGraphAnalyzer, "_compute_layer", forbidden)
+    monkeypatch.setattr(GraphLoader, "_compute_layer", forbidden)
     result = session.project(
         ProjectionRequest(architecture=profile, output_dir=tmp_path / "double")
     )
@@ -146,10 +148,10 @@ def test_rate_change_reuses_counts_and_drops_inherited_audit(
     assert not result.record.publication_eligible
     assert not result.record.profile_audit_verified
     metadata = ArtifactDocument(
-        result.output_dir, result.analysis
+        path=result.output_dir, data=result.analysis
     ).require_mapping("metadata")
     architecture = ArtifactDocument(
-        result.output_dir, metadata
+        path=result.output_dir, data=metadata
     ).require_mapping("architecture")
     assert architecture["audit_evidence"] == {
         "status": "unavailable",
@@ -170,13 +172,13 @@ def test_capacity_and_timeout_enter_identity_and_recompute_evidence(
     session = ReuseSession(identity)
     profile = ArchitectureProfile.load(PROFILE).to_dict()
     seen = []
-    original = IRGraphAnalyzer._run_formal_analysis
+    original = FormalBoundAnalyzer._run_formal_analysis
 
     def record(self, prepared, *args, **kwargs):
         seen.append(prepared.profile.last_level_cache_bytes)
         return original(self, prepared, *args, **kwargs)
 
-    monkeypatch.setattr(IRGraphAnalyzer, "_run_formal_analysis", record)
+    monkeypatch.setattr(FormalBoundAnalyzer, "_run_formal_analysis", record)
     results = []
     for capacity, timeout in ((64, 5), (4096, 5), (4096, 6)):
         profile["last_level_cache_bytes"] = capacity
@@ -238,7 +240,7 @@ def test_resource_mode_changes_are_reclassified_before_pricing(
         result = session.project(request)
         assert (
             ArtifactDocument(
-                result.output_dir, result.analysis
+                path=result.output_dir, data=result.analysis
             ).require_mapping("total")
             == full["total"]
         )
@@ -320,7 +322,7 @@ def test_partial_or_changed_projection_cannot_be_resumed(
         (result.output_dir / "unfinished.tmp").touch()
     else:
         record_sha256 = "0" * 64
-    with pytest.raises(ValueError, match="inventory|SHA-256"):
+    with pytest.raises(ValueError, match=r"inventory|SHA-256"):
         load_projection(
             result.output_dir,
             record_sha256=record_sha256,
@@ -362,14 +364,14 @@ def test_pinned_public_inverse_matches_owned_forward_analysis(source, tmp_path):
             architecture=PROFILE, output_dir=tmp_path / "inverse-source"
         )
     )
-    document = ArtifactDocument(result.output_dir, result.analysis)
+    document = ArtifactDocument(path=result.output_dir, data=result.analysis)
     metadata = document.require_mapping("metadata")
     target = read_analysis_views(metadata["views"])[
         AnalysisView.IDEAL_FUSED
     ].seconds
     assert target is not None
     total = ArtifactDocument(
-        result.output_dir, document.require_mapping("total")
+        path=result.output_dir, data=document.require_mapping("total")
     )
     resource_work = total.require_mapping("resource_work")
     query = InverseRequest(
@@ -380,7 +382,7 @@ def test_pinned_public_inverse_matches_owned_forward_analysis(source, tmp_path):
         ),
         view=AnalysisView.IDEAL_FUSED,
         target_seconds=target,
-        scale_resources=tuple(sorted(resource_work)) + ("dram",),
+        scale_resources=(*tuple(sorted(resource_work)), "dram"),
     )
     answer = query_resources(query)
     assert answer.required_group_scale == pytest.approx(1.0)
@@ -388,7 +390,7 @@ def test_pinned_public_inverse_matches_owned_forward_analysis(source, tmp_path):
     assert answer.projection_sha256 == result.record.projection_sha256
     assert not answer.performance_authority
     (result.output_dir / ANALYSIS_FILENAME).write_text("corrupt")
-    with pytest.raises(ValueError, match="SHA-256|digest|hash"):
+    with pytest.raises(ValueError, match=r"SHA-256|digest|hash"):
         query_resources(query)
 
 
@@ -597,7 +599,7 @@ def test_scan_resume_drift_is_rejected(source, tmp_path, drift):
             "corrupt"
         )
     with pytest.raises(
-        ValueError, match="identity differs|SHA-256|digest|hash"
+        ValueError, match=r"identity differs|SHA-256|digest|hash"
     ):
         scan_profiles(request)
 
@@ -773,7 +775,7 @@ def test_description_change_preserves_qualification_but_changes_full_identity(
     assert not result.record.profile_audit_verified
     assert result.analysis["total"] == full["total"]
     metadata = ArtifactDocument(
-        result.output_dir, result.analysis
+        path=result.output_dir, data=result.analysis
     ).require_mapping("metadata")
     observed = metadata["architecture"]
     assert observed == profile

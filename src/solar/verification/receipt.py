@@ -85,8 +85,7 @@ def _require_results(
         gradient_error = result.get("gradient_error_semantics_verified")
         if policy.verify_gradients and not (
             _finite_nonnegative(gradient_count)
-            or _finite_nonnegative(gradient_error)
-            and gradient_error == 1
+            or (_finite_nonnegative(gradient_error) and gradient_error == 1)
         ):
             raise VerificationError(
                 "verification result lacks gradient evidence"

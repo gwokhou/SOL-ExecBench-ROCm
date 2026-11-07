@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import shutil
+from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -95,7 +96,7 @@ def _analysis_outcome(
         lower_bound_seconds=result.bound.seconds,
         bound_kind=result.bound.kind,
         limiting_resource=result.bound.limiting_resource,
-        artifacts=tuple(artifact.__dict__ for artifact in result.artifacts),
+        artifacts=tuple(asdict(artifact) for artifact in result.artifacts),
         publication_eligible=result.publication_eligible,
     )
     if formal and not outcome.is_formal_publication:

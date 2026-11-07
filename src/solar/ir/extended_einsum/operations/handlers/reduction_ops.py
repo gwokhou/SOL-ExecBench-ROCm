@@ -23,14 +23,13 @@ This module provides einsum handlers for:
 """
 
 import string
-from typing import Any
 
 from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOp,
     EinsumOperand,
     EinsumOpHandler,
 )
-from solar.types import TensorShape, TensorShapes
+from solar.types import DynamicValue, TensorShape, TensorShapes
 
 
 class ReductionHandler(EinsumOpHandler):
@@ -73,7 +72,7 @@ class ReductionHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for reduction operation."""
         input_shape = (
@@ -132,8 +131,8 @@ class ReductionHandler(EinsumOpHandler):
         )
 
         operands = [
-            EinsumOperand("Input", input_labels, is_output=False),
-            EinsumOperand("Output", output_labels, is_output=True),
+            EinsumOperand(name="Input", dims=input_labels, is_output=False),
+            EinsumOperand(name="Output", dims=output_labels, is_output=True),
         ]
 
         equation = f"{''.join(input_labels)}->{''.join(output_labels)}"

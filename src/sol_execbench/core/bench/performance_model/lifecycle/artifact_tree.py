@@ -13,21 +13,30 @@ from pydantic import Field, model_validator
 from sol_execbench.core.bench.performance_model.lifecycle.blob_store import (
     BlobStore,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.schema_versions import (
+    DiagnosticLifecycleSchema,
+    DiagnosticLifecycleStateKind,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
 )
 from sol_execbench.core.data.base_model import CurrentFrozenSchemaModel
 from sol_execbench.core.data.json_utils import canonical_json_bytes
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 class DiagnosticArtifactTreeManifest(CurrentFrozenSchemaModel):
     """One entry manifest and every relative file needed to consume it."""
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_ARTIFACT_TREE
+    current_schema_version = (
+        DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    )
+    current_artifact_kind = DiagnosticLifecycleStateKind.ARTIFACT_TREE
 
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_ARTIFACT_TREE] = (
-        SchemaVersion.DIAGNOSTIC_ARTIFACT_TREE
+    schema_version: Literal[
+        DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    ] = DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    artifact_kind: Literal[DiagnosticLifecycleStateKind.ARTIFACT_TREE] = (
+        DiagnosticLifecycleStateKind.ARTIFACT_TREE
     )
     root_path: str = Field(min_length=1)
     artifacts: tuple[DiagnosticLifecycleArtifact, ...] = Field(min_length=1)

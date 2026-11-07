@@ -18,6 +18,7 @@ from sol_execbench.cli.commands.diagnostics import (
     _verify_acceptance_against_manifest,
 )
 from sol_execbench.core.bench.performance_model.acceptance import (
+    DiagnosticAcceptanceArtifactKind,
     DiagnosticAcceptanceCase,
     DiagnosticAcceptanceManifest,
     evaluate_diagnostic_acceptance,
@@ -87,6 +88,7 @@ def _case(kind: WorkloadKind, index: int) -> DiagnosticAcceptanceCase:
 
 def _manifest(*, vacuous: bool = False) -> DiagnosticAcceptanceManifest:
     return DiagnosticAcceptanceManifest(
+        artifact_kind=DiagnosticAcceptanceArtifactKind.MANIFEST,
         model_identity=_model_identity(),
         calibration_profile_sha256="a" * 64,
         calibration_identity=_identity(),

@@ -93,7 +93,7 @@ def compulsory_witness_streaming_dimension(
     )
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class _DimensionRegistry:
     sizes: dict[str, int] = field(default_factory=dict)
     symbols: dict[str, str] = field(default_factory=dict)

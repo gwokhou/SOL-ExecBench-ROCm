@@ -39,6 +39,9 @@ from sol_execbench.core.bench.performance_model.lifecycle.resolver import (
     ReferenceResolver,
     materialize_corpus_references,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.schema_versions import (
+    DiagnosticLifecycleSchema,
+)
 from sol_execbench.core.bench.performance_model.models import (
     DiagnosticCalibrationProfile,
 )
@@ -65,7 +68,6 @@ from sol_execbench.core.integrity import (
     validate_relative_artifact_path,
     verify_artifact_file,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 PUBLICATION_MANIFEST_NAME = "publication.json"
 _NUMERIC_REPRODUCTION_ABS_TOLERANCE = 1e-9
@@ -122,11 +124,13 @@ class DiagnosticPublicationArtifact(FrozenArtifactModel):
 class DiagnosticPublicationProjection(CurrentDiagnosticSidecarAuthority):
     """Exact compact development corpus and reproducible inference inputs."""
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_PUBLICATION_PROJECTION
-
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_PUBLICATION_PROJECTION] = (
-        SchemaVersion.DIAGNOSTIC_PUBLICATION_PROJECTION
+    current_schema_version = (
+        DiagnosticLifecycleSchema.DIAGNOSTIC_PUBLICATION_PROJECTION
     )
+
+    schema_version: Literal[
+        DiagnosticLifecycleSchema.DIAGNOSTIC_PUBLICATION_PROJECTION
+    ] = DiagnosticLifecycleSchema.DIAGNOSTIC_PUBLICATION_PROJECTION
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     policy: Literal[DiagnosticPublicationPolicy.COMPACT_MODEL_INPUTS_V1] = (
         DiagnosticPublicationPolicy.COMPACT_MODEL_INPUTS_V1

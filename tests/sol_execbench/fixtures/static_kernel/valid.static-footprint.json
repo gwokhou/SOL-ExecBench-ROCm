@@ -1,5 +1,6 @@
 {
-  "schema_version": "sol_execbench.static_kernel_evidence.v4",
+  "schema_version": "sol_execbench.performance_evidence_component.v1",
+  "artifact_kind": "static_kernel",
   "status": "collected",
   "reason_code": "static_evidence_collected",
   "diagnostic_only": true,

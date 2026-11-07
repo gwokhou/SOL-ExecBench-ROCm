@@ -59,7 +59,7 @@ def all_traces_passed(traces: list[Trace]) -> bool:
 
 def evaluation_artifacts(
     output: Path | None, scope_archive: Path | None
-) -> tuple[dict[str, str], ...]:
+) -> tuple[dict[str, object], ...]:
     """Expose the canonical trace and the independently archived scope verdict."""
     result = (
         (artifact(output, "canonical_trace_jsonl"),)

@@ -17,12 +17,13 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     CurrentDiagnosticSidecarAuthority,
     DiagnosticSidecarStatus,
 )
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+    PerformanceEvidenceComponentKind,
+)
 from sol_execbench.core.data.base_model import StrictArtifactModel
 from sol_execbench.core.data.definition_models import DType
 from sol_execbench.core.integrity import SHA256Digest, sha256_file
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 
 MAX_EXACT_INDEX_ELEMENTS = 4 * 1024 * 1024
 _HISTOGRAM_KEYS = ("1", "2-3", "4-7", "8-15", "16-31", "32+")
@@ -84,10 +85,16 @@ class PerformanceAccessEvidenceSidecar(CurrentDiagnosticSidecarAuthority):
     """Content-bound access summaries generated before candidate timing."""
 
     model_config = _CONFIG
-    current_schema_version = SchemaVersion.PERFORMANCE_ACCESS_EVIDENCE
+    current_schema_version = (
+        PerformanceArtifactSchema.PERFORMANCE_EVIDENCE_COMPONENT
+    )
+    current_artifact_kind = PerformanceEvidenceComponentKind.ACCESS_PATTERN
 
-    schema_version: Literal[SchemaVersion.PERFORMANCE_ACCESS_EVIDENCE] = (
-        SchemaVersion.PERFORMANCE_ACCESS_EVIDENCE
+    schema_version: Literal[
+        PerformanceArtifactSchema.PERFORMANCE_EVIDENCE_COMPONENT
+    ] = PerformanceArtifactSchema.PERFORMANCE_EVIDENCE_COMPONENT
+    artifact_kind: Literal[PerformanceEvidenceComponentKind.ACCESS_PATTERN] = (
+        PerformanceEvidenceComponentKind.ACCESS_PATTERN
     )
     status: DiagnosticSidecarStatus
     run_id: SHA256Digest

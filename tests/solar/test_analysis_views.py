@@ -26,9 +26,9 @@ def costs(layers, *, compulsory, capacity=None):
             layer["unfused_bytes"] for layer in layers.values()
         ),
         external_reads=ExternalReads(
-            AccessQuality.EXACT,
-            (AccessReason.STATIC,),
-            DEFAULT_ACCESS_BUDGET,
+            quality=AccessQuality.EXACT,
+            reasons=(AccessReason.STATIC,),
+            budget=DEFAULT_ACCESS_BUDGET,
         ),
     )
     for layer in layers.values():
@@ -193,7 +193,7 @@ def test_serialized_views_reject_ambiguous_or_inconsistent_claims(damage):
         raw["cache_aware"]["seconds"] = 0
     with pytest.raises(
         ValueError,
-        match="three model views|assumptions disagree|sum serial|unavailable view",
+        match=r"three model views|assumptions disagree|sum serial|unavailable view",
     ):
         read_analysis_views(raw)
 

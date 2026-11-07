@@ -31,7 +31,7 @@ def normalize_gpu_uuid(value: str) -> str:
     return normalized
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class GPULockPaths:
     """Physical L1 and L2 files for one explicitly selected GPU."""
 
@@ -73,7 +73,10 @@ def configured_gpu_locks(
     ):
         raise ValueError("GPU_LOCK_FD must be a nonnegative inherited L1 fd")
     return GPULockPaths(
-        Path(directory), uuid, host == "1", int(raw_fd) if raw_fd else None
+        directory=Path(directory),
+        uuid=uuid,
+        host_managed=host == "1",
+        inherited_fd=int(raw_fd) if raw_fd else None,
     )
 
 

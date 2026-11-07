@@ -10,7 +10,7 @@ from sol_execbench.core.data.base_model import (
     BaseModelWithDocstrings,
     StrictArtifactModel,
 )
-from sol_execbench.core.platform.runtime import PCIeTopologyIdentity
+from sol_execbench.core.platform.hardware import PCIeTopologyIdentity
 
 MODEL_CONFIG = ConfigDict(
     extra="forbid",

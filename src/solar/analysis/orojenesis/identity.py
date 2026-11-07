@@ -13,7 +13,7 @@ from solar.schema_versions import OROJENESIS_PROVENANCE_SCHEMA_VERSION
 from solar.types import DynamicValue
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class OrojenesisIdentityPolicy:
     """Expected source, artifact, and reproducible-build identities."""
 

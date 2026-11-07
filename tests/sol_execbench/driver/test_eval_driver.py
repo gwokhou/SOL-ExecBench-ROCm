@@ -41,11 +41,11 @@ import torch
 
 from sol_execbench import driver
 from sol_execbench.core.bench.reference_protocol import TRUSTED_DEFINITION_FILE
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
+from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
 
 _TEMPLATES_DIR = Path(driver.__file__).parent / "templates"
+_EVAL_DRIVER_TIMEOUT_SECONDS = 60
+_TORCH_COMPILE_TIMEOUT_SECONDS = 180
 
 
 def _stage_evaluation_templates(tmp_path: Path) -> None:
@@ -111,7 +111,7 @@ _SOLUTION_SPEC = {
 def _stage_definitions(tmp_path: Path, definition: dict) -> None:
     """Stage a worker-only definition and a candidate-visible redacted copy."""
     definition = {
-        "schema_version": SchemaVersion.DEFINITION,
+        "schema_version": BenchmarkArtifactSchema.DEFINITION,
         **definition,
     }
     (tmp_path / TRUSTED_DEFINITION_FILE).write_text(json.dumps(definition))
@@ -145,6 +145,8 @@ def _run_eval_driver(
     extra_env: dict | None = None,
     definition: dict | None = None,
     workload: dict | None = None,
+    *,
+    timeout_seconds: int = _EVAL_DRIVER_TIMEOUT_SECONDS,
 ) -> list[dict]:
     """Write all staging files and run eval_driver.py in a subprocess.
 
@@ -157,6 +159,7 @@ def _run_eval_driver(
         extra_env: Additional environment variables for the subprocess.
         definition: Problem definition dict. Defaults to ``_MINIMAL_DEFINITION``.
         workload: Workload dict. Defaults to ``_MINIMAL_WORKLOAD``.
+        timeout_seconds: Bounded subprocess timeout for this scenario.
 
     Returns:
         List of Trace dicts parsed from the driver's stdout.
@@ -169,6 +172,7 @@ def _run_eval_driver(
         extra_env=extra_env,
         definition=definition,
         workload=workload,
+        timeout_seconds=timeout_seconds,
     )
     return parse_eval_result(result.stdout, result.stderr)
 
@@ -180,6 +184,8 @@ def _run_eval_driver_process(
     extra_env: dict | None = None,
     definition: dict | None = None,
     workload: dict | None = None,
+    *,
+    timeout_seconds: int = _EVAL_DRIVER_TIMEOUT_SECONDS,
 ) -> subprocess.CompletedProcess[str]:
     """Run the isolated reference/candidate workflow and return its result."""
     _stage_evaluation_templates(tmp_path)
@@ -190,13 +196,13 @@ def _run_eval_driver_process(
     (tmp_path / "workload.jsonl").write_text(
         json.dumps(
             {
-                "schema_version": SchemaVersion.WORKLOAD,
+                "schema_version": BenchmarkArtifactSchema.WORKLOAD,
                 **(workload if workload is not None else _MINIMAL_WORKLOAD),
             },
         ),
     )
     solution = {
-        "schema_version": SchemaVersion.SOLUTION,
+        "schema_version": BenchmarkArtifactSchema.SOLUTION,
         **_SOLUTION_SPEC,
         "sources": [{"path": "kernel.py", "content": kernel_code}],
     }
@@ -214,7 +220,7 @@ def _run_eval_driver_process(
     (tmp_path / "config.json").write_text(
         json.dumps(
             {
-                "schema_version": SchemaVersion.BENCHMARK_CONFIG,
+                "schema_version": BenchmarkArtifactSchema.BENCHMARK_CONFIG,
                 **cfg,
             },
         ),
@@ -235,7 +241,7 @@ def _run_eval_driver_process(
         capture_output=True,
         check=False,
         text=True,
-        timeout=60,
+        timeout=timeout_seconds,
     )
 
 
@@ -551,12 +557,12 @@ def test_reference_outputs_are_frozen_before_user_call(tmp_path):
     _stage_definitions(tmp_path, definition)
     (tmp_path / "workload.jsonl").write_text(
         json.dumps(
-            {"schema_version": SchemaVersion.WORKLOAD, **workload},
+            {"schema_version": BenchmarkArtifactSchema.WORKLOAD, **workload},
         ),
     )
     kernel = "def run(x):\n    original = x.clone()\n    x.add_(1)\n    return original\n"
     solution = {
-        "schema_version": SchemaVersion.SOLUTION,
+        "schema_version": BenchmarkArtifactSchema.SOLUTION,
         **_SOLUTION_SPEC,
         "definition": "test_alias_freeze",
         "sources": [{"path": "kernel.py", "content": kernel}],
@@ -566,7 +572,7 @@ def test_reference_outputs_are_frozen_before_user_call(tmp_path):
     (tmp_path / "config.json").write_text(
         json.dumps(
             {
-                "schema_version": SchemaVersion.BENCHMARK_CONFIG,
+                "schema_version": BenchmarkArtifactSchema.BENCHMARK_CONFIG,
                 "lock_clocks": False,
                 "benchmark_reference": False,
             },
@@ -660,6 +666,7 @@ def test_thread_injection_detected(tmp_path):
     )
 
 
+@pytest.mark.xdist_group("serial")
 def test_torch_compile_no_reward_hack(tmp_path):
     """@torch.compile must not trigger thread injection false positive.
 
@@ -675,7 +682,11 @@ def test_torch_compile_no_reward_hack(tmp_path):
         "def run(x, y):\n"
         "    return x + y\n"
     )
-    traces = _run_eval_driver(tmp_path, kernel)
+    traces = _run_eval_driver(
+        tmp_path,
+        kernel,
+        timeout_seconds=_TORCH_COMPILE_TIMEOUT_SECONDS,
+    )
 
     assert len(traces) == 1
     ev = traces[0]["evaluation"]
@@ -938,10 +949,16 @@ def test_nan_correctness_fields_are_finite_with_flags(tmp_path):
     # Error values must be finite (not NaN/Inf)
     max_abs = correctness.get("max_absolute_error", 0.0)
     max_rel = correctness.get("max_relative_error", 0.0)
-    assert isinstance(max_abs, (int, float)) and math.isfinite(max_abs), (
+    assert isinstance(max_abs, (int, float)), (
         f"max_absolute_error should be finite, got {max_abs!r}"
     )
-    assert isinstance(max_rel, (int, float)) and math.isfinite(max_rel), (
+    assert math.isfinite(max_abs), (
+        f"max_absolute_error should be finite, got {max_abs!r}"
+    )
+    assert isinstance(max_rel, (int, float)), (
+        f"max_relative_error should be finite, got {max_rel!r}"
+    )
+    assert math.isfinite(max_rel), (
         f"max_relative_error should be finite, got {max_rel!r}"
     )
 
@@ -965,9 +982,15 @@ def test_passing_trace_correctness_unchanged(tmp_path):
     max_rel = correctness.get("max_relative_error")
 
     # For a correct kernel, error values must be finite numbers (not null)
-    assert isinstance(max_abs, (int, float)) and math.isfinite(max_abs), (
+    assert isinstance(max_abs, (int, float)), (
         f"Expected finite max_absolute_error for PASSED trace, got {max_abs!r}"
     )
-    assert isinstance(max_rel, (int, float)) and math.isfinite(max_rel), (
+    assert math.isfinite(max_abs), (
+        f"Expected finite max_absolute_error for PASSED trace, got {max_abs!r}"
+    )
+    assert isinstance(max_rel, (int, float)), (
+        f"Expected finite max_relative_error for PASSED trace, got {max_rel!r}"
+    )
+    assert math.isfinite(max_rel), (
         f"Expected finite max_relative_error for PASSED trace, got {max_rel!r}"
     )

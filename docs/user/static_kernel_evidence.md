@@ -49,7 +49,8 @@ timing, scoring, paper-parity, leaderboard, or default benchmark semantics.
 
 ## What The Sidecar Contains
 
-The sidecar schema is `sol_execbench.static_kernel_evidence.v4`. It contains:
+The sidecar is the `static_kernel` variant of
+`sol_execbench.performance_evidence_component.v1`. It contains:
 
 - diagnostic-only authority flags
 - aggregate status and reason code

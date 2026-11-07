@@ -50,7 +50,7 @@ from sol_execbench.core.process.environment import (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SolutionTimingResult:
     """Aggregate solution latency and exact sample count for every trial."""
 
@@ -66,7 +66,7 @@ class SolutionTimingResult:
         return counts.pop() if len(counts) == 1 else 0
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class _TimedReferenceState:
     """Reference material bound to the current candidate invocation."""
 

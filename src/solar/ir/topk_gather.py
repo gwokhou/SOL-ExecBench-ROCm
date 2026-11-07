@@ -176,39 +176,8 @@ def topk_gather_read_proved(
             name = passthrough_inputs[0]
             continue
         if target in TOPK_TARGETS:
-            selection = _topk_selection(layer_semantic)
-            if selection is None or len(outputs) != 2:
-                return False
-            k, topk_dim = selection
-            if outputs[TOPK_INDEX_OUTPUT_SLOT] != name:
-                return False
-            topk_inputs = tuple(
-                (layer.get("tensor_names") or {}).get("inputs") or ()
-            )
-            operands = tuple(operation_operands(layer_semantic))
-            operand_name = _tensor_operand(operands, 0, topk_inputs)
-            if operand_name is None:
-                return False
-            operand_shapes, _ = _layer_shapes(layer)
-            position = topk_inputs.index(operand_name)
-            operand_shape = (
-                _static_shape(operand_shapes[position])
-                if position < len(operand_shapes)
-                else None
-            )
-            if operand_shape is None or operand_shape != source_shape:
-                return False
-            topk_axis = _normalize_dim(topk_dim, len(operand_shape))
-            if topk_axis != gather_axis:
-                return False
-            expected_index = (
-                source_shape[:gather_axis]
-                + (k,)
-                + source_shape[gather_axis + 1 :]
-            )
-            return (
-                1 <= k <= source_shape[gather_axis]
-                and index_shape == expected_index
+            return _topk_matches_gather(
+                layer, name, source_shape, index_shape, gather_axis
             )
         return False
     return False
@@ -220,3 +189,44 @@ __all__ = [
     "TOPK_TARGETS",
     "topk_gather_read_proved",
 ]
+
+
+def _topk_matches_gather(
+    layer: NodeDict,
+    name: str,
+    source_shape: tuple[int, ...],
+    index_shape: tuple[int, ...],
+    gather_axis: int,
+) -> bool:
+    """Check top-k output slot, source shape, axis, and static selection size."""
+    layer_semantic = layer_operation(layer)
+    outputs = tuple((layer.get("tensor_names") or {}).get("outputs") or ())
+    selection = _topk_selection(layer_semantic)
+    if selection is None or len(outputs) != 2:
+        return False
+    k, topk_dim = selection
+    if outputs[TOPK_INDEX_OUTPUT_SLOT] != name:
+        return False
+    topk_inputs = tuple((layer.get("tensor_names") or {}).get("inputs") or ())
+    operands = tuple(operation_operands(layer_semantic))
+    operand_name = _tensor_operand(operands, 0, topk_inputs)
+    if operand_name is None:
+        return False
+    operand_shapes, _ = _layer_shapes(layer)
+    position = topk_inputs.index(operand_name)
+    operand_shape = (
+        _static_shape(operand_shapes[position])
+        if position < len(operand_shapes)
+        else None
+    )
+    if operand_shape is None or operand_shape != source_shape:
+        return False
+    topk_axis = _normalize_dim(topk_dim, len(operand_shape))
+    if topk_axis != gather_axis:
+        return False
+    expected_index = (
+        *source_shape[:gather_axis],
+        k,
+        *source_shape[gather_axis + 1 :],
+    )
+    return 1 <= k <= source_shape[gather_axis] and index_shape == expected_index

@@ -141,13 +141,19 @@ def test_verified_mutation_cost_matches_independent_base01_oracle(
         request,
         ArchitectureProfile.load(PROFILE),
         tmp_path,
-        IRGraphArtifact(converted / ir_path.graph_filename, ir_path.ir_kind),
+        IRGraphArtifact(
+            path=converted / ir_path.graph_filename,
+            kind=ir_path.ir_kind,
+        ),
     )
     assert (
         result["total"]["resource_work"] == resource_expectations()[sample_id]
     )
     assert result["total"]["num_orphaned_layers"] == 0
-    graph = IRGraphArtifact(converted / ir_path.graph_filename, ir_path.ir_kind)
+    graph = IRGraphArtifact(
+        path=converted / ir_path.graph_filename,
+        kind=ir_path.ir_kind,
+    )
     layers = {}
     for name, layer in graph.document.require_mapping("layers").items():
         assert isinstance(layer, dict)

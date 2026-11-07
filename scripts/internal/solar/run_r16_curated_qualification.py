@@ -20,6 +20,7 @@ from sol_execbench.core.solar_bridge.corpus_readiness import (
     audit_corpus_stage_readiness,
 )
 from solar.ir.contracts import IRPath
+from solar.schema_versions import SchemaVersion
 
 R16_ITEMS: dict[str, str] = {
     "R01": "torch2hip/l1n1_square_matmul/aka-l1n1_square_matmul-w0",
@@ -44,7 +45,7 @@ def evaluate_curated_gate(
 ) -> dict[str, object]:
     """Pass only on ready slots or declared, matching expected rejections."""
     verdict: dict[str, object] = {
-        "schema_version": "sol_execbench.solar_curated_gate.v1",
+        "schema_version": SchemaVersion.SOLAR_CURATED_GATE,
         "denominator": "R16",
         "slots": {},
         "passed": True,

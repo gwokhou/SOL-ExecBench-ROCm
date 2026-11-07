@@ -9,7 +9,7 @@ from typing import Any
 from solar.types import NodeDict, TensorShape
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class NodeInfo:
     """Normalized metadata for one Torchview computation node."""
 
@@ -51,4 +51,21 @@ class NodeInfo:
         return result
 
 
-__all__ = ["NodeInfo"]
+@dataclass(slots=True, kw_only=True)
+class TorchviewProcessorState:
+    """Mutable node-indexing state owned by one processing invocation."""
+
+    processed_nodes: set[str] = field(default_factory=set)
+    matched_modules: set[str] = field(default_factory=set)
+    node_counter: dict[str, int] = field(default_factory=dict)
+    original_to_clean_id: dict[str, str] = field(default_factory=dict)
+    module_index_tracker: dict[tuple[str, str], dict[int, int]] = field(
+        default_factory=dict
+    )
+    module_has_duplicates: set[tuple[str, str]] = field(default_factory=set)
+    names_repeated_in_any_path: set[str] = field(default_factory=set)
+    hierarchical_counter: dict[str, int] = field(default_factory=dict)
+    original_to_hierarchical: dict[str, str] = field(default_factory=dict)
+
+
+__all__ = ["NodeInfo", "TorchviewProcessorState"]

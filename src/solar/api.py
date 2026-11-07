@@ -130,8 +130,10 @@ def formal_producer_readiness() -> FormalProducerReadiness:
     from solar.analysis.orojenesis import OROJENESIS_TRUSTED_MAPPER_SHA256
 
     if not OROJENESIS_TRUSTED_MAPPER_SHA256:
-        return FormalProducerReadiness(False, "formal_mapper_not_allowlisted")
-    return FormalProducerReadiness(True, "ready")
+        return FormalProducerReadiness(
+            ready=False, reason_code="formal_mapper_not_allowlisted"
+        )
+    return FormalProducerReadiness(ready=True, reason_code="ready")
 
 
 def architecture_profile_sha256(

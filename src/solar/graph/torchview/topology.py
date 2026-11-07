@@ -39,11 +39,11 @@ from typing import Any
 
 from torch import nn
 
+from solar.composition import BoundComponent
 from solar.graph.torchview.models import NodeInfo
-from solar.graph.torchview.processor_contract import TorchviewProcessorContract
 
 
-class TorchviewTopologyMixin(TorchviewProcessorContract):
+class TopologyBuilder(BoundComponent):
     """Recover graph edges, hierarchy, and stable node identities."""
 
     def _extract_from_edge_list(
@@ -423,7 +423,7 @@ class TorchviewTopologyMixin(TorchviewProcessorContract):
                 parent_hierarchy = self._get_module_hierarchy_with_ids(
                     parent, visited
                 )
-                return parent_hierarchy + [(parent_name, parent_obj_id)]
+                return [*parent_hierarchy, (parent_name, parent_obj_id)]
 
         # No direct ModuleNode parent - trace through TensorNode parents only
         # (TensorNodes are part of module containment, FunctionNodes are data flow)

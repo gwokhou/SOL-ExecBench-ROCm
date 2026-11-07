@@ -33,7 +33,7 @@ DEFAULT_REUSE_TIMEOUT_SECONDS = 900.0
 REUSE_WORKER_MODULE = "sol_execbench.core.solar_bridge.reuse_worker"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ReuseReport:
     """Outer report keeps CLI dependencies behind the SOLAR bridge."""
 
@@ -47,7 +47,7 @@ def run_reuse_report(path: Path, *, timeout_seconds: float) -> ReuseReport:
         load_reuse_job(path), timeout_seconds=timeout_seconds
     )
     metadata = ArtifactDocument(
-        result.output_dir, result.analysis
+        path=result.output_dir, data=result.analysis
     ).require_mapping("metadata")
     return ReuseReport(
         data={

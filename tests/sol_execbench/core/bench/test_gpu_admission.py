@@ -19,6 +19,9 @@ from sol_execbench.core.bench.gpu_admission import (
     AdmissionRecord,
 )
 from sol_execbench.core.bench.gpu_lock import acquire_gpu_lock
+from sol_execbench.core.control_plane_schema_versions import (
+    ExecutionControlSchema,
+)
 from sol_execbench.tools.docker_process import ContainerCleanupError
 
 UUID = "a3007590-0000-1000-800f-a29c1cca1511"
@@ -63,7 +66,8 @@ def test_host_guard_finishes_native_release_before_ready(tmp_path, monkeypatch):
     def active():
         record = AdmissionRecord.model_validate_json(admission.read_text())
         assert record.state == "held"
-        assert record.record_ref is not None and record.owner is not None
+        assert record.record_ref is not None
+        assert record.owner is not None
         native = json.loads(record.record_ref.read_text())
         assert native["state"] == "active"
         assert native["lease_id"] == record.owner.lease_id
@@ -134,7 +138,7 @@ def lifecycle(tmp_path, monkeypatch):
     effects = []
 
     def activate(*_):
-        held = Admission(admission).read(AdmissionDevice(**DEVICE))
+        held = Admission(path=admission).read(AdmissionDevice(**DEVICE))
         assert held.state == "held"
         assert held.record_ref is not None
         assert json.loads(held.record_ref.read_text())["state"] == "active"
@@ -189,7 +193,10 @@ def test_unready_never_starts_device(lifecycle, case):
         )
     else:
         if case == "unknown-schema":
-            value["schema_version"] = "unknown"
+            family, _, version = (
+                ExecutionControlSchema.GPU_ADMISSION.rpartition(".v")
+            )
+            value["schema_version"] = f"{family}.v{int(version) + 1}"
         elif case == "wrong-device":
             value["device"]["pci_bdf"] = "0000:06:00.0"
         else:
@@ -390,8 +397,8 @@ def test_explicit_uuid_required_in_neutral_mode(lifecycle, monkeypatch):
 def test_frozen_cross_project_structure_cases(tmp_path):
     cases = json.loads(
         (
-            Path(__file__).resolve().parents[5]
-            / "contract-reference/schema-cases.json"
+            Path(__file__).resolve().parent
+            / "fixtures/gpu_admission_schema_cases.json"
         ).read_text()
     )
     for case in cases:
@@ -399,12 +406,12 @@ def test_frozen_cross_project_structure_cases(tmp_path):
         path.write_text(json.dumps(case["record"]))
         if case["valid"]:
             assert (
-                Admission(path).read(AdmissionDevice(**DEVICE)).state
+                Admission(path=path).read(AdmissionDevice(**DEVICE)).state
                 == case["record"]["state"]
             ), case["name"]
         else:
             with pytest.raises(AdmissionError):
-                Admission(path).read(AdmissionDevice(**DEVICE))
+                Admission(path=path).read(AdmissionDevice(**DEVICE))
 
 
 @pytest.mark.parametrize("point", ["before-native", "before-ready"])

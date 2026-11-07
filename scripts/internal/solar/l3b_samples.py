@@ -45,24 +45,32 @@ def shared_derived_domain() -> ShapeDomain:
     return ShapeDomain(
         domain_id="l3b-shared-derived-v1",
         symbols={
-            "B": ShapeSymbol("B", 1, 64, provenance="l3b_samples:B"),
-            "N": ShapeSymbol("N", 2, 32, 2, provenance="l3b_samples:N"),
+            "B": ShapeSymbol(
+                name="B", lower=1, upper=64, provenance="l3b_samples:B"
+            ),
+            "N": ShapeSymbol(
+                name="N",
+                lower=2,
+                upper=32,
+                divisibility=2,
+                provenance="l3b_samples:N",
+            ),
         },
         tensors={
             "left": TensorBinding(
-                "left",
-                TensorRole.INPUT,
-                (DimExpr.symbol("B"), DimExpr.symbol("N")),
+                tensor="left",
+                role=TensorRole.INPUT,
+                dims=(DimExpr.symbol("B"), DimExpr.symbol("N")),
             ),
             "right": TensorBinding(
-                "right",
-                TensorRole.INPUT,
-                (DimExpr.symbol("B"), DimExpr.symbol("N")),
+                tensor="right",
+                role=TensorRole.INPUT,
+                dims=(DimExpr.symbol("B"), DimExpr.symbol("N")),
             ),
             "y": TensorBinding(
-                "y",
-                TensorRole.OUTPUT,
-                (DimExpr.symbol("B"), DimExpr.symbol("N").scaled(2)),
+                tensor="y",
+                role=TensorRole.OUTPUT,
+                dims=(DimExpr.symbol("B"), DimExpr.symbol("N").scaled(2)),
             ),
         },
     )
@@ -73,21 +81,27 @@ def nonzero_domain() -> ShapeDomain:
     return ShapeDomain(
         domain_id="l3b-nonzero-v1",
         symbols={
-            "N": ShapeSymbol("N", 1, 128, provenance="l3b_samples:N"),
+            "N": ShapeSymbol(
+                name="N", lower=1, upper=128, provenance="l3b_samples:N"
+            ),
         },
         tensors={
             "value": TensorBinding(
-                "value", TensorRole.INPUT, (DimExpr.symbol("N"),)
+                tensor="value",
+                role=TensorRole.INPUT,
+                dims=(DimExpr.symbol("N"),),
             ),
             "y": TensorBinding(
-                "y", TensorRole.OUTPUT, (DimExpr.symbol("nnz"),)
+                tensor="y",
+                role=TensorRole.OUTPUT,
+                dims=(DimExpr.symbol("nnz"),),
             ),
         },
         intervals=(
             IntervalDim(
-                "nnz",
-                DimExpr.fixed(0),
-                DimExpr.symbol("N"),
+                symbol="nnz",
+                lower=DimExpr.fixed(0),
+                upper=DimExpr.symbol("N"),
                 provenance="nonzero:value",
             ),
         ),
@@ -99,13 +113,23 @@ def shape_branch_domain() -> ShapeDomain:
     return ShapeDomain(
         domain_id="l3b-shape-branch-v1",
         symbols={
-            "N": ShapeSymbol("N", 64, 1024, 64, provenance="l3b_samples:N"),
+            "N": ShapeSymbol(
+                name="N",
+                lower=64,
+                upper=1024,
+                divisibility=64,
+                provenance="l3b_samples:N",
+            ),
         },
         tensors={
             "value": TensorBinding(
-                "value", TensorRole.INPUT, (DimExpr.symbol("N"),)
+                tensor="value",
+                role=TensorRole.INPUT,
+                dims=(DimExpr.symbol("N"),),
             ),
-            "y": TensorBinding("y", TensorRole.OUTPUT, (DimExpr.symbol("N"),)),
+            "y": TensorBinding(
+                tensor="y", role=TensorRole.OUTPUT, dims=(DimExpr.symbol("N"),)
+            ),
         },
     )
 
@@ -115,22 +139,30 @@ def alias_mutation_domain() -> ShapeDomain:
     return ShapeDomain(
         domain_id="l3b-alias-mutation-v1",
         symbols={
-            "N": ShapeSymbol("N", 16, 64, 4, provenance="l3b_samples:N"),
+            "N": ShapeSymbol(
+                name="N",
+                lower=16,
+                upper=64,
+                divisibility=4,
+                provenance="l3b_samples:N",
+            ),
         },
         tensors={
             "value": TensorBinding(
-                "value", TensorRole.INPUT, (DimExpr.symbol("N"),)
+                tensor="value",
+                role=TensorRole.INPUT,
+                dims=(DimExpr.symbol("N"),),
             ),
             "y": TensorBinding(
-                "y",
-                TensorRole.OUTPUT,
-                (DimExpr(terms=(("N", 1),), constant=-4),),
+                tensor="y",
+                role=TensorRole.OUTPUT,
+                dims=(DimExpr(terms=(("N", 1),), constant=-4),),
             ),
         },
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class L3bSample:
     """One focused sample with its reference and shape domain."""
 
@@ -164,28 +196,28 @@ def bound_mutation_reference() -> Reference:
 
 L3B_SAMPLES: tuple[L3bSample, ...] = (
     L3bSample(
-        "shared_and_derived",
-        shared_and_derived,
-        shared_derived_domain(),
-        ((4, 8), (4, 8)),
+        sample_id="shared_and_derived",
+        reference=shared_and_derived,
+        domain=shared_derived_domain(),
+        input_shapes=((4, 8), (4, 8)),
     ),
     L3bSample(
-        "nonzero_interval",
-        nonzero_interval,
-        nonzero_domain(),
-        ((64,),),
+        sample_id="nonzero_interval",
+        reference=nonzero_interval,
+        domain=nonzero_domain(),
+        input_shapes=((64,),),
     ),
     L3bSample(
-        "shape_branch",
-        shape_branch,
-        shape_branch_domain(),
-        ((128,),),
+        sample_id="shape_branch",
+        reference=shape_branch,
+        domain=shape_branch_domain(),
+        input_shapes=((128,),),
     ),
     L3bSample(
-        "alias_mutation",
-        bound_mutation_reference(),
-        alias_mutation_domain(),
-        ((32,),),
+        sample_id="alias_mutation",
+        reference=bound_mutation_reference(),
+        domain=alias_mutation_domain(),
+        input_shapes=((32,),),
     ),
 )
 
@@ -202,15 +234,19 @@ def assumption_probe_domain() -> ShapeDomain:
     return ShapeDomain(
         domain_id="l3b-assumption-probe-v1",
         symbols={
-            "N": ShapeSymbol("N", 2, 16, provenance="l3b_samples:N"),
-            "M": ShapeSymbol("M", 1, 4, provenance="l3b_samples:M"),
+            "N": ShapeSymbol(
+                name="N", lower=2, upper=16, provenance="l3b_samples:N"
+            ),
+            "M": ShapeSymbol(
+                name="M", lower=1, upper=4, provenance="l3b_samples:M"
+            ),
         },
         tensors={},
         assumptions=(
             Assumption(
-                DimExpr.symbol("M"),
-                AssumptionOp.LE,
-                DimExpr(terms=(("N", 1),), constant=-2),
+                left=DimExpr.symbol("M"),
+                op=AssumptionOp.LE,
+                right=DimExpr(terms=(("N", 1),), constant=-2),
             ),
         ),
     )

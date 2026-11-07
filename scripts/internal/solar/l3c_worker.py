@@ -7,6 +7,8 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from solar.schema_versions import SchemaVersion
+
 MESSAGE_LIMIT = 4096
 
 
@@ -66,7 +68,7 @@ def run_slot(args: argparse.Namespace) -> None:
         ir_path=args.ir_path,
     )
     record: dict[str, Any] = {
-        "schema_version": "sol_execbench.solar_l3c_analysis.v1",
+        "schema_version": SchemaVersion.SOLAR_L3C_ANALYSIS,
         "item": args.item,
         "ir_path": args.ir_path,
         "status": outcome.status.value,

@@ -7,21 +7,21 @@ from __future__ import annotations
 
 from typing import Literal
 
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
 from sol_execbench.core.data.base_model import CurrentFrozenSchemaModel
 from sol_execbench.core.integrity import SHA256Digest
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 
 
 class Rocprofv3CounterProvenance(CurrentFrozenSchemaModel):
     """Hashes for every executable and configuration admitted to replay."""
 
-    current_schema_version = SchemaVersion.ROCPROFV3_COUNTER_PROVENANCE
+    current_schema_version = ProfilerArtifactSchema.ROCPROFV3_COUNTER_PROVENANCE
 
-    schema_version: Literal[SchemaVersion.ROCPROFV3_COUNTER_PROVENANCE] = (
-        SchemaVersion.ROCPROFV3_COUNTER_PROVENANCE
-    )
+    schema_version: Literal[
+        ProfilerArtifactSchema.ROCPROFV3_COUNTER_PROVENANCE
+    ] = ProfilerArtifactSchema.ROCPROFV3_COUNTER_PROVENANCE
     diagnostic_only: Literal[True] = True
     score_authority: Literal[False] = False
     replay_phase: Literal["evidence"] = "evidence"

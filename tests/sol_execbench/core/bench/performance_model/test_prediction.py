@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 
 from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarStatus
-from sol_execbench.core.bench.performance_model import prediction
 from sol_execbench.core.bench.performance_model.attribution import (
     calculate_ratios,
     derive_attributions,
@@ -32,6 +31,15 @@ from sol_execbench.core.bench.performance_model.prediction import (
     predict_hw,
     predict_ir,
     validate_calibration_identity,
+)
+from sol_execbench.core.bench.performance_model.prediction.calibration import (
+    _required,
+)
+from sol_execbench.core.bench.performance_model.prediction.hardware import (
+    _matrix_counter_names,
+)
+from sol_execbench.core.bench.performance_model.prediction.primitives import (
+    _wave_size,
 )
 
 
@@ -132,7 +140,7 @@ def test_required_parameter_interpolates_adjacent_calibrated_points() -> None:
         },
     )
 
-    result = prediction._required(
+    result = _required(
         calibration,
         CalibrationParameterName.REDUCTION_OP_PER_MS,
         coordinate=48.0,
@@ -177,22 +185,22 @@ def _semantic(
 def test_wave_size_and_matrix_counter_order_are_arch_aware() -> None:
     # gfx1200 keeps historical wave-32 / WMMA-first behavior; gfx942 resolves
     # to wave-64 and MFMA-first; unknown targets fall back to gfx1200 defaults.
-    assert prediction._wave_size("gfx1200") == 32.0
-    assert prediction._wave_size("gfx942") == 64.0
-    assert prediction._wave_size(None) == 32.0
-    assert prediction._wave_size("gfx9999") == 32.0
+    assert _wave_size("gfx1200") == 32.0
+    assert _wave_size("gfx942") == 64.0
+    assert _wave_size(None) == 32.0
+    assert _wave_size("gfx9999") == 32.0
 
-    assert prediction._matrix_counter_names("gfx1200") == (
+    assert _matrix_counter_names("gfx1200") == (
         "SQ_INSTS_WMMA",
         "SQ_INSTS_MFMA",
         "MFMAINSTS",
     )
-    assert prediction._matrix_counter_names("gfx942") == (
+    assert _matrix_counter_names("gfx942") == (
         "SQ_INSTS_MFMA",
         "MFMAINSTS",
         "SQ_INSTS_WMMA",
     )
-    assert prediction._matrix_counter_names(None) == (
+    assert _matrix_counter_names(None) == (
         "SQ_INSTS_WMMA",
         "SQ_INSTS_MFMA",
         "MFMAINSTS",

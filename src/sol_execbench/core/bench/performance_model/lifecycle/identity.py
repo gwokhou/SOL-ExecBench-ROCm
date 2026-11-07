@@ -37,10 +37,10 @@ from sol_execbench.core.bench.performance_model.lifecycle.models import (
     DiagnosticReleaseLifecycleManifest,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
-    GpuLifecycleIdentity,
     SoftwareLifecycleIdentity,
 )
 from sol_execbench.core.integrity import SHA256Digest, stable_json_checksum
+from sol_execbench.core.platform.hardware import HardwareExecutionIdentity
 
 
 def diagnostic_lifecycle_id(
@@ -52,11 +52,14 @@ def diagnostic_lifecycle_id(
 
 
 def _dump(
-    value: GpuLifecycleIdentity | SoftwareLifecycleIdentity,
+    value: HardwareExecutionIdentity | SoftwareLifecycleIdentity,
 ) -> object:
     """Return a stable JSON-serializable form for nested identity models."""
     payload = value.model_dump(mode="json")
-    if isinstance(value, GpuLifecycleIdentity) and value.pcie_topology is None:
+    if (
+        isinstance(value, HardwareExecutionIdentity)
+        and value.pcie_topology is None
+    ):
         payload.pop("pcie_topology", None)
     return payload
 
@@ -87,7 +90,7 @@ def collection_run_id(
     generation: int,
     roles: tuple[str, ...] = ("development", "held_out"),
     frozen_held_out_sha256: SHA256Digest | None = None,
-    gpu_identity: GpuLifecycleIdentity | None = None,
+    gpu_identity: HardwareExecutionIdentity | None = None,
     source_revision: str,
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
@@ -167,7 +170,7 @@ def calibration_id(
     *,
     calibration_profile_sha256: SHA256Digest,
     calibration_audit_sha256: SHA256Digest,
-    gpu_identity: GpuLifecycleIdentity,
+    gpu_identity: HardwareExecutionIdentity,
     software_identity: SoftwareLifecycleIdentity,
     source_revision: str,
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
@@ -295,6 +298,7 @@ def release_id(
     source_revision: str,
     producer_version: str,
     archive_size_bytes: int,
+    hardware_validation_receipt_sha256: SHA256Digest,
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
     """Identity of one deterministic release archive.
@@ -310,6 +314,9 @@ def release_id(
         {
             "archive_sha256": archive_sha256,
             "archive_size_bytes": archive_size_bytes,
+            "hardware_validation_receipt_sha256": (
+                hardware_validation_receipt_sha256
+            ),
             "producer_version": producer_version,
             "publication_id": publication_id,
             "source_revision": source_revision,
@@ -464,6 +471,9 @@ def _recompute_downstream_stage_id(
             source_revision=manifest.source_revision,
             producer_version=manifest.producer_version,
             archive_size_bytes=manifest.archive_size_bytes,
+            hardware_validation_receipt_sha256=(
+                manifest.hardware_validation_receipt_sha256
+            ),
             purpose=manifest.purpose,
         )
     name = type(manifest).__name__

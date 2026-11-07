@@ -32,7 +32,7 @@ torch.manual_seed(20261011)
 m = k = n = 4096
 a_cpu = torch.randn(m, k, dtype=torch.float32)
 b_cpu = torch.randn(k, n, dtype=torch.float32)
-a, b = a_cpu.cuda(), b_cpu.cuda()
+a, b = a_cpu.to(device="cuda"), b_cpu.to(device="cuda")
 producer, consumer = torch.cuda.Stream(), torch.cuda.Stream()
 event = torch.cuda.Event()
 for _ in range(2):

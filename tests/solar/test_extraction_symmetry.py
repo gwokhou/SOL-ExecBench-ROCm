@@ -246,7 +246,12 @@ def test_graph_extraction_dispatches_through_registry(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    expected = OperatorGraphArtifact(tmp_path / "registered.yaml", (), (), ())
+    expected = OperatorGraphArtifact(
+        path=tmp_path / "registered.yaml",
+        source_inputs=(),
+        used_source_indices=(),
+        reference_outputs=(),
+    )
     seen: dict[str, object] = {}
 
     def extract(reference, inputs, **options):
@@ -257,7 +262,7 @@ def test_graph_extraction_dispatches_through_registry(
         )
         return expected
 
-    stub = GraphBackend(ExtractionKind.MAKE_FX_REFERENCE, extract)
+    stub = GraphBackend(kind=ExtractionKind.MAKE_FX_REFERENCE, extract=extract)
     monkeypatch.setitem(
         graph_registry._EXTRACTION_LOADERS,
         ExtractionKind.MAKE_FX_REFERENCE,

@@ -244,7 +244,12 @@ def causal_trace(
         _dispatch(capture, item) for item in records.kernel_dispatch
     )
     return HIPCausalTrace(
-        label, digest, capture.metadata.pid, calls, barriers, dispatches
+        capture=label,
+        artifact_sha256=digest,
+        process_id=capture.metadata.pid,
+        calls=calls,
+        barriers=barriers,
+        dispatches=dispatches,
     )
 
 

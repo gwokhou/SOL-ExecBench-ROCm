@@ -12,13 +12,16 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
+from sol_execbench.core.control_plane_schema_versions import (
+    BatchGPUQualificationArtifactKind,
+    ExecutionControlSchema,
+)
 from sol_execbench.core.data.base_model import (
     CurrentSchemaModel,
     NonEmptyString,
     StrictArtifactModel,
 )
 from sol_execbench.core.integrity import SHA256Digest, sha256_file
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 _CONFIG = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
@@ -62,10 +65,14 @@ class BatchGPUQualificationReceipt(CurrentSchemaModel):
     """Verified result for one partition within a qualification stage."""
 
     model_config = _CONFIG
-    current_schema_version = SchemaVersion.BATCH_GPU_QUALIFICATION_RECEIPT
+    current_schema_version = ExecutionControlSchema.BATCH_GPU_QUALIFICATION
+    current_artifact_kind = BatchGPUQualificationArtifactKind.RECEIPT
 
-    schema_version: Literal[SchemaVersion.BATCH_GPU_QUALIFICATION_RECEIPT] = (
-        SchemaVersion.BATCH_GPU_QUALIFICATION_RECEIPT
+    schema_version: Literal[ExecutionControlSchema.BATCH_GPU_QUALIFICATION] = (
+        ExecutionControlSchema.BATCH_GPU_QUALIFICATION
+    )
+    artifact_kind: Literal[BatchGPUQualificationArtifactKind.RECEIPT] = (
+        BatchGPUQualificationArtifactKind.RECEIPT
     )
     stage: BatchGPUQualificationStage
     partition: NonEmptyString
@@ -78,8 +85,11 @@ class BatchGPUQualificationReceipt(CurrentSchemaModel):
     @model_validator(mode="after")
     def item_ids_are_unique(self) -> BatchGPUQualificationReceipt:
         """Reject ambiguous item coverage."""
-        if len(self.item_ids) != len(set(self.item_ids)):
-            raise ValueError("qualification receipt repeats item IDs")
+        validate_unique_qualification_ids(
+            self.item_ids,
+            owner="qualification receipt",
+            item_name="item",
+        )
         return self
 
 
@@ -87,10 +97,14 @@ class BatchGPUQualificationGate(CurrentSchemaModel):
     """Content-bound completion gate required before a large batch GPU run."""
 
     model_config = _CONFIG
-    current_schema_version = SchemaVersion.BATCH_GPU_QUALIFICATION
+    current_schema_version = ExecutionControlSchema.BATCH_GPU_QUALIFICATION
+    current_artifact_kind = BatchGPUQualificationArtifactKind.GATE
 
-    schema_version: Literal[SchemaVersion.BATCH_GPU_QUALIFICATION] = (
-        SchemaVersion.BATCH_GPU_QUALIFICATION
+    schema_version: Literal[ExecutionControlSchema.BATCH_GPU_QUALIFICATION] = (
+        ExecutionControlSchema.BATCH_GPU_QUALIFICATION
+    )
+    artifact_kind: Literal[BatchGPUQualificationArtifactKind.GATE] = (
+        BatchGPUQualificationArtifactKind.GATE
     )
     task: LargeBatchGPUTask
     stage: BatchGPUQualificationStage
@@ -109,20 +123,12 @@ class BatchGPUQualificationGate(CurrentSchemaModel):
     @model_validator(mode="after")
     def chain_and_coverage_are_consistent(self) -> BatchGPUQualificationGate:
         """Require exact parent shape and non-overlapping receipt coverage."""
-        if len(self.item_ids) != len(set(self.item_ids)):
-            raise ValueError("qualification gate repeats item IDs")
-        if self.stage is BatchGPUQualificationStage.STATIC:
-            if self.parent_gate_sha256 is not None:
-                raise ValueError("static qualification cannot have a parent")
-        elif self.parent_gate_sha256 is None:
-            raise ValueError("GPU qualification requires a parent gate")
-        receipt_items = tuple(
-            item_id for receipt in self.receipts for item_id in receipt.item_ids
+        validate_qualification_parent(self.stage, self.parent_gate_sha256)
+        validate_qualification_coverage(
+            self.item_ids,
+            tuple(receipt.item_ids for receipt in self.receipts),
+            item_name="item",
         )
-        if set(receipt_items) != set(self.item_ids):
-            raise ValueError("qualification receipts do not cover gate items")
-        if len(receipt_items) != len(set(receipt_items)):
-            raise ValueError("qualification receipts overlap item IDs")
         if any(receipt.stage is not self.stage for receipt in self.receipts):
             raise ValueError("qualification receipt stage mismatch")
         return self
@@ -145,6 +151,52 @@ def qualification_parent_stage(
     if stage is BatchGPUQualificationStage.CANARY:
         return BatchGPUQualificationStage.STATIC
     return BatchGPUQualificationStage.CANARY
+
+
+def validate_qualification_parent(
+    stage: BatchGPUQualificationStage,
+    parent_gate_sha256: str | None,
+) -> None:
+    """Validate the common static → canary → full parent shape."""
+    if stage is BatchGPUQualificationStage.STATIC:
+        if parent_gate_sha256 is not None:
+            raise ValueError("static qualification cannot have a parent")
+    elif parent_gate_sha256 is None:
+        raise ValueError("GPU qualification requires a parent gate")
+
+
+def validate_unique_qualification_ids(
+    item_ids: Sequence[str],
+    *,
+    owner: str,
+    item_name: str,
+) -> None:
+    """Reject repeated identifiers in a qualification contract."""
+    if len(item_ids) != len(set(item_ids)):
+        raise ValueError(f"{owner} repeats {item_name} IDs")
+
+
+def validate_qualification_coverage(
+    gate_item_ids: Sequence[str],
+    receipt_item_groups: Sequence[Sequence[str]],
+    *,
+    item_name: str,
+) -> None:
+    """Validate unique, exact, non-overlapping receipt coverage."""
+    validate_unique_qualification_ids(
+        gate_item_ids,
+        owner="qualification gate",
+        item_name=item_name,
+    )
+    receipt_items = tuple(
+        item_id for group in receipt_item_groups for item_id in group
+    )
+    if set(receipt_items) != set(gate_item_ids):
+        raise ValueError(
+            f"qualification receipts do not cover gate {item_name}s"
+        )
+    if len(receipt_items) != len(set(receipt_items)):
+        raise ValueError(f"qualification receipts overlap {item_name} IDs")
 
 
 def require_isolated_qualification_root(
@@ -251,5 +303,8 @@ __all__ = [
     "qualification_parent_stage",
     "require_isolated_qualification_root",
     "select_risk_first_axis_extrema",
+    "validate_qualification_coverage",
+    "validate_qualification_parent",
+    "validate_unique_qualification_ids",
     "verify_qualification_artifact",
 ]

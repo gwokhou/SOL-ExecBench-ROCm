@@ -23,7 +23,6 @@ from sol_execbench.core.platform.dependency_matrix.policy import (
     load_docker_target_dependency_policy,
 )
 from sol_execbench.core.platform.docker_matrix import (
-    DEFAULT_DOCKER_TARGET_MANIFEST,
     select_docker_target,
 )
 
@@ -35,7 +34,7 @@ def _build_parser() -> argparse.ArgumentParser:
     preflight.add_argument(
         "--manifest",
         type=Path,
-        default=DEFAULT_DOCKER_TARGET_MANIFEST,
+        default=None,
     )
     preflight.add_argument("--target")
     preflight.add_argument("--allow-mixed-version-debug", action="store_true")

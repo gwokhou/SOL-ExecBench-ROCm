@@ -1,22 +1,26 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""AKA-derived problem-corpus commands.
+"""Dataset corpus commands.
 
-Materialize and audit the problem set derived from AMD AgentKernelArena (AKA).
-The benchmark problems are authored artifacts committed under
-``problems/AMD_AKA/<suite>/<name>/``. ``materialize`` selects workloads for an
-observed GPU and ``audit`` verifies the target-specific result.
+The ``corpus`` group validates and derives measured target views for LLM Core.
+The remaining commands materialize and audit the problem set derived from AMD
+AgentKernelArena (AKA).
 """
 
 from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from types import MappingProxyType
 
 import click
 from rich.console import Console
 
+from sol_execbench.cli.error_translation import (
+    CliErrorRule,
+    translate_cli_errors,
+)
 from sol_execbench.cli.protocol import (
     CliExitCode,
     CliFailure,
@@ -33,13 +37,127 @@ from sol_execbench.core.dataset.aka_corpus import (
     AKA_REVISION,
     AKACorpusManifest,
 )
+from sol_execbench.core.dataset.corpus import (
+    TARGET_VIEW_MANIFEST_FILENAME,
+    generate_corpus,
+    load_target_descriptor,
+    validate_corpus,
+)
+from sol_execbench.core.dataset.corpus_models import (
+    CorpusProfile,
+    StaticTargetDescriptor,
+)
+from sol_execbench.core.platform.hardware import HardwareConfigurationKind
+from sol_execbench.core.platform.memory_quota import (
+    DEFAULT_PROBE_TIMEOUT_SECONDS as DEFAULT_CAPACITY_PROBE_TIMEOUT_SECONDS,
+    collect_gpu_memory_quota_isolated,
+)
 from sol_execbench.core.platform.runtime import detect_rocm_device
+
+_INVALID_CORPUS_MANIFEST_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="invalid_corpus_manifest",
+    ),
+)
+
+_CORPUS_GENERATION_OUTPUT_EXISTS_ERRORS = (
+    CliErrorRule(
+        exception_type=FileExistsError,
+        code="corpus_generation_output_exists",
+    ),
+    CliErrorRule(
+        exception_type=RuntimeError,
+        code="corpus_capacity_probe_unavailable",
+        exit_code=CliExitCode.UNAVAILABLE,
+        hint="Use a visible ROCm device or adjust the probe quota and timeout.",
+    ),
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="corpus_generation_invalid",
+    ),
+)
+
+_AKA_TARGET_UNAVAILABLE_ERRORS = (
+    CliErrorRule(
+        exception_type=(RuntimeError, ValueError),
+        code="aka_target_unavailable",
+        exit_code=CliExitCode.UNAVAILABLE,
+        hint="Use a ROCm device whose exact target is gfx942, gfx1150, or gfx1200.",
+    ),
+)
+
+_AKA_PROBE_INFRASTRUCTURE_ERROR_ERRORS = (
+    CliErrorRule(
+        exception_type=AKAProbeInfrastructureError,
+        code="aka_probe_infrastructure_error",
+        exit_code=CliExitCode.UNAVAILABLE,
+        hint="Check ROCm visibility and retry the reported workload probe.",
+    ),
+    CliErrorRule(
+        exception_type=FileExistsError,
+        code="aka_materialization_output_exists",
+        hint="Choose a new --output path or remove the old tree after auditing it.",
+    ),
+    CliErrorRule(
+        exception_type=ValueError,
+        code="aka_materialization_invalid",
+    ),
+)
+
+_AKA_AUDIT_FAILED_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="aka_audit_failed",
+    ),
+)
+
+_INVALID_AKA_MANIFEST_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="invalid_aka_manifest",
+    ),
+)
 
 console = Console(stderr=True)
 DEFAULT_MANIFEST = Path("problems/AMD_AKA/manifest.yaml")
 DEFAULT_OUTPUT_ROOT = Path("problems/local/AMD_AKA")
 DEFAULT_AKA_ROOT = Path("data/AgentKernelArena")
 DEFAULT_FETCH_SCRIPT = Path("scripts/fetch_aka_source.sh")
+DEFAULT_CORPUS_MANIFEST = Path(
+    "problems/LLM_CORE/releases/LLM_CORE_V2/manifest.yaml",
+)
+DEFAULT_TARGET_ROOT = Path("problems/LLM_CORE/targets")
+BUNDLED_TARGET_TEMPLATE_KINDS = MappingProxyType(
+    {
+        "isa/gfx1200": HardwareConfigurationKind.ISA_TEMPLATE,
+        "isa/gfx942": HardwareConfigurationKind.ISA_TEMPLATE,
+        "products/mi300x": HardwareConfigurationKind.PRODUCT_TEMPLATE,
+        "products/mi308x": HardwareConfigurationKind.PRODUCT_TEMPLATE,
+        "products/rx9060xt": HardwareConfigurationKind.PRODUCT_TEMPLATE,
+        "configurations/mi300x/spx-192gb": (
+            HardwareConfigurationKind.CONFIGURATION_TEMPLATE
+        ),
+        "configurations/rx9060xt/standard-16gb": (
+            HardwareConfigurationKind.CONFIGURATION_TEMPLATE
+        ),
+    }
+)
+TARGET_TEMPLATES = tuple(BUNDLED_TARGET_TEMPLATE_KINDS)
+
+
+def _load_bundled_target_template(
+    template_id: str,
+) -> StaticTargetDescriptor:
+    target = load_target_descriptor(DEFAULT_TARGET_ROOT / f"{template_id}.yaml")
+    expected_kind = BUNDLED_TARGET_TEMPLATE_KINDS[template_id]
+    if target.hardware.kind is not expected_kind:
+        raise ValueError(
+            "bundled target template tier mismatch: "
+            f"{template_id} declares {target.hardware.kind.value}, "
+            f"expected {expected_kind.value}"
+        )
+    return target
 
 
 @click.group(
@@ -47,7 +165,138 @@ DEFAULT_FETCH_SCRIPT = Path("scripts/fetch_aka_source.sh")
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 def dataset_cli() -> None:
-    """Materialize and audit the AKA-derived problem corpus."""
+    """Validate and generate problem corpora; preserve AKA compatibility."""
+
+
+@dataset_cli.group("corpus")
+def corpus_cli() -> None:
+    """Validate rules or generate a measured target view."""
+
+
+@corpus_cli.command("validate")
+@click.option(
+    "--manifest",
+    "manifest_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=DEFAULT_CORPUS_MANIFEST,
+    show_default=True,
+)
+def validate_corpus_cli(manifest_path: Path) -> CliResult:
+    """Validate the manifest, artifacts, provenance, and coverage floors."""
+    with translate_cli_errors(*_INVALID_CORPUS_MANIFEST_ERRORS):
+        report = validate_corpus(manifest_path)
+    console.print(
+        f"[green]Valid {report['release_id']}: {report['definitions']} definitions, "
+        f"{report['generation_rules']} generation rules[/green]",
+    )
+    return CliResult(data={"manifest": str(manifest_path), **report})
+
+
+@corpus_cli.command("generate")
+@click.option(
+    "--manifest",
+    "manifest_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=DEFAULT_CORPUS_MANIFEST,
+    show_default=True,
+)
+@click.option(
+    "--target-template",
+    type=click.Choice(TARGET_TEMPLATES),
+    help="Bundled declared target template.",
+)
+@click.option(
+    "--target-descriptor",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="External static target descriptor in JSON or YAML.",
+)
+@click.option(
+    "--device",
+    default="cuda:0",
+    show_default=True,
+    help="Visible ROCm device used by the isolated capacity probe.",
+)
+@click.option(
+    "--environment-quota",
+    type=click.IntRange(min=1),
+    help="Optional container or scheduler quota; measured limits still apply.",
+)
+@click.option(
+    "--capacity-probe-timeout",
+    type=click.FloatRange(min=1.0),
+    default=DEFAULT_CAPACITY_PROBE_TIMEOUT_SECONDS,
+    show_default=True,
+)
+@click.option(
+    "--profile",
+    "profile_values",
+    type=click.Choice(tuple(profile.value for profile in CorpusProfile)),
+    multiple=True,
+    default=(CorpusProfile.CORE.value,),
+    show_default=True,
+)
+@click.option(
+    "--output",
+    type=click.Path(file_okay=False, path_type=Path),
+    required=True,
+)
+@click.option(
+    "--require-complete-profile",
+    is_flag=True,
+    help="Fail when generated Definitions fall below a profile floor.",
+)
+def generate_corpus_cli(
+    manifest_path: Path,
+    target_template: str | None,
+    target_descriptor: Path | None,
+    device: str,
+    environment_quota: int | None,
+    capacity_probe_timeout: float,
+    profile_values: tuple[str, ...],
+    output: Path,
+    require_complete_profile: bool,
+) -> CliResult:
+    """Generate a concrete target view from rules and measured memory."""
+    if (target_template is None) == (target_descriptor is None):
+        raise CliFailure(
+            "provide exactly one of --target-template or --target-descriptor",
+            code="invalid_static_target",
+        )
+    with translate_cli_errors(*_CORPUS_GENERATION_OUTPUT_EXISTS_ERRORS):
+        if target_descriptor is not None:
+            target = load_target_descriptor(target_descriptor)
+        else:
+            if target_template is None:
+                raise ValueError("bundled target template is required")
+            target = _load_bundled_target_template(target_template)
+        capacity = collect_gpu_memory_quota_isolated(
+            device,
+            environment_quota_bytes=environment_quota,
+            timeout_seconds=capacity_probe_timeout,
+        )
+        result = generate_corpus(
+            manifest_path,
+            output,
+            target=target,
+            profiles=tuple(CorpusProfile(value) for value in profile_values),
+            require_complete_profile=require_complete_profile,
+            capacity_evidence=capacity,
+        )
+    record = result / TARGET_VIEW_MANIFEST_FILENAME
+    console.print(
+        f"[green]Generated corpus target view written to {result}[/green]"
+    )
+    return CliResult(
+        data={
+            "output": str(result),
+            "target_id": target.target_id,
+            "profiles": list(profile_values),
+            "qualification_status": "hardware_qualified",
+            "usable_budget_bytes": capacity.usable_budget_bytes,
+            "capacity_probe_digest": capacity.capacity_probe_digest,
+        },
+        artifacts=(artifact(record, "yaml_file"),),
+    )
 
 
 @dataset_cli.command("materialize")
@@ -106,16 +355,9 @@ def materialize_cli(
 ) -> CliResult:
     """Select executable AKA workloads for one exact AMD GPU target."""
     manifest = _load_manifest(manifest_path)
-    try:
+    with translate_cli_errors(*_AKA_TARGET_UNAVAILABLE_ERRORS):
         device_info = detect_rocm_device(device)
         target = materialization_target(device_info)
-    except (RuntimeError, ValueError) as exc:
-        raise CliFailure(
-            str(exc),
-            code="aka_target_unavailable",
-            exit_code=CliExitCode.UNAVAILABLE,
-            hint="Use a ROCm device whose exact target is gfx942, gfx1150, or gfx1200.",
-        ) from exc
     if target_arch is not None and device_info.gfx_target != target_arch:
         raise CliFailure(
             f"detected {device_info.gfx_target} on {device}, expected {target_arch}",
@@ -125,27 +367,12 @@ def materialize_cli(
     if not skip_aka_fetch:
         _ensure_aka_clone(aka_root)
     output = output or DEFAULT_OUTPUT_ROOT / device_info.gfx_target
-    try:
+    with translate_cli_errors(*_AKA_PROBE_INFRASTRUCTURE_ERROR_ERRORS):
         result_path = manifest.materialize(
             output,
             target=target,
             probe_timeout_seconds=probe_timeout_seconds,
         )
-    except AKAProbeInfrastructureError as exc:
-        raise CliFailure(
-            str(exc),
-            code="aka_probe_infrastructure_error",
-            exit_code=CliExitCode.UNAVAILABLE,
-            hint="Check ROCm visibility and retry the reported workload probe.",
-        ) from exc
-    except FileExistsError as exc:
-        raise CliFailure(
-            str(exc),
-            code="aka_materialization_output_exists",
-            hint="Choose a new --output path or remove the old tree after auditing it.",
-        ) from exc
-    except ValueError as exc:
-        raise CliFailure(str(exc), code="aka_materialization_invalid") from exc
     report = manifest.audit(result_path)
     console.print(
         f"[green]Materialized {report['problems']} problems / "
@@ -188,10 +415,8 @@ def audit_cli(
 ) -> CliResult:
     """Fail closed if local problems differ from the pinned AKA selection."""
     manifest = _load_manifest(manifest_path)
-    try:
+    with translate_cli_errors(*_AKA_AUDIT_FAILED_ERRORS):
         report = manifest.audit(problem_root)
-    except (OSError, ValueError) as exc:
-        raise CliFailure(str(exc), code="aka_audit_failed") from exc
     if aka_root.is_dir():
         report["aka_provenance"] = manifest.audit_aka_provenance(aka_root)
         console.print(
@@ -206,10 +431,8 @@ def audit_cli(
 
 
 def _load_manifest(path: Path) -> AKACorpusManifest:
-    try:
+    with translate_cli_errors(*_INVALID_AKA_MANIFEST_ERRORS):
         return AKACorpusManifest.load(path)
-    except (OSError, ValueError) as exc:
-        raise CliFailure(str(exc), code="invalid_aka_manifest") from exc
 
 
 def _ensure_aka_clone(aka_root: Path) -> None:

@@ -97,7 +97,8 @@ def test_plan_script_wraps_package() -> None:
         "plan_retirement_script",
         repo_root() / "scripts" / "plan_diagnostic_retirement.py",
     )
-    assert spec is not None and spec.loader is not None
+    assert spec is not None
+    assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)

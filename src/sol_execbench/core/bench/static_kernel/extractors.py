@@ -65,7 +65,7 @@ from sol_execbench.core.process.subprocesses import (
 _FOOTPRINT_EXTRACTOR_TOOL_IDS = ("roc-objdump",)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _ExtractorContext:
     """Shared paths, tool routing, and execution settings for one collection."""
 

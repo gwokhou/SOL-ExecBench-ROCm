@@ -92,7 +92,7 @@ def test_load_staged_problem_reads_definition_and_workloads(tmp_path):
 
 
 def test_load_staged_problem_rejects_missing_definition(tmp_path):
-    with pytest.raises(RuntimeError, match="definition.json not found"):
+    with pytest.raises(RuntimeError, match=r"definition\.json not found"):
         load_staged_problem(tmp_path)
 
 
@@ -298,7 +298,7 @@ def test_solution_uses_native_rocm_and_missing_so_rejected(tmp_path):
     solution = _solution(entry_point="kernel.hip::run", languages=["hip_cpp"])
 
     assert solution_uses_native_rocm(solution) is True
-    with pytest.raises(RuntimeError, match="benchmark_kernel.so not found"):
+    with pytest.raises(RuntimeError, match=r"benchmark_kernel\.so not found"):
         load_user_function(solution, tmp_path)
 
 

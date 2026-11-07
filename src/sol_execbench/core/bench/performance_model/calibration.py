@@ -46,7 +46,7 @@ _INDEXED_READ_DIMENSIONS = (
 )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class MetricSample:
     """One tagged device-event measurement."""
 
@@ -56,7 +56,7 @@ class MetricSample:
     unit: str
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ProbeBatch:
     """One fresh-process result for a probe mode."""
 
@@ -97,7 +97,11 @@ def parse_probe_metrics(output: str) -> list[MetricSample]:
         value = float(fields[3])
         if not np.isfinite(value) or value <= 0:
             raise ValueError(f"invalid diagnostic metric: {line}")
-        metrics.append(MetricSample(fields[1], fields[2], value, fields[4]))
+        metrics.append(
+            MetricSample(
+                name=fields[1], variant=fields[2], value=value, unit=fields[4]
+            )
+        )
     return metrics
 
 

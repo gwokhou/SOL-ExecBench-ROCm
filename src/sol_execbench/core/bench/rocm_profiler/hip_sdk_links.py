@@ -11,6 +11,7 @@ from sol_execbench.core.bench.rocm_profiler.hip_causality_json import (
 from sol_execbench.core.bench.rocm_profiler.hip_causality_models import (
     RECORD_APIS,
     WAIT_API,
+    HIPHostCall,
 )
 from sol_execbench.core.bench.rocm_profiler.hip_events import HIPEventOperation
 from sol_execbench.core.bench.rocm_profiler.hip_scope_artifacts import (
@@ -78,41 +79,7 @@ def sdk_event_links(
             ),
             HIPScopeReason.BARRIER,
         )
-    records = [r for r in events if apis[r.corr].name in RECORD_APIS]
-    require_scope(
-        len({r.event for r in records}) == len(records),
-        HIPScopeReason.CAUSALITY,
-    )
-    by_handle = {r.event: r for r in records}
-    links = []
-    for wait in (r for r in events if apis[r.corr].name == WAIT_API):
-        record = by_handle.get(wait.event)
-        require_scope(
-            record is not None and record.seq < wait.seq,
-            HIPScopeReason.CAUSALITY,
-        )
-        if record is None:
-            raise HIPScopeError(HIPScopeReason.CAUSALITY)
-        require_scope(
-            not any(
-                r.name == "hipEventDestroy"
-                and r.event_handle == wait.event
-                and host[record.corr].end_ns
-                < r.start_ns
-                < host[wait.corr].start_ns
-                for r in host.values()
-            ),
-            HIPScopeReason.CAUSALITY,
-        )
-        require_scope(
-            record.agent == wait.agent
-            and record.queue == wait.source_queue
-            and record.source_queue == record.queue
-            and record.queue != wait.queue,
-            HIPScopeReason.CAUSALITY,
-        )
-        links.append(_link(record, wait, enqueues, copies))
-    return links
+    return _event_links(events, apis, host, enqueues, copies)
 
 
 def _link(
@@ -187,3 +154,48 @@ def _endpoint(
         return None
     key = max if last else min
     return key(submissions, key=lambda submission: submission.seq)
+
+
+def _event_links(
+    events: list[SDKEventEnqueue],
+    apis: dict[int, SDKAPI],
+    host: dict[int, HIPHostCall],
+    enqueues: list[SDKEnqueue],
+    copies: Sequence[HIPSDKEngineCopy],
+) -> list[HIPSDKEventLink]:
+    """Resolve waits against the single qualified event generation."""
+    records = [r for r in events if apis[r.corr].name in RECORD_APIS]
+    require_scope(
+        len({r.event for r in records}) == len(records),
+        HIPScopeReason.CAUSALITY,
+    )
+    by_handle = {r.event: r for r in records}
+    links = []
+    for wait in (r for r in events if apis[r.corr].name == WAIT_API):
+        record = by_handle.get(wait.event)
+        require_scope(
+            record is not None and record.seq < wait.seq,
+            HIPScopeReason.CAUSALITY,
+        )
+        if record is None:
+            raise HIPScopeError(HIPScopeReason.CAUSALITY)
+        require_scope(
+            not any(
+                r.name == "hipEventDestroy"
+                and r.event_handle == wait.event
+                and host[record.corr].end_ns
+                < r.start_ns
+                < host[wait.corr].start_ns
+                for r in host.values()
+            ),
+            HIPScopeReason.CAUSALITY,
+        )
+        require_scope(
+            record.agent == wait.agent
+            and record.queue == wait.source_queue
+            and record.source_queue == record.queue
+            and record.queue != wait.queue,
+            HIPScopeReason.CAUSALITY,
+        )
+        links.append(_link(record, wait, enqueues, copies))
+    return links

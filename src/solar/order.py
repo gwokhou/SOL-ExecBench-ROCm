@@ -128,7 +128,11 @@ class _OrderExecutor:
                 program.architecture,
             )
         self.context = OrderContext(
-            request, conversion, program, chain, configuration
+            request=request,
+            conversion=conversion,
+            program=program,
+            chain=chain,
+            configuration=configuration,
         )
         self.planned = tuple(
             OrderCandidate(

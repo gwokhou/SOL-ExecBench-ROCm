@@ -6,7 +6,12 @@ import argparse
 from dataclasses import replace
 from pathlib import Path
 from time import perf_counter
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from scripts.internal.solar.l3a_measure import MapperMonitor, StageCollector
+
+from solar.schema_versions import SchemaVersion
 
 MESSAGE_LIMIT = 4096
 
@@ -40,18 +45,15 @@ def _argument_parser() -> argparse.ArgumentParser:
 def run_measure(args: argparse.Namespace, torch_seconds: float) -> None:
     """Drive the real ``solar.api.analyze`` flow with stage probes."""
     from scripts.internal.solar.l3a_measure import (
-        MEASUREMENT_SCHEMA,
         GpuPeakMonitor,
         MapperMonitor,
         MeasuredStage,
         StageCollector,
         install_stage_probes,
-        peak_rss_kb,
         stage_probe,
         timed_orojenesis_runner,
     )
     from sol_execbench.core.bench.gpu_execution import native_gpu_execution
-    from sol_execbench.core.data.json_utils import atomic_write_json_value
     from sol_execbench.core.solar_bridge.analyzer import require_formal_device
     from sol_execbench.core.solar_bridge.formal_device import (
         FORMAL_ARCHITECTURE,
@@ -113,11 +115,28 @@ def run_measure(args: argparse.Namespace, torch_seconds: float) -> None:
         _attach_reason_code(collector.rows, result)
     with stage_probe(collector, MeasuredStage.INPUT_GENERATION_STANDALONE, gpu):
         request.input_factory(request.trace_seed)
+    _write_measurement(
+        args, torch_seconds, ir_path.value, collector, mapper, outcome
+    )
+
+
+def _write_measurement(
+    args: argparse.Namespace,
+    torch_seconds: float,
+    ir_path: str,
+    collector: StageCollector,
+    mapper: MapperMonitor,
+    outcome: dict[str, Any],
+) -> None:
+    """Publish the observed stages, mapper use, and outcome for one slot."""
+    from scripts.internal.solar.l3a_measure import peak_rss_kb
+    from sol_execbench.core.data.json_utils import atomic_write_json_value
+
     record = {
-        "schema_version": MEASUREMENT_SCHEMA,
+        "schema_version": SchemaVersion.SOLAR_L3A_MEASUREMENT,
         "slot": args.slot,
-        "ir_path": ir_path.value,
-        "device": device,
+        "ir_path": ir_path,
+        "device": args.device,
         "torch_import_seconds": torch_seconds,
         "process_peak_rss_kb": peak_rss_kb(),
         "stages": collector.rows,

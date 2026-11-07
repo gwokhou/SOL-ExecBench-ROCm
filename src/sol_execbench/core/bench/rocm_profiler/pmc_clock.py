@@ -33,9 +33,11 @@ from sol_execbench.core.bench.clock_ownership import (
     verify_clock_owner,
 )
 from sol_execbench.core.bench.gpu_lock import gpu_lock_directory
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
 from sol_execbench.core.data.base_model import CurrentFrozenSchemaModel
 from sol_execbench.core.data.json_utils import atomic_write_json_value
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.platform.amd_smi import (
     AMDSMIListPayload,
     parse_performance_levels,
@@ -68,7 +70,7 @@ class PMCClockMode(StrEnum):
     BEST_EFFORT = "best-effort"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class PMCClockOptions:
     """Explicit GPU selector (BDF/UUID/index or all) and setup failure policy."""
 
@@ -102,9 +104,9 @@ def configured_pmc_clock_options() -> PMCClockOptions | None:
 class PMCClockReceipt(CurrentFrozenSchemaModel):
     """Independent control evidence; not benchmark score authority."""
 
-    current_schema_version = SchemaVersion.PMC_CLOCK_WINDOW
-    schema_version: Literal[SchemaVersion.PMC_CLOCK_WINDOW] = (
-        SchemaVersion.PMC_CLOCK_WINDOW
+    current_schema_version = ProfilerArtifactSchema.PMC_CLOCK_WINDOW
+    schema_version: Literal[ProfilerArtifactSchema.PMC_CLOCK_WINDOW] = (
+        ProfilerArtifactSchema.PMC_CLOCK_WINDOW
     )
     diagnostic_only: Literal[True] = True
     score_authority: Literal[False] = False

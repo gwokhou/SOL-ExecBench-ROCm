@@ -1,0 +1,77 @@
+{
+  "schema_version": "sol_execbench.definition.v1",
+  "name": "kv_cache_paged_write",
+  "op_type": "kv_cache",
+  "axes": {
+    "P": {
+      "type": "var",
+      "description": "P"
+    },
+    "BS": {
+      "type": "var",
+      "description": "BS"
+    },
+    "B": {
+      "type": "var",
+      "description": "B"
+    },
+    "S": {
+      "type": "var",
+      "description": "S"
+    },
+    "H": {
+      "type": "var",
+      "description": "H"
+    },
+    "D": {
+      "type": "var",
+      "description": "D"
+    }
+  },
+  "custom_inputs_entrypoint": null,
+  "inputs": {
+    "cache": {
+      "shape": [
+        "P",
+        "BS",
+        "H",
+        "D"
+      ],
+      "dtype": "bfloat16",
+      "description": null
+    },
+    "update": {
+      "shape": [
+        "B",
+        "S",
+        "H",
+        "D"
+      ],
+      "dtype": "bfloat16",
+      "description": null
+    },
+    "slots": {
+      "shape": [
+        "B",
+        "S"
+      ],
+      "dtype": "int64",
+      "description": null
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "P",
+        "BS",
+        "H",
+        "D"
+      ],
+      "dtype": "bfloat16",
+      "description": null
+    }
+  },
+  "reference": "import torch\n\ndef run(cache, update, slots):\n    shape = cache.shape\n    flat = cache.float().reshape(-1, shape[-2], shape[-1]).clone()\n    u = update.float().reshape(-1, shape[-2], shape[-1])\n    u = u * 0.5\n    index = slots.reshape(-1).remainder(flat.shape[0]).long()\n    flat.index_copy_(0, index, u)\n    return flat.reshape(shape).to(torch.bfloat16)\n",
+  "description": "Production-derived LLM Core V2 semantic: llm.kv_cache.paged_write.v2.",
+  "hf_id": null
+}

@@ -15,11 +15,13 @@ from sol_execbench.core.bench.rocm_profiler.hip_scope_models import (
     UUID_PATTERN,
     HIPBoundDispatch,
 )
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
 from sol_execbench.core.data.base_model import (
     BaseModelWithDocstrings,
     CurrentFrozenSchemaModel,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 MAX_TORCH_SCOPE_BYTES = 64 * 1024 * 1024
 
@@ -122,8 +124,8 @@ class HIPSDKLedger(CurrentFrozenSchemaModel):
     """Fail closed without a successful lossless-buffer finalization footer."""
 
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
-    current_schema_version = SchemaVersion.HIP_SDK_LEDGER
-    schema_version: Literal[SchemaVersion.HIP_SDK_LEDGER]
+    current_schema_version = ProfilerArtifactSchema.HIP_SDK_LEDGER
+    schema_version: Literal[ProfilerArtifactSchema.HIP_SDK_LEDGER]
     run_id: str = Field(pattern=UUID_PATTERN)
     pid: int = Field(gt=0)
     records: list[
@@ -299,9 +301,9 @@ class HIPSDKBoundDispatch(HIPBoundDispatch):
 class HIPTorchScope(CurrentFrozenSchemaModel):
     """Capture-local coverage proof with restricted-domain schedule completeness."""
 
-    current_schema_version = SchemaVersion.HIP_TORCH_SCOPE
-    schema_version: Literal[SchemaVersion.HIP_TORCH_SCOPE] = (
-        SchemaVersion.HIP_TORCH_SCOPE
+    current_schema_version = ProfilerArtifactSchema.HIP_TORCH_SCOPE
+    schema_version: Literal[ProfilerArtifactSchema.HIP_TORCH_SCOPE] = (
+        ProfilerArtifactSchema.HIP_TORCH_SCOPE
     )
     status: Literal["qualified_eager_scope"] = "qualified_eager_scope"
     scope: HIPTorchExpectation

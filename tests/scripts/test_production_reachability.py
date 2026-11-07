@@ -6,7 +6,8 @@ SCRIPT_PATH = (
     / "scripts/check_production_reachability.py"
 )
 SPEC = spec_from_file_location("check_production_reachability", SCRIPT_PATH)
-assert SPEC is not None and SPEC.loader is not None
+assert SPEC is not None
+assert SPEC.loader is not None
 reachability = module_from_spec(SPEC)
 SPEC.loader.exec_module(reachability)
 

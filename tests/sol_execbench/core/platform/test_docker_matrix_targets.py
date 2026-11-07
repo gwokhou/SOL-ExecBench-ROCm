@@ -21,7 +21,15 @@ from sol_execbench.core.platform.docker_matrix import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
+MANIFEST_PATH = REPO_ROOT / "src/sol_execbench/data/rocm_targets.json"
+
+
+def test_packaged_manifest_is_the_default_source() -> None:
+    packaged = load_docker_target_manifest()
+    source = load_docker_target_manifest(MANIFEST_PATH)
+
+    assert packaged == source
+    assert select_docker_target().target_id == packaged.default_target_id
 
 
 def test_manifest_declares_default_and_configured_rocm_complete_targets() -> (

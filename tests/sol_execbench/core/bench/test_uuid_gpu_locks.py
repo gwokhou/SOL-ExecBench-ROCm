@@ -77,7 +77,7 @@ def test_uuid_names_and_normalization(paths, monkeypatch):
 )
 def test_invalid_or_legacy_configuration_stops(paths, monkeypatch, name, value):
     monkeypatch.setenv(name, value)
-    with pytest.raises(ValueError, match="GPU_LOCK|legacy GPU"):
+    with pytest.raises(ValueError, match=r"GPU_LOCK|legacy GPU"):
         configured_gpu_locks()
     assert not paths.directory.exists()
 
@@ -112,7 +112,8 @@ def test_two_uuid_owners_can_remain_active_together(paths, monkeypatch):
             with published_clock_owner(
                 lease_b, paths.directory, (second,)
             ) as token_b:
-                assert token_a is not None and token_b is not None
+                assert token_a is not None
+                assert token_b is not None
                 for token, device in ((token_a, first), (token_b, second)):
                     assert (
                         verify_clock_owner(
@@ -120,7 +121,8 @@ def test_two_uuid_owners_can_remain_active_together(paths, monkeypatch):
                         ).state
                         is ClockOwnerState.ACTIVE
                     )
-    assert lease_a.released and lease_b.released
+    assert lease_a.released
+    assert lease_b.released
 
 
 @pytest.mark.parametrize("location", ["private", "old-private"])

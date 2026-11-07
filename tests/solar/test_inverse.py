@@ -74,7 +74,8 @@ def test_m06_resource_constraints_and_independent_forward_oracle(view):
         == max(Fraction(120, 60), Fraction(80, 40))
         == 2
     )
-    assert result.necessary_only and not result.performance_authority
+    assert result.necessary_only
+    assert not result.performance_authority
 
 
 def test_m07_shared_modes_sum_before_common_scaling():
@@ -114,7 +115,7 @@ def test_m08_invalid_rates_rejected(rate):
 
 @pytest.mark.parametrize("names", [("missing",), ("dram", "dram")])
 def test_invalid_resource_groups_rejected(names):
-    with pytest.raises(ValueError, match="unknown|duplicates"):
+    with pytest.raises(ValueError, match=r"unknown|duplicates"):
         solve_constraints(model({}), target_seconds=1, scale_resources=names)
 
 

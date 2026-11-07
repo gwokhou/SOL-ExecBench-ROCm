@@ -13,6 +13,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from solar.schema_versions import SchemaVersion
+
 WORKTREE = Path(__file__).resolve().parents[3]
 PRISTINE = Path("/home/guohao/PyCharmMiscProject/SOL-ExecBench-ROCm")
 
@@ -106,7 +108,7 @@ def main() -> int:
         for row in rows:
             handle.write(json.dumps(row, sort_keys=True) + "\n")
     summary = {
-        "schema_version": "sol_execbench.solar_lineb_equality.v1",
+        "schema_version": SchemaVersion.SOLAR_LINEB_EQUALITY,
         "total": len(rows),
         "equal": equal,
         "mismatches": [r for r in rows if not r["equal"]][:32],

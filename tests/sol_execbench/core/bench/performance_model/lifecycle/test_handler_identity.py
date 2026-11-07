@@ -1,6 +1,6 @@
 """Real handlers derive their stage_id from the identity family.
 
-``test_orchestrator`` drives the chain with fake handlers, so the real
+``test_engine`` drives the chain with fake handlers, so the real
 ``CorpusSnapshotHandler`` and ``AcceptanceHandler`` stage_id derivation is
 not exercised there. These tests pin the runtime contract that every real
 handler routes its stage_id through the identity functions rather than
@@ -29,14 +29,19 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     DiagnosticRunManifest,
     acceptance_id,
     corpus_snapshot_id,
-    orchestrator as lifecycle_orchestrator,
+    model_stages as lifecycle_model_stages,
+    records as lifecycle_records,
 )
-from sol_execbench.core.bench.performance_model.lifecycle.orchestrator import (
-    AcceptanceHandler,
+from sol_execbench.core.bench.performance_model.lifecycle.collection_stages import (
     CollectionRunHandler,
     CorpusSnapshotHandler,
-    PublicationHandler,
+)
+from sol_execbench.core.bench.performance_model.lifecycle.execution import (
     StageRunContext,
+)
+from sol_execbench.core.bench.performance_model.lifecycle.model_stages import (
+    AcceptanceHandler,
+    PublicationHandler,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.receipts import (
     DiagnosticStageReceipt,
@@ -48,6 +53,24 @@ from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
 from sol_execbench.core.bench.performance_model.models import WorkloadKind
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.integrity import sha256_file
+
+
+def _plan_stub(**values: object) -> Any:
+    defaults: dict[str, object] = {
+        "collection_run_id": "a" * 64,
+        "generation": 1,
+        "purpose": DiagnosticEvidencePurpose.PRODUCTION,
+        "collection_root": ".",
+        "calibration_profile_path": "calibration.json",
+        "calibration_audit_path": "calibration-audit.json",
+        "vram_policy_path": None,
+        "frozen_inference_profile_path": None,
+        "held_out_corpus_path": "held-out.json",
+        "output_root": "output",
+        "source_revision": "unknown",
+        "model_version": "gfx1200_diagnostic.v7",
+    }
+    return cast(Any, SimpleNamespace(**(defaults | values)))
 
 
 def test_collection_handler_requires_exact_reviewed_inventory(
@@ -64,20 +87,14 @@ def test_collection_handler_requires_exact_reviewed_inventory(
     )
     context = StageRunContext(
         store_root=tmp_path,
-        plan=cast(
-            Any,
-            SimpleNamespace(
-                collection_inventory=(artifact,),
-                held_out_corpus=artifact,
-                purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
-            ),
+        plan=_plan_stub(
+            collection_inventory=(artifact,),
+            held_out_corpus=artifact,
+            purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
+            collection_root=str(corpus_root),
+            held_out_corpus_path=str(corpus),
         ),
         design_manifest_path=tmp_path / "design.json",
-        collection_run_id="a" * 64,
-        generation=1,
-        purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
-        corpus_root=corpus_root,
-        held_out_corpus_path=corpus,
     )
     handler = CollectionRunHandler()
     completion = handler.run(context)
@@ -121,17 +138,15 @@ def test_collection_generation_counts_failed_precollection_run(
     )
     context = StageRunContext(
         store_root=tmp_path,
-        plan=cast(
-            Any,
-            SimpleNamespace(design=SimpleNamespace(stage_id=design_id)),
+        plan=_plan_stub(
+            design=SimpleNamespace(stage_id=design_id),
+            collection_run_id=current_run_id,
+            generation=2,
         ),
         design_manifest_path=tmp_path / "design.json",
-        collection_run_id=current_run_id,
-        generation=2,
-        purpose=DiagnosticEvidencePurpose.PRODUCTION,
     )
 
-    assert lifecycle_orchestrator._latest_collection_run(context) is None
+    assert lifecycle_records._latest_collection_run(context) is None
 
 
 def test_corpus_snapshot_handler_derives_identity(tmp_path: Path) -> None:
@@ -147,12 +162,13 @@ def test_corpus_snapshot_handler_derives_identity(tmp_path: Path) -> None:
     )
     context = StageRunContext(
         store_root=tmp_path,
-        plan=cast(Any, SimpleNamespace(held_out_corpus=held_out_artifact)),
+        plan=_plan_stub(
+            held_out_corpus=held_out_artifact,
+            collection_run_id=collection_run_id,
+            collection_root=str(corpus_root),
+            held_out_corpus_path=str(held_out),
+        ),
         design_manifest_path=tmp_path / "design.json",
-        collection_run_id=collection_run_id,
-        generation=1,
-        corpus_root=corpus_root,
-        held_out_corpus_path=held_out,
     )
 
     completion = CorpusSnapshotHandler().run(context)
@@ -219,23 +235,19 @@ def test_acceptance_handler_derives_identity(
     )
     context = StageRunContext(
         store_root=store,
-        plan=cast(
-            Any,
-            SimpleNamespace(
-                development_snapshot=DiagnosticLifecycleParent(
-                    stage=DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
-                    stage_id=development_snapshot_id,
-                    sha256="e" * 64,
-                )
+        plan=_plan_stub(
+            collection_run_id=collection_run_id,
+            development_snapshot=DiagnosticLifecycleParent(
+                stage=DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+                stage_id=development_snapshot_id,
+                sha256="e" * 64,
             ),
+            calibration_profile_path=str(tmp_path / "calibration.json"),
+            held_out_corpus_path=str(held_out),
+            output_root=str(output_root),
         ),
         design_manifest_path=store / "design.json",
-        collection_run_id=collection_run_id,
-        generation=1,
-        calibration_profile_path=tmp_path / "calibration.json",
         development_corpus_path=tmp_path / "development.json",
-        held_out_corpus_path=held_out,
-        output_root=output_root,
     )
     context.set_output(
         DiagnosticLifecycleStage.MODEL_BUILD,
@@ -288,16 +300,14 @@ def test_acceptance_handler_records_precondition_exposure(
     )
     context = StageRunContext(
         store_root=tmp_path,
-        plan=cast(Any, SimpleNamespace()),
+        plan=_plan_stub(
+            purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
+            calibration_profile_path=str(tmp_path / "calibration.json"),
+            held_out_corpus_path=str(held_out),
+            output_root=str(output_root),
+        ),
         design_manifest_path=tmp_path / "design.json",
-        collection_run_id="a" * 64,
-        generation=1,
-        purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
-        calibration_profile_path=tmp_path / "calibration.json",
         development_corpus_path=tmp_path / "development.json",
-        held_out_corpus_path=held_out,
-        output_root=output_root,
-        source_revision="unknown",
     )
     context.set_output(
         DiagnosticLifecycleStage.MODEL_BUILD, tmp_path / "inference.json"
@@ -366,7 +376,7 @@ def test_publication_handler_uses_promoted_development_identity(
         _build,
     )
     monkeypatch.setattr(
-        lifecycle_orchestrator,
+        lifecycle_model_stages,
         "load_json_file",
         lambda model, path: (
             SimpleNamespace(accepted=True)
@@ -379,26 +389,22 @@ def test_publication_handler_uses_promoted_development_identity(
         ),
     )
     monkeypatch.setattr(
-        lifecycle_orchestrator, "publication_id", _publication_id
+        lifecycle_model_stages, "publication_id", _publication_id
     )
     context = StageRunContext(
         store_root=tmp_path,
-        plan=cast(
-            Any,
-            SimpleNamespace(
-                development_snapshot=DiagnosticLifecycleParent(
-                    stage=DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
-                    stage_id=development_snapshot_id,
-                    sha256="f" * 64,
-                )
+        plan=_plan_stub(
+            collection_run_id=run_id,
+            development_snapshot=DiagnosticLifecycleParent(
+                stage=DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+                stage_id=development_snapshot_id,
+                sha256="f" * 64,
             ),
+            calibration_profile_path=str(tmp_path / "calibration.json"),
+            output_root=str(output_root),
         ),
         design_manifest_path=tmp_path / "design.json",
-        collection_run_id=run_id,
-        generation=1,
-        calibration_profile_path=tmp_path / "calibration.json",
         development_corpus_path=tmp_path / "development.json",
-        output_root=output_root,
     )
     context.set_output(DiagnosticLifecycleStage.ACCEPTANCE, acceptance)
     context.set_output(DiagnosticLifecycleStage.MODEL_BUILD, tmp_path / "model")

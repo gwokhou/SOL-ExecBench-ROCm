@@ -50,7 +50,7 @@ class TimingActivityDomain(StrEnum):
     UNSUPPORTED = "unsupported"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class TimingPolicy:
     """Selected timing policy and user-facing interpretation."""
 

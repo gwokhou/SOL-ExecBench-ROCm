@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import Any
 
 from scripts.internal.solar.l3a_measure import (
-    MEASUREMENT_SCHEMA,
     aggregate_stages,
     evaluate_measurement_gate,
     evaluate_pilot_gate,
@@ -30,6 +29,7 @@ from sol_execbench.core.process.subprocesses import (
 )
 from sol_execbench.core.timestamps import utc_timestamp
 from solar.artifacts import sha256_file
+from solar.schema_versions import SchemaVersion
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CORPUS_ROOT = REPO_ROOT / "problems" / "AMD_AKA"
@@ -37,7 +37,6 @@ IR_PATH_VALUES = (
     "make_fx_aten",
     "torchview_extended_einsum",
 )
-PILOT_SCHEMA_SUMMARY = "sol_execbench.solar_l3a_pilot_summary.v1"
 
 
 def _slot_ids() -> dict[str, tuple[Path, str, str]]:
@@ -123,7 +122,7 @@ def run_measure_phase(
             atomic_write_json_value(
                 record_file,
                 {
-                    "schema_version": MEASUREMENT_SCHEMA,
+                    "schema_version": SchemaVersion.SOLAR_L3A_MEASUREMENT,
                     "slot": slot,
                     "ir_path": ir_path,
                     "worker_error": error,
@@ -134,7 +133,7 @@ def run_measure_phase(
     cuda_mode = args.device.split(":", 1)[0] != "cpu"
     gate = evaluate_measurement_gate(records, list(slots), cuda_mode=cuda_mode)
     report = {
-        "schema_version": MEASUREMENT_SCHEMA,
+        "schema_version": SchemaVersion.SOLAR_L3A_MEASUREMENT,
         "generated_at": utc_timestamp(),
         "identity": identity,
         "device": args.device,
@@ -200,6 +199,34 @@ def run_pilot_phase(
         if "worker_error" in _load_json(record_file):
             crashed = True
         slots[item] = _load_json(record_file)
+    focused, focused_crashed = _run_focused_pilot(output, args)
+    crashed |= focused_crashed
+    gate = evaluate_pilot_gate(
+        slots, focused, structure_check=_production_src_untouched()
+    )
+    summary = {
+        "schema_version": SchemaVersion.SOLAR_L3A_PILOT_SUMMARY,
+        "generated_at": utc_timestamp(),
+        "identity": identity,
+        "decision_rule": (
+            "docs/internal/solar-l3a-fake-static-pilot-acceptance-2026-11-05.md"
+        ),
+        "worker_crashed": crashed,
+        "gate": gate,
+        "slots": slots,
+        "focused": focused,
+    }
+    atomic_write_json_value(
+        output / "fake-pilot" / "pilot-summary.json", summary
+    )
+    return summary
+
+
+def _run_focused_pilot(
+    output: Path, args: argparse.Namespace
+) -> tuple[dict[str, Any], bool]:
+    """Run or resume the focused pilot worker and retain its crash verdict."""
+    crashed = False
     focused_dir = output / "fake-pilot" / "focused"
     focused_done = focused_dir / "focused.done"
     if not (args.resume and focused_done.is_file()):
@@ -227,25 +254,7 @@ def run_pilot_phase(
         path.stem: _load_json(path)
         for path in sorted(focused_dir.glob("*.json"))
     }
-    gate = evaluate_pilot_gate(
-        slots, focused, structure_check=_production_src_untouched()
-    )
-    summary = {
-        "schema_version": PILOT_SCHEMA_SUMMARY,
-        "generated_at": utc_timestamp(),
-        "identity": identity,
-        "decision_rule": (
-            "docs/internal/solar-l3a-fake-static-pilot-acceptance-2026-11-05.md"
-        ),
-        "worker_crashed": crashed,
-        "gate": gate,
-        "slots": slots,
-        "focused": focused,
-    }
-    atomic_write_json_value(
-        output / "fake-pilot" / "pilot-summary.json", summary
-    )
-    return summary
+    return focused, crashed
 
 
 def _production_src_untouched() -> bool:

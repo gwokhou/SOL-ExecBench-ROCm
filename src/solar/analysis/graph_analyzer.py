@@ -32,15 +32,15 @@ import yaml
 
 from solar.analysis.access_regions import DEFAULT_ACCESS_BUDGET, AccessBudget
 from solar.analysis.external_reads import external_reads
-from solar.analysis.formal_analysis import FormalAnalysisMixin
-from solar.analysis.graph_accounting import GraphAccountingMixin
+from solar.analysis.formal_analysis import FormalBoundAnalyzer
+from solar.analysis.graph_accounting import LayerAccountant
 from solar.analysis.graph_context import (
     AnalysisJob,
     IntrinsicGraph,
     PathLike,
     PreparedAnalysis,
 )
-from solar.analysis.graph_loading import GraphLoadingMixin
+from solar.analysis.graph_loading import GraphLoader
 from solar.analysis.graph_models import (
     AnalysisAccumulator,
 )
@@ -51,8 +51,9 @@ from solar.analysis.graph_validation import (
 from solar.analysis.orojenesis.runner import (
     OrojenesisRunner,
 )
-from solar.analysis.orojenesis_evidence import OrojenesisEvidenceMixin
+from solar.analysis.orojenesis_evidence import OrojenesisEvidenceEvaluator
 from solar.analysis.reporting import build_analysis_result, write_analysis
+from solar.composition import BoundComponent, component_attribute
 from solar.ir.access import AccessQuality
 from solar.ir.extended_einsum.operations.analyzer import EinsumAnalyzer
 from solar.precision import (
@@ -62,12 +63,7 @@ from solar.precision import (
 from solar.rocm.architecture import ArchitectureProfile
 
 
-class IRGraphAnalyzer(
-    GraphLoadingMixin,
-    GraphAccountingMixin,
-    OrojenesisEvidenceMixin,
-    FormalAnalysisMixin,
-):
+class IRGraphAnalyzer:
     """Analyze a SOLAR IR graph and write `analysis.yaml`."""
 
     def __init__(
@@ -75,11 +71,22 @@ class IRGraphAnalyzer(
         debug: bool = False,
         *,
         validator: GraphValidator = accept_prevalidated_graph,
+        einsum_analyzer: EinsumAnalyzer | None = None,
     ) -> None:
         """Initialize graph analysis and operation-cost helpers."""
         self.debug = debug
         self.validator = validator
-        self.einsum_analyzer = EinsumAnalyzer(debug=debug)
+        self.einsum_analyzer = einsum_analyzer or EinsumAnalyzer(debug=debug)
+        self._components: tuple[BoundComponent, ...] = (
+            GraphLoader(self),
+            LayerAccountant(self),
+            OrojenesisEvidenceEvaluator(self),
+            FormalBoundAnalyzer(self),
+        )
+
+    def __getattr__(self, name: str) -> Any:
+        """Resolve private workflow behavior from composed components."""
+        return component_attribute(self._components, name)
 
     def analyze_graph(
         self,
@@ -168,7 +175,12 @@ class IRGraphAnalyzer(
             prepared.access,
             budget=access_budget,
         )
-        return IntrinsicGraph(prepared, topology, layers, reads)
+        return IntrinsicGraph(
+            prepared=prepared,
+            topology=topology,
+            layers=layers,
+            external_reads=reads,
+        )
 
     def project_intrinsic(
         self,

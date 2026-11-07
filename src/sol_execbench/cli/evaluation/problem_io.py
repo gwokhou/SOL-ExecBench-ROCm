@@ -25,7 +25,7 @@ from sol_execbench.core.data.workload_validation import (
 from sol_execbench.core.platform.runtime import detect_rocm_device
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ResolvedProblemInputs:
     """Resolved paths for one evaluation's problem inputs."""
 
@@ -35,7 +35,7 @@ class ResolvedProblemInputs:
     config_file: Path | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class LoadedProblemInputs:
     """Validated models loaded from a resolved CLI input set."""
 

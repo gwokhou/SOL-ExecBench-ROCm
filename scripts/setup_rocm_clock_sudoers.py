@@ -79,7 +79,7 @@ Known legacy cleanup:
 """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SudoCommandCheck:
     """Result of one passwordless sudo policy check."""
 
@@ -208,9 +208,19 @@ def _run_check(command: list[str]) -> SudoCommandCheck:
             timeout=COMMAND_TIMEOUT_S,
         )
     except FileNotFoundError as exc:
-        return SudoCommandCheck(command, "missing_tool", None, str(exc))
+        return SudoCommandCheck(
+            command=command,
+            status="missing_tool",
+            returncode=None,
+            stderr_tail=str(exc),
+        )
     except subprocess.TimeoutExpired as exc:
-        return SudoCommandCheck(command, "timed_out", None, str(exc))
+        return SudoCommandCheck(
+            command=command,
+            status="timed_out",
+            returncode=None,
+            stderr_tail=str(exc),
+        )
     stderr = result.stderr or ""
     output = f"{result.stdout or ''}\n{stderr}".lower()
     status = "covered" if result.returncode == 0 else "missing_or_failed"
@@ -221,10 +231,10 @@ def _run_check(command: list[str]) -> SudoCommandCheck:
     elif any(marker in output for marker in _COMMAND_FAILURE_MARKERS):
         status = "command_failed"
     return SudoCommandCheck(
-        command,
-        status,
-        result.returncode,
-        _tail(stderr.strip()),
+        command=command,
+        status=status,
+        returncode=result.returncode,
+        stderr_tail=_tail(stderr.strip()),
     )
 
 

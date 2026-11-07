@@ -13,7 +13,13 @@ from __future__ import annotations
 
 from typing import Annotated, ClassVar, Literal
 
-from pydantic import ConfigDict, Field, TypeAdapter, model_validator
+from pydantic import (
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    TypeAdapter,
+    model_validator,
+)
 
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticEvidencePurpose,
@@ -24,19 +30,23 @@ from sol_execbench.core.bench.performance_model.lifecycle.enums import (
 from sol_execbench.core.bench.performance_model.lifecycle.receipts import (
     DiagnosticStageReceipt,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.schema_versions import (
+    DiagnosticLifecycleSchema,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
     DiagnosticLifecycleParent,
-    GpuLifecycleIdentity,
     SoftwareLifecycleIdentity,
-    require_complete_gpu_identity,
 )
 from sol_execbench.core.data.base_model import (
     CurrentSchemaMixin,
     StrictArtifactModel,
 )
 from sol_execbench.core.integrity import SHA256Digest
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.platform.hardware import (
+    HardwareExecutionIdentity,
+    require_complete_execution_identity,
+)
 
 PRODUCER_VERSION = "4.0.0"
 
@@ -45,7 +55,6 @@ class DiagnosticLifecycleManifestBase(StrictArtifactModel):
     """Shared fields for every lifecycle stage object."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
-    expected_stage: ClassVar[DiagnosticLifecycleStage | None] = None
     stage: DiagnosticLifecycleStage
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     stage_id: str = Field(min_length=1)
@@ -56,20 +65,11 @@ class DiagnosticLifecycleManifestBase(StrictArtifactModel):
     producer_version: str = PRODUCER_VERSION
     parents: tuple[DiagnosticLifecycleParent, ...] = ()
     policy_hashes: dict[str, str] = Field(default_factory=dict)
-    gpu_identity: GpuLifecycleIdentity | None = None
+    gpu_identity: HardwareExecutionIdentity | None = None
     software_identity: SoftwareLifecycleIdentity | None = None
     exact_inventory: tuple[DiagnosticLifecycleArtifact, ...] = ()
     receipt: DiagnosticStageReceipt | None = None
     created_at: str = Field(min_length=1)
-
-    @model_validator(mode="after")
-    def _stage_matches_family(self) -> DiagnosticLifecycleManifestBase:
-        expected = type(self).expected_stage
-        if expected is not None and self.stage is not expected:
-            raise ValueError(
-                f"{type(self).__name__} requires stage={expected.value!r}",
-            )
-        return self
 
     @model_validator(mode="after")
     def _gpu_identity_is_authoritative(
@@ -82,7 +82,10 @@ class DiagnosticLifecycleManifestBase(StrictArtifactModel):
         so it can participate in the stage identity. ``unknown`` or a
         missing field is not an authoritative production identity.
         """
-        require_complete_gpu_identity(self.gpu_identity, stage=self.stage)
+        require_complete_execution_identity(
+            self.gpu_identity,
+            context=self.stage.value,
+        )
         return self
 
     @model_validator(mode="after")
@@ -105,24 +108,21 @@ class CurrentDiagnosticLifecycleManifest(
     CurrentSchemaMixin,
     DiagnosticLifecycleManifestBase,
 ):
-    """Version-aware base for every concrete lifecycle stage object.
+    """One versioned lifecycle envelope shared by every stage variant."""
 
-    This intermediate mirrors ``CurrentDiagnosticSidecarAuthority``: the
-    concrete stage subclasses assign ``current_schema_version`` beneath a
-    pydantic model that already carries the ``ClassVar`` annotation, so
-    pydantic does not treat the reassignment as a new field.
-    """
+    current_schema_version: ClassVar[str] = (
+        DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_MANIFEST
+    )
+
+    schema_version: Literal[
+        DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_MANIFEST
+    ] = DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_MANIFEST
 
 
 class DiagnosticDesignManifest(CurrentDiagnosticLifecycleManifest):
     """One preregistered diagnostic design."""
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_LIFECYCLE_DESIGN
-    expected_stage = DiagnosticLifecycleStage.DESIGN
-
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_LIFECYCLE_DESIGN] = (
-        SchemaVersion.DIAGNOSTIC_LIFECYCLE_DESIGN
-    )
+    stage: Literal[DiagnosticLifecycleStage.DESIGN]
     universe_start: int = Field(ge=0)
     design_payload_sha256: SHA256Digest
     vram_policy_sha256: SHA256Digest | None = None
@@ -131,12 +131,7 @@ class DiagnosticDesignManifest(CurrentDiagnosticLifecycleManifest):
 class DiagnosticCollectionRunManifest(CurrentDiagnosticLifecycleManifest):
     """One immutable collection generation beneath a design."""
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_LIFECYCLE_COLLECTION_RUN
-    expected_stage = DiagnosticLifecycleStage.COLLECTION_RUN
-
-    schema_version: Literal[
-        SchemaVersion.DIAGNOSTIC_LIFECYCLE_COLLECTION_RUN
-    ] = SchemaVersion.DIAGNOSTIC_LIFECYCLE_COLLECTION_RUN
+    stage: Literal[DiagnosticLifecycleStage.COLLECTION_RUN]
     roles: tuple[Literal["development", "held_out"], ...] = (
         "development",
         "held_out",
@@ -149,12 +144,7 @@ class DiagnosticCollectionRunManifest(CurrentDiagnosticLifecycleManifest):
 class DiagnosticCorpusSnapshotManifest(CurrentDiagnosticLifecycleManifest):
     """One frozen development or held-out corpus snapshot."""
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_LIFECYCLE_CORPUS_SNAPSHOT
-    expected_stage = DiagnosticLifecycleStage.CORPUS_SNAPSHOT
-
-    schema_version: Literal[
-        SchemaVersion.DIAGNOSTIC_LIFECYCLE_CORPUS_SNAPSHOT
-    ] = SchemaVersion.DIAGNOSTIC_LIFECYCLE_CORPUS_SNAPSHOT
+    stage: Literal[DiagnosticLifecycleStage.CORPUS_SNAPSHOT]
     role: Literal["development", "held_out"]
     corpus_file_sha256: SHA256Digest
     case_count: int = Field(ge=220)
@@ -174,12 +164,7 @@ class DiagnosticCalibrationLifecycleManifest(
     any mismatch is a hard identity change rather than silent drift.
     """
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_LIFECYCLE_CALIBRATION
-    expected_stage = DiagnosticLifecycleStage.CALIBRATION
-
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_LIFECYCLE_CALIBRATION] = (
-        SchemaVersion.DIAGNOSTIC_LIFECYCLE_CALIBRATION
-    )
+    stage: Literal[DiagnosticLifecycleStage.CALIBRATION]
     calibration_profile_sha256: SHA256Digest
     calibration_audit_sha256: SHA256Digest
 
@@ -191,19 +176,17 @@ class DiagnosticCalibrationLifecycleManifest(
             raise ValueError("calibration requires a complete gpu_identity")
         if self.software_identity is None:
             raise ValueError("calibration requires a software_identity")
-        require_complete_gpu_identity(self.gpu_identity, stage=self.stage)
+        require_complete_execution_identity(
+            self.gpu_identity,
+            context=self.stage.value,
+        )
         return self
 
 
 class DiagnosticModelBuildManifest(CurrentDiagnosticLifecycleManifest):
     """One frozen inference model build."""
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_LIFECYCLE_MODEL_BUILD
-    expected_stage = DiagnosticLifecycleStage.MODEL_BUILD
-
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_LIFECYCLE_MODEL_BUILD] = (
-        SchemaVersion.DIAGNOSTIC_LIFECYCLE_MODEL_BUILD
-    )
+    stage: Literal[DiagnosticLifecycleStage.MODEL_BUILD]
     calibration_profile_sha256: SHA256Digest
     calibration_audit_sha256: SHA256Digest
     inference_profile_sha256: SHA256Digest
@@ -215,12 +198,7 @@ class DiagnosticAcceptanceLifecycleManifest(
 ):
     """One held-out acceptance verdict."""
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_LIFECYCLE_ACCEPTANCE
-    expected_stage = DiagnosticLifecycleStage.ACCEPTANCE
-
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_LIFECYCLE_ACCEPTANCE] = (
-        SchemaVersion.DIAGNOSTIC_LIFECYCLE_ACCEPTANCE
-    )
+    stage: Literal[DiagnosticLifecycleStage.ACCEPTANCE]
     held_out_corpus_snapshot_id: str = Field(min_length=1)
     accepted: bool
     verdict_sha256: SHA256Digest
@@ -231,12 +209,7 @@ class DiagnosticPublicationLifecycleManifest(
 ):
     """One compact publication projection."""
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_LIFECYCLE_PUBLICATION
-    expected_stage = DiagnosticLifecycleStage.PUBLICATION
-
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_LIFECYCLE_PUBLICATION] = (
-        SchemaVersion.DIAGNOSTIC_LIFECYCLE_PUBLICATION
-    )
+    stage: Literal[DiagnosticLifecycleStage.PUBLICATION]
     source_corpus_sha256: SHA256Digest
     publication_manifest_sha256: SHA256Digest
     uncompressed_size_bytes: int = Field(ge=0)
@@ -246,29 +219,34 @@ class DiagnosticPublicationLifecycleManifest(
 class DiagnosticReleaseLifecycleManifest(CurrentDiagnosticLifecycleManifest):
     """One deterministic release archive and its attestation."""
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_LIFECYCLE_RELEASE
-    expected_stage = DiagnosticLifecycleStage.RELEASE
-
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_LIFECYCLE_RELEASE] = (
-        SchemaVersion.DIAGNOSTIC_LIFECYCLE_RELEASE
-    )
+    stage: Literal[DiagnosticLifecycleStage.RELEASE]
     archive_sha256: SHA256Digest
     archive_size_bytes: int = Field(ge=0)
     attestation_sha256: SHA256Digest
+    hardware_validation_receipt_sha256: SHA256Digest
     draft_release_url: str | None = None
     published: bool = False
 
 
+def _require_current_lifecycle_schema(value: object) -> object:
+    """Reject non-current envelopes before dispatching on the stage field."""
+    CurrentDiagnosticLifecycleManifest._require_current_schema(value)
+    return value
+
+
 DiagnosticLifecycleManifest = Annotated[
-    DiagnosticDesignManifest
-    | DiagnosticCollectionRunManifest
-    | DiagnosticCorpusSnapshotManifest
-    | DiagnosticCalibrationLifecycleManifest
-    | DiagnosticModelBuildManifest
-    | DiagnosticAcceptanceLifecycleManifest
-    | DiagnosticPublicationLifecycleManifest
-    | DiagnosticReleaseLifecycleManifest,
-    Field(discriminator="schema_version"),
+    Annotated[
+        DiagnosticDesignManifest
+        | DiagnosticCollectionRunManifest
+        | DiagnosticCorpusSnapshotManifest
+        | DiagnosticCalibrationLifecycleManifest
+        | DiagnosticModelBuildManifest
+        | DiagnosticAcceptanceLifecycleManifest
+        | DiagnosticPublicationLifecycleManifest
+        | DiagnosticReleaseLifecycleManifest,
+        Field(discriminator="stage"),
+    ],
+    BeforeValidator(_require_current_lifecycle_schema),
 ]
 
 DIAGNOSTIC_LIFECYCLE_MANIFEST_ADAPTER = TypeAdapter(DiagnosticLifecycleManifest)

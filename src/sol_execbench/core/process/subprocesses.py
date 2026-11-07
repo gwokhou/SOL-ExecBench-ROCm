@@ -19,6 +19,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Protocol
 
+from sol_execbench.core.process.process_observation import (
+    process_group_has_live_members,
+    wait_for_exit_without_reaping,
+)
+
 _MAX_CAPTURE_BYTES = 5 * 1024 * 1024
 _OUTPUT_DRAIN_GRACE_SECONDS = 5.0
 _PROCESS_GROUP_GRACE_SECONDS = 1.0
@@ -42,7 +47,7 @@ class TextSubprocessRunner(Protocol):
         ...
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ProbeCompletedProcess:
     """Small subprocess result shape used by injectable probe runners."""
 
@@ -141,7 +146,7 @@ def run_in_process_group_to_files(
             start_new_session=True,
         )
         try:
-            _wait_for_exit_without_reaping(process, timeout)
+            wait_for_exit_without_reaping(process, timeout)
             _wait_for_process_group_members(
                 process.pid,
                 _PROCESS_GROUP_GRACE_SECONDS,
@@ -184,7 +189,7 @@ def run_attached_process_group(
         if interactive:
             return_code = process.wait(timeout=timeout)
         else:
-            _wait_for_exit_without_reaping(process, timeout)
+            wait_for_exit_without_reaping(process, timeout)
             _wait_for_process_group_members(
                 process.pid,
                 _PROCESS_GROUP_GRACE_SECONDS,
@@ -238,7 +243,7 @@ def run_in_process_group_bounded(
         _start_capture_thread(process.stderr, stderr_capture),
     )
     try:
-        _wait_for_exit_without_reaping(
+        wait_for_exit_without_reaping(
             process,
             timeout,
             **(
@@ -297,7 +302,7 @@ class _TailCapture:
         return value
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _CaptureWorker:
     thread: threading.Thread
     stop: threading.Event
@@ -343,29 +348,6 @@ def _stop_capture_threads(workers: tuple[_CaptureWorker, ...]) -> None:
     _join_capture_threads(workers, _PROCESS_GROUP_GRACE_SECONDS)
 
 
-def _wait_for_exit_without_reaping(
-    process: subprocess.Popen[bytes] | subprocess.Popen[str],
-    timeout: float | None,
-    *,
-    cancel_event: threading.Event | None = None,
-) -> None:
-    """Observe leader exit while retaining its PID/session identity for cleanup."""
-    if timeout is None and cancel_event is None:
-        os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOWAIT)
-        return
-    deadline = (
-        time.monotonic() + timeout if timeout is not None else float("inf")
-    )
-    flags = os.WEXITED | os.WNOWAIT | os.WNOHANG
-    while os.waitid(os.P_PID, process.pid, flags) is None:
-        if cancel_event is not None and cancel_event.is_set():
-            raise CancelledError("subprocess batch cancelled")
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise subprocess.TimeoutExpired(process.args, timeout or 0)
-        time.sleep(min(_WAIT_POLL_SECONDS, remaining))
-
-
 def _signal_unreaped_process_group(
     process: subprocess.Popen[bytes] | subprocess.Popen[str],
     signal_number: int,
@@ -388,10 +370,10 @@ def _terminate_unreaped_process_group(
 ) -> None:
     _signal_unreaped_process_group(process, signal.SIGTERM)
     try:
-        _wait_for_exit_without_reaping(process, _PROCESS_GROUP_GRACE_SECONDS)
+        wait_for_exit_without_reaping(process, _PROCESS_GROUP_GRACE_SECONDS)
     except subprocess.TimeoutExpired:
         _signal_unreaped_process_group(process, signal.SIGKILL)
-        _wait_for_exit_without_reaping(process, None)
+        wait_for_exit_without_reaping(process, None)
     _cleanup_unreaped_process_group(process, workers)
     process.wait()
 
@@ -400,13 +382,13 @@ def _cleanup_unreaped_process_group(
     process: subprocess.Popen[bytes] | subprocess.Popen[str],
     workers: tuple[_CaptureWorker, ...],
 ) -> None:
-    if _process_group_has_live_members(process.pid):
+    if process_group_has_live_members(process.pid):
         _signal_unreaped_process_group(process, signal.SIGTERM)
         _wait_for_process_group_members(
             process.pid,
             _PROCESS_GROUP_GRACE_SECONDS,
         )
-    if _process_group_has_live_members(process.pid):
+    if process_group_has_live_members(process.pid):
         _signal_unreaped_process_group(process, signal.SIGKILL)
         _wait_for_process_group_members(
             process.pid,
@@ -420,35 +402,12 @@ def _wait_for_process_group_members(
     timeout: float,
 ) -> bool:
     deadline = time.monotonic() + timeout
-    while _process_group_has_live_members(process_group_id):
+    while process_group_has_live_members(process_group_id):
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             return False
         time.sleep(min(_WAIT_POLL_SECONDS, remaining))
     return True
-
-
-def _process_group_has_live_members(process_group_id: int) -> bool:
-    for entry in Path("/proc").iterdir():
-        if not entry.name.isdigit() or int(entry.name) == process_group_id:
-            continue
-        try:
-            raw = (entry / "stat").read_text()
-            fields = raw[raw.rfind(")") + 2 :].split()
-            state, process_group, session = (
-                fields[0],
-                int(fields[2]),
-                int(fields[3]),
-            )
-        except OSError, IndexError, ValueError:
-            continue
-        if (
-            state != "Z"
-            and process_group == process_group_id
-            and session == process_group_id
-        ):
-            return True
-    return False
 
 
 def _terminate_process_group(

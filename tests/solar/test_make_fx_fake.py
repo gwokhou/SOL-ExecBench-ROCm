@@ -52,7 +52,7 @@ def test_backend_records_mutation_effects(tmp_path: Path) -> None:
 def test_backend_rejects_data_dependent_branch(tmp_path: Path) -> None:
     """Converting fake scalars to bool must fail loudly, not trace."""
     sample = get_focused_sample("data_dependent_branch")
-    with pytest.raises(Exception, match="(?i)data.?dependent|bool|scalar"):
+    with pytest.raises(Exception, match=r"(?i)data.?dependent|bool|scalar"):
         extract_operator_graph(
             sample.bound_reference(),
             sample.inputs(200),

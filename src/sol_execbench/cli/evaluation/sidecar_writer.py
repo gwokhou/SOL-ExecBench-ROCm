@@ -74,7 +74,7 @@ class WrittenSidecars:
     performance_replay: Path | None
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _PerformanceSidecars:
     timing: Path | None
     access: Path | None

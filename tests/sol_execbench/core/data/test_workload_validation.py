@@ -46,7 +46,7 @@ def test_rejects_missing_and_extra_input_names() -> None:
         ],
     )
 
-    with pytest.raises(WorkloadContractError, match="missing=.*index.*extra"):
+    with pytest.raises(WorkloadContractError, match=r"missing=.*index.*extra"):
         validate_workload_contract(_definition(), workload)
 
 
@@ -61,7 +61,7 @@ def test_rejects_duplicate_or_uncovered_output_checks() -> None:
         ],
     )
 
-    with pytest.raises(WorkloadContractError, match="duplicates=.*value"):
+    with pytest.raises(WorkloadContractError, match=r"duplicates=.*value"):
         validate_workload_contract(_definition(), workload)
 
 

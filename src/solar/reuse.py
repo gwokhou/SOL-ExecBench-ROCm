@@ -209,10 +209,10 @@ class ReuseSession:
         # Serialized bytes have passed the output budget. Return detached data
         # so a caller cannot mutate the session's graphs or identity records.
         return ReuseResult(
-            output,
-            deepcopy(analysis),
-            record.model_copy(deep=True),
-            restricted.model_copy(deep=True)
+            output_dir=output,
+            analysis=deepcopy(analysis),
+            record=record.model_copy(deep=True),
+            restricted=restricted.model_copy(deep=True)
             if restricted is not None
             else None,
         )

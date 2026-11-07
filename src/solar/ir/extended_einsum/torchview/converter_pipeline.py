@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -50,19 +51,18 @@ import networkx as nx
 import yaml
 
 from solar.artifacts.yaml import NoAliasDumper
+from solar.composition import BoundComponent
 from solar.ir.extended_einsum.torchview.af_graph_builder import (
     build_af_graph_from_dict,
 )
-from solar.ir.extended_einsum.torchview.converter_contract import (
-    ConverterMixinContract,
-)
 from solar.ir.extended_einsum.torchview.converter_expansion import (
     OperationExpansionRequest,
-    expand_operation,
 )
 from solar.ir.extended_einsum.torchview.converter_models import (
     ConversionError,
+    ConversionGraph,
     PathLike,
+    normalize_conversion_graph,
 )
 from solar.ir.extended_einsum.torchview.semantics import (
     annotate_semantics,
@@ -71,7 +71,7 @@ from solar.ir.extended_einsum.torchview.semantics import (
 from solar.ir.extended_einsum.torchview.taco import add_taco_expressions
 
 
-class ConverterPipelineMixin(ConverterMixinContract):
+class GraphEmitter(BoundComponent):
     """Orchestrate loading, conversion, validation, and publication."""
 
     def convert(
@@ -128,7 +128,7 @@ class ConverterPipelineMixin(ConverterMixinContract):
 
     def _convert_loaded_graph(
         self,
-        pytorch_graph: dict[str, Any],
+        pytorch_graph: ConversionGraph,
         *,
         expand_complex_ops: bool,
     ) -> dict[str, Any]:
@@ -228,7 +228,7 @@ class ConverterPipelineMixin(ConverterMixinContract):
         self,
         src: Path,
         out_dir: Path,
-        pytorch_graph: dict[str, Any],
+        pytorch_graph: Mapping[str, Any],
     ) -> None:
         """Copy input graph to output directory."""
         try:
@@ -251,7 +251,7 @@ class ConverterPipelineMixin(ConverterMixinContract):
                     "Debug: Failed to copy/write canonical pytorch_graph.yaml"
                 )
 
-    def _load_pytorch_graph(self, path: Path) -> dict[str, Any] | None:
+    def _load_pytorch_graph(self, path: Path) -> ConversionGraph | None:
         """Load PyTorch graph from YAML or JSON file.
 
         Args:
@@ -275,9 +275,11 @@ class ConverterPipelineMixin(ConverterMixinContract):
                 return None
 
             if isinstance(data, dict) and "layers" in data:
-                return data
+                return normalize_conversion_graph(data)
             if isinstance(data, list):
-                return self._convert_node_list(data, model_name=path.stem)
+                return normalize_conversion_graph(
+                    self._convert_node_list(data, model_name=path.stem)
+                )
 
             if self._debug:
                 print(f"Debug: Unexpected structure in {path}")
@@ -315,7 +317,7 @@ class ConverterPipelineMixin(ConverterMixinContract):
 
     def _build_op_graph(
         self,
-        pytorch_graph: dict[str, Any],
+        pytorch_graph: Mapping[str, Any],
     ) -> tuple[nx.DiGraph, list[dict[str, Any]], list[dict[str, Any]]]:
         """Build operation-only graph by collapsing tensor nodes.
 
@@ -534,7 +536,7 @@ class ConverterPipelineMixin(ConverterMixinContract):
 
     def _build_einsum_graph(
         self,
-        pytorch_graph: dict[str, Any],
+        pytorch_graph: Mapping[str, Any],
         op_graph: nx.DiGraph,
         start_nodes_info: list[dict[str, Any]],
         param_nodes_info: list[dict[str, Any]] | None = None,
@@ -577,8 +579,7 @@ class ConverterPipelineMixin(ConverterMixinContract):
         for node_id in op_graph.nodes():
             node_data = dict(op_graph.nodes[node_id] or {})
             self._validate_input_types_alignment(node_id, node_data)
-            expansion = expand_operation(
-                self,
+            expansion = self._expand_operation(
                 OperationExpansionRequest(
                     node_id=node_id,
                     node=node_data,

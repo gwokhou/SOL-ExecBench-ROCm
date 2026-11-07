@@ -22,7 +22,7 @@ from sol_execbench.core.bench.rocm_profiler.hip_causality_models import (
 from sol_execbench.core.bench.rocm_profiler.hip_events import HIPEventOperation
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class HIPCausalTrace:
     """One bounded capture, with no joins across files or processes."""
 

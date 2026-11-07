@@ -902,7 +902,7 @@ class TestExecute:
             hip_solution,
             config,
         )
-        with pytest.raises(FileNotFoundError, match="benchmark_kernel.so"):
+        with pytest.raises(FileNotFoundError, match=r"benchmark_kernel\.so"):
             pkg.execute()
 
     def test_succeeds_with_so_for_cpp(
