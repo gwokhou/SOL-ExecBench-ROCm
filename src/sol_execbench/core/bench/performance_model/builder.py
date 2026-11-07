@@ -68,6 +68,9 @@ from sol_execbench.core.bench.performance_model.replay_evidence import (
 from sol_execbench.core.bench.performance_model.schedule_evidence import (
     build_schedule_evidence,
 )
+from sol_execbench.core.bench.performance_model.schedule_feed import (
+    ScopeScheduleFeed,
+)
 from sol_execbench.core.bench.performance_model.timing_evidence import (
     PerformanceTimingEvidenceSidecar,
     WorkloadTimingEvidence,
@@ -112,6 +115,7 @@ class PerformanceDiagnosticBuildRequest:
     calibration_profile_path: Path | None = None
     inference_profile_path: Path | None = None
     frontier_trace_path: Path | None = None
+    schedule_scope_path: Path | None = None
 
 
 class SemanticCharacterizationLoader(Protocol):
@@ -177,6 +181,7 @@ def build_performance_diagnostic(
     """Validate all input identities and build one diagnostic-only sidecar."""
     evidence = _load_build_evidence(request, semantic_loader=semantic_loader)
     manifest = evidence.manifest
+    feed = _load_schedule_feed(request, evidence)
     workload = _workload_diagnostic(
         _WorkloadDiagnosticInputs(
             trace=evidence.trace,
@@ -192,7 +197,10 @@ def build_performance_diagnostic(
             extra_reasons=[
                 *manifest.reason_codes,
                 *evidence.dispatch_reasons,
+                *feed.reasons,
             ],
+            cross_lane_verified=feed.cross_lane_verified,
+            event_edges=feed.event_edges,
         )
     )
     reasons = list(
@@ -1022,6 +1030,25 @@ def _counter_artifact_paths(
     if len(verified) != len(set(verified)):
         raise ValueError("counter_csv_citation_duplicate")
     return sorted(verified)
+
+
+def _load_schedule_feed(
+    request: PerformanceDiagnosticBuildRequest,
+    evidence: _BuildEvidence | object,
+) -> ScopeScheduleFeed:
+    """Bridge the opted-in scope archive into this workload's id space."""
+    from sol_execbench.core.bench.performance_model.schedule_feed import (
+        load_scope_schedule_feed,
+    )
+
+    if request.schedule_scope_path is None:
+        return ScopeScheduleFeed(False, (), None, ())
+    dispatches = getattr(evidence, "dispatches", ())
+    uuid = dispatches[0].workload_uuid if dispatches else None
+    known: dict[str, frozenset[str]] = {
+        uuid or "_workload": frozenset(item.dispatch_id for item in dispatches),
+    }
+    return load_scope_schedule_feed(request.schedule_scope_path, known)
 
 
 def _workload_diagnostic(
