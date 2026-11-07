@@ -113,26 +113,26 @@ The M-d scope-archive bridge landed and closed with all five gates green
   copy-only/bad-sha refusals); M2 builder seam; M3 CLI plumbing; M5
   default-invariance. performance_model + hip-torch-scope suites 386
   passed.
-- **M4 (open)**: real dual collection. The counter mirror runner is
-  landed (`scripts/internal/upgrade/md_feed_counter_runner.py`, same
-  dispatch sequence as the L2 case). Two rocprofv3 invocation forms were
-  open, with two decisive findings from 2026-11-07: (1) the host rocprofv3
-  CLI is categorically unavailable for torch apps — the production
-  `--kernel-trace` command form crashes identically with
-  `LLVM ERROR: PointerFlowAnalysisResult` (profiler LLVM vs torch LLVM in
-  one process), so this is not a `--pmc` artifact; the `-i <txt>` form
-  additionally hits an `inp_args[0]` wrapper parser bug. (2) The container
-  path is protocol-gated: ad-hoc `docker run` is refused by the image
-  guard ("Use scripts/run_docker.sh with a native host GPU owner"), and
-  `scripts/run_docker.sh --device=/dev/kfd --device=/dev/dri --
-  <collection>` completes preflight (`probes_allowed: true`,
-  `status: not_tested`) without executing the command. Next bounded step:
-  complete the wrapper's validation flow (e.g. `--allow-untested-target-
-  smoke`) and run, inside the container, `rocprofv3 --kernel-trace
-  --output-format json -- python scripts/internal/upgrade/
-  md_feed_counter_runner.py /work`, then extract the dispatch-id set from
-  the json (same SDK id space as counter CSVs) and bridge against the
-  real scope capture via `load_scope_schedule_feed`.
+- **M4 (verified)**: real dual collection closed the line. The counter
+  side ran the mirror case
+  (`scripts/internal/upgrade/md_feed_counter_runner.py`, same dispatch
+  sequence as the L2 event_chain case) inside the sanctioned container —
+  `run_docker.sh` with the engineering image tag
+  (`IMAGE_TAG=engineering-89cf9c1-20261031`, the default rocm/pytorch
+  target lacks `/usr/bin/amd-smi` for the clock entrypoint check),
+  `--allow-untested-target-smoke`, repo mounted read-only at
+  `/sol-execbench` — under the production in-process rocprofv3 SDK
+  session (`--kernel-trace --output-format json`): 13 kernel dispatches,
+  ids {1..13}. The bridge over the real 2026-11-06 scope capture then
+  verified edge `("11","12")` with `schedule_feed_edges_verified`
+  (`data/outputs/solar-l2-md-feed-20261107/m4-dual-collection.json`).
+  Path findings recorded: the host CLI crashes under both `--pmc` and
+  `--kernel-trace` with `LLVM ERROR: PointerFlowAnalysisResult`
+  (profiler LLVM vs torch LLVM on the host), the `-i <txt>` form hits a
+  wrapper parser bug, and ad-hoc `docker run` is refused by the image
+  guard. L2's M-d wiring debt is settled: the scope↔counter
+  dispatch-identity bridge plus explicit opt-in are production code,
+  fail-closed by default, and dual-collection verified.
 
 
 ### SOLAR L4 throughput closure — 2026-11-07
