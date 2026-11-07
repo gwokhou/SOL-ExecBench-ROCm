@@ -91,6 +91,38 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
+### SOLAR L2 M-d production feed — 2026-11-07 (landed, one GPU gate open)
+
+The M-d scope-archive bridge landed with its opt-in plumbing
+([spec](docs/internal/solar-l2-md-feed-acceptance-2026-11-07.md)):
+
+- **Bridge** (`performance_model/schedule_feed.py`): loads one qualified
+  `hip_torch_scope.v2` archive, verifies sibling sha bindings, requires
+  `schedule_complete` + copy-domain qualification, extracts only
+  dispatch↔dispatch cross-lane event links, converts int dispatch ids to
+  the counter string space, and binds to the workload by uuid or unique
+  covering id set. Fail-closed on any unresolved identity — no partial
+  feeds; `performance_authority` stays false.
+- **Wiring**: `PerformanceDiagnosticBuildRequest.schedule_scope_path`
+  opt-in; `_load_schedule_feed` feeds
+  `cross_lane_verified`/`event_edges` into the existing predict_hw path;
+  `sol-execbench diagnostics performance --schedule-scope PATH` CLI.
+  Without the opt-in the feed is empty (default bit-identical, M5).
+- **Gates green**: M1 bridge units on the REAL L2 event_chain capture
+  bytes (verified edge `("11","12")`, unknown-endpoint/incomplete/
+  copy-only/bad-sha refusals); M2 builder seam; M3 CLI plumbing; M5
+  default-invariance. performance_model + hip-torch-scope suites 386
+  passed.
+- **M4 (open)**: real dual collection. The counter mirror runner is
+  landed (`scripts/internal/upgrade/md_feed_counter_runner.py`, same
+  dispatch sequence as the L2 case). Two rocprofv3 invocation forms were
+  attempted: `-i <txt>` hits a wrapper parser bug (`inp_args[0]`
+  IndexError), `--pmc ... --` runs but the app exits rc=1 before CSV
+  output — next step is capturing the app-side traceback inside the
+  session (likely env/GPU visibility under the profiler session) and
+  re-running the bridge against both real artifacts.
+
+
 ### SOLAR L4 throughput closure — 2026-11-07
 
 L4's remaining three items closed measurement-first

@@ -131,6 +131,14 @@ def diagnostics_cli() -> None:
 @click.option("--frontier-trace", type=_FILE)
 @click.option("--calibration-profile", type=_FILE)
 @click.option("--inference-profile", type=_FILE)
+@click.option(
+    "--schedule-scope",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help=(
+        "Opt-in scope archive feeding verified cross-lane schedule edges "
+        "into the HW prediction (L2 M-d; fail-closed)."
+    ),
+)
 @click.option("--output", type=_OUTPUT, required=True)
 def performance_diagnostics_cli(
     evidence_manifest: Path,
@@ -138,6 +146,7 @@ def performance_diagnostics_cli(
     frontier_trace: Path | None,
     calibration_profile: Path | None,
     inference_profile: Path | None,
+    schedule_scope: Path | None,
     output: Path,
 ) -> CliResult:
     """Build T_pred(IR/HW), L/C/R, and structured performance advice."""
@@ -150,6 +159,7 @@ def performance_diagnostics_cli(
                 frontier_trace_path=frontier_trace,
                 calibration_profile_path=calibration_profile,
                 inference_profile_path=inference_profile,
+                schedule_scope_path=schedule_scope,
             ),
             semantic_loader=load_manifest_semantic_characterization,
         )
