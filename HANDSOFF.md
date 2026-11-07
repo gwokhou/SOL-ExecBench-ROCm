@@ -116,15 +116,23 @@ The M-d scope-archive bridge landed with its opt-in plumbing
 - **M4 (open)**: real dual collection. The counter mirror runner is
   landed (`scripts/internal/upgrade/md_feed_counter_runner.py`, same
   dispatch sequence as the L2 case). Two rocprofv3 invocation forms were
-  attempted; root cause captured: the CLI wrapper's preload crashes the
-  app with `LLVM ERROR: support is already registered for analysis:
-  PointerFlowAnalysisResult` (profiler LLVM vs torch LLVM in one process;
-  plus a harmless gfx1036 secondary-agent counter warning). The correct
-  M4 vehicle is the production **in-process SDK session** — i.e. run the
-  mirror case under the `evaluate --profile rocprofv3-counter` machinery
-  (same collection seam as the standing counter evidence) and then bridge
-  against the real scope capture; the `-i <txt>` wrapper form additionally
-  hits an `inp_args[0]` parser bug and is not usable on this host.
+  open, with two decisive findings from 2026-11-07: (1) the host rocprofv3
+  CLI is categorically unavailable for torch apps — the production
+  `--kernel-trace` command form crashes identically with
+  `LLVM ERROR: PointerFlowAnalysisResult` (profiler LLVM vs torch LLVM in
+  one process), so this is not a `--pmc` artifact; the `-i <txt>` form
+  additionally hits an `inp_args[0]` wrapper parser bug. (2) The container
+  path is protocol-gated: ad-hoc `docker run` is refused by the image
+  guard ("Use scripts/run_docker.sh with a native host GPU owner"), and
+  `scripts/run_docker.sh --device=/dev/kfd --device=/dev/dri --
+  <collection>` completes preflight (`probes_allowed: true`,
+  `status: not_tested`) without executing the command. Next bounded step:
+  complete the wrapper's validation flow (e.g. `--allow-untested-target-
+  smoke`) and run, inside the container, `rocprofv3 --kernel-trace
+  --output-format json -- python scripts/internal/upgrade/
+  md_feed_counter_runner.py /work`, then extract the dispatch-id set from
+  the json (same SDK id space as counter CSVs) and bridge against the
+  real scope capture via `load_scope_schedule_feed`.
 
 
 ### SOLAR L4 throughput closure — 2026-11-07
