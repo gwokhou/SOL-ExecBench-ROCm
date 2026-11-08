@@ -2,6 +2,8 @@
 
 日期：2026-11-08。规划锚点仍为 `8641b9dc78d00250ba1cf75d5e9434f9839e5ef4`；
 本次实现位于其后的工作树改动，尚未形成 B1 执行提交。
+后续状态：同日完成的[B1冻结](solar-b1-execution-freeze-2026-11-08.md)已将同一执行源码绑定到
+`160b9988c0f1c6f28be514651918419a39f0d438`；下文仍保留E1/C1验收当时的范围与结果。
 依据 [E0](solar-m0-judge-preregistration-2026-11-07.md)、
 [C0](solar-m0-llm-core-coverage-spec-2026-11-07.md) 和
 [迭代计划](solar-next-iteration-plan-2026-11-07.md)。动态任务状态见

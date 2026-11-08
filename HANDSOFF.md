@@ -91,18 +91,18 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
-### Next iteration — E1/C1 CPU integration complete 2026-11-08; B1 next
+### Next iteration — B1 frozen 2026-11-08; B2 pending
 
 [Plan](docs/internal/solar-next-iteration-plan-2026-11-07.md) and
 [roadmap](docs/internal/solar-evolution-roadmap-2026-11-05.md) define B0–B2
 (version baseline), E0–E2 (judge discrimination), C0–C3 (LLM_CORE coverage),
 and D0 (evidence-based follow-ups). B0/E0/C0 are complete as read-only
 inventory and frozen specifications; E1/C1 implementation and targeted CPU
-checks are complete. B1/B2/E2/C2/C3/D0 remain planned. The planning
+checks are complete. B1 is now complete; B2/E2/C2/C3/D0 remain planned. The planning
 anchor is `8641b9dc78d00250ba1cf75d5e9434f9839e5ef4`; earlier GPU receipts
 do not establish acceptance of that merged revision. Minimal experiment
 integration precedes the execution-source freeze and qualification refresh.
-The current authorization covered E1/C1 implementation and CPU checks only:
+The follow-up covered B1 local source/environment freeze and CPU checks:
 no GPU, real mapper, capacity probe, h0 instance/key/commitment, or real
 LLM_CORE target view was produced. Official scoring contracts are unchanged.
 The start700 pause and deferred L3-d/L5 scope remain unchanged.
@@ -112,7 +112,7 @@ The start700 pause and deferred L3-d/L5 scope remain unchanged.
 | B0 / E0 / C0 | Complete; frozen documents below unchanged | Historical evidence and research specifications, not current hardware acceptance |
 | E1 | Complete within minimal CPU scope | 12 candidates; 72 development inputs / 288 candidate units; 36/36 mandatory P1/P2 witnesses certified; 11 LayerNorm P3 reference/oracle discrepancies retained |
 | C1 | Integration and CPU checks complete | Validated target-view reader, two explicit paths, ready-only formal dispatch, identity-bound resume and optional cost/resource observations; no real target-view scan |
-| B1 | Next, not started | Review/freeze reproducible execution commit and environment/budgets; include E1/C1 diff and discrepancy interpretation |
+| B1 | Complete | Execution commit `160b9988c0f1c6f28be514651918419a39f0d438`, pinned runtime image/mapper/resources; host and container each 288 CPU tests passed; approved E0 arithmetic erratum |
 | B2 / E2 / C2 / C3 / D0 | Not started | Existing dependency gates and subsequent hardware scope still apply |
 
 [E1/C1 CPU acceptance](docs/internal/solar-e1-c1-cpu-acceptance-2026-11-08.md)
@@ -121,10 +121,33 @@ records 169 passing targeted tests plus quality guards. Evidence root:
 SHA-256 `7e66b09b58aa78fd10feb7d3ec14d410c1f5f83566ba822a253f8a9fdfcea65e`.
 The 739-file execution source manifest digest is
 `047b6fc082fd7450ca7d3a8f2555b0b90f63c2ccbd73b915401cc007afd7330d`.
-This is a working-tree CPU record, not a B1 frozen commit or E2 gate verdict.
+This was a working-tree CPU record; B1 verified the same source bytes against
+the execution commit below. It remains distinct from an E2 gate verdict.
 The 11 P3 disagreements cannot enter confirmed legal-control false-rejection
 statistics without resolving the actual reference/oracle label; no tolerance,
 seed, family, or candidate was adjusted to remove them.
+
+[B1 execution freeze](docs/internal/solar-b1-execution-freeze-2026-11-08.md):
+use the detached checkout at
+`data/outputs/solar-b1-freeze-20261108/execution-source/`, fixed at
+`160b9988c0f1c6f28be514651918419a39f0d438`, not the evolving ledger branch HEAD.
+The release-source validator passes. The selected runtime image is
+`sol-execbench:solar-b1-20261108`, content ID
+`sha256:1b92e7b1a59987aaef4449e7e6eec0fdb138de209b16e09e214f0dc5e17ddaaa`.
+Host Python 3.14.3 and container Python 3.14.4 are separate identities; both
+use Torch 2.14.0+rocm10.1.0 and passed the same 288 CPU checks independently.
+Mapper binary/provenance were verified without execution; 32 mapper threads,
+jobs=1, and 16,081,639,424-byte worker memory cap are fixed. Expected device
+UUID/configuration still require B2 observation; no current GPU qualification
+or capacity claim is made.
+
+The user approved [E0 r2-counts](docs/internal/solar-e0-cost-count-erratum-2026-11-08.md):
+144 cost sessions have `144 × 3 × (10+50) = 25,920` candidate warmup/timed calls,
+correcting r1's 23,040. Original M0 files remain byte-identical; session count,
+checks, candidates, holdout policy and the six-hour E2 GPU cap are unchanged.
+No holdout was generated. Evidence and command logs are indexed by
+`data/outputs/solar-b1-freeze-20261108/freeze-manifest.json`.
+Its SHA-256 is `1ceb04b24674daf7ed19090044761e3be29eb6ce879cfd679eef79d5d2f8280c`.
 
 - [B0 evidence inventory](docs/internal/solar-m0-baseline-evidence-2026-11-07.md):
   the prior full matrix's 489 referenced stage files match their hashes, but

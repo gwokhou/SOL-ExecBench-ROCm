@@ -67,6 +67,8 @@ release-status claims.
   [judge preregistration](internal/solar-m0-judge-preregistration-2026-11-07.md),
   [LLM_CORE coverage specification](internal/solar-m0-llm-core-coverage-spec-2026-11-07.md)
 - [E1/C1 implementation and CPU acceptance, 2026-11-08](internal/solar-e1-c1-cpu-acceptance-2026-11-08.md)
+- [B1 execution/environment freeze and CPU baseline](internal/solar-b1-execution-freeze-2026-11-08.md)
+- [Approved E0 cost-count arithmetic erratum](internal/solar-e0-cost-count-erratum-2026-11-08.md)
 - [Stage 0: capabilities, assumptions, and baseline](internal/solar-evolution-stage0.md)
 - [Acceptance sample specifications](internal/solar-evolution-acceptance.md)
 - [Stage 1–3 task specifications](internal/solar-evolution-tasks.md)
@@ -81,7 +83,8 @@ snapshots. Current implementation and evidence status are recorded in
 [HANDSOFF](../HANDSOFF.md#solar-evolution). The next-iteration document is a plan,
 not an execution record or authorization to start implementation or GPU work.
 The E1/C1 acceptance record covers the separately authorized implementation and
-CPU checks; B1/B2 and the real judge/LLM_CORE experiments remain pending.
+CPU checks. B1 freezes their execution commit and environment separately;
+B2 and the real judge/LLM_CORE experiments remain pending.
 
 Public contracts in this tree describe the current implementation. Superseded contracts,
 completed readiness snapshots, and engineering history are available from Git
