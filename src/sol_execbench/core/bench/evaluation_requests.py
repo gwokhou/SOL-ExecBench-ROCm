@@ -28,6 +28,10 @@ class EvaluationDependencies:
     driver_globals: dict[str, Any]
     real_stdout: TextIO
     timing_recorder: Callable[[dict[str, object]], None] | None = None
+    correctness_observer: (
+        Callable[[int, int, list[torch.Tensor], float, bool | None], None]
+        | None
+    ) = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

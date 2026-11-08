@@ -63,7 +63,11 @@ def _active_files() -> list[Path]:
 
 def _classification(relative_path: str, line: str) -> str | None:
     if (
-        relative_path == "src/sol_execbench/core/bench/judge/executor.py"
+        relative_path
+        in {
+            "src/sol_execbench/core/bench/judge/executor.py",
+            "tests/sol_execbench/core/bench/test_judge_experiment.py",
+        }
         and line.strip() == '"CUDA_VISIBLE_DEVICES": "",'
     ):
         return (
@@ -487,6 +491,18 @@ def _classification(relative_path: str, line: str) -> str | None:
 @pytest.mark.parametrize(
     ("path", "line", "accepted"),
     [
+        pytest.param(
+            "tests/sol_execbench/core/bench/test_judge_experiment.py",
+            '"CUDA_VISIBLE_DEVICES": "",',
+            True,
+            id="cpu-experiment-test-hides-devices",
+        ),
+        pytest.param(
+            "tests/sol_execbench/core/bench/test_judge_experiment.py",
+            '"CUDA_VISIBLE_DEVICES": "0",',
+            False,
+            id="cpu-experiment-test-does-not-allow-device-selection",
+        ),
         pytest.param(
             "src/sol_execbench/core/bench/judge/executor.py",
             '    "CUDA_VISIBLE_DEVICES": "",',

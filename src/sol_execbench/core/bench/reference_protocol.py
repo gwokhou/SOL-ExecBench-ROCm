@@ -515,7 +515,9 @@ class ReferenceClient:
                     os.waitpid(self._worker_pid, 0)
 
 
-def connect_reference_worker(*, device: str) -> ReferenceClient:
+def connect_reference_worker(
+    *, device: str, client_type: type[ReferenceClient] = ReferenceClient
+) -> ReferenceClient:
     """Connect to the orchestrator-owned worker and scrub its credentials."""
     request_fd = os.environ.pop(REFERENCE_REQUEST_FD_ENV, None)
     response_fd = os.environ.pop(REFERENCE_RESPONSE_FD_ENV, None)
@@ -528,7 +530,7 @@ def connect_reference_worker(*, device: str) -> ReferenceClient:
     writer = Connection(int(request_fd), readable=False, writable=True)
     reader = Connection(int(response_fd), readable=True, writable=False)
     worker_pid = int(raw_pid) if raw_pid else None
-    return ReferenceClient(
+    return client_type(
         reader,
         writer,
         token=token,

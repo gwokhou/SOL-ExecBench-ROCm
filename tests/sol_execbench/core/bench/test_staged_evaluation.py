@@ -88,6 +88,7 @@ def _request(
         check_integrity=check_integrity,
         driver_globals={},
         real_stdout=StringIO(),
+        correctness_observer=None,
     )
     return cast(
         WorkloadEvaluationRequest,

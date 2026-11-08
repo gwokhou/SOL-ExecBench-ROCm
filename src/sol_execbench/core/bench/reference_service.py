@@ -193,6 +193,9 @@ class ReferenceService:
             failure,
         )
 
+    def close(self) -> None:
+        """Release optional worker-owned observers after the channel closes."""
+
     def _request_context(
         self,
         request: dict[str, Any],
@@ -493,16 +496,20 @@ def serve_reference_worker(
     input_nonce: str,
     device: str,
     ready_stream: TextIO,
+    service_type: type[ReferenceService] = ReferenceService,
 ) -> None:
     """Serve one authenticated candidate worker over inherited private pipes."""
-    service = ReferenceService(
+    service = service_type(
         Path(staging_dir),
         device=device,
         input_nonce=input_nonce,
     )
     ready_stream.write("READY\n")
     ready_stream.flush()
-    _serve_connection(request_stream, response_stream, service, token=token)
+    try:
+        _serve_connection(request_stream, response_stream, service, token=token)
+    finally:
+        service.close()
 
 
 __all__ = [

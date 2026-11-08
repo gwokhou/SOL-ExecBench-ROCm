@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import time
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -114,7 +115,7 @@ def run_correctness_rounds(
             return CorrectnessRoundsResult(
                 failed=True, inputs=inputs, correctness=correctness
             )
-        inputs, ref_outputs = case.inputs, case.outputs
+        inputs = case.inputs
         user_outputs = _candidate_outputs(
             request=request,
             workload=workload,
@@ -138,36 +139,90 @@ def run_correctness_rounds(
             return CorrectnessRoundsResult(
                 failed=True, inputs=inputs, correctness=correctness
             )
-        if round_index == 0 and _first_round_failed(
-            emitter,
+        correctness, failed = _check_observed_round(
+            request,
             workload,
-            ref_outputs,
-            user_outputs,
-        ):
-            return CorrectnessRoundsResult(
-                failed=True, inputs=inputs, correctness=correctness
-            )
-        correctness, numerically_wrong = _compare_outputs(
-            definition,
-            inputs,
-            ref_outputs,
-            user_outputs,
-            workload,
-            correctness,
+            row_index,
             round_index,
+            emitter,
+            case,
+            user_outputs,
+            correctness,
         )
-        if numerically_wrong:
-            emitter.emit_status(
-                workload,
-                EvaluationStatus.INCORRECT_NUMERICAL,
-                correctness=correctness,
-            )
+        if failed:
             return CorrectnessRoundsResult(
                 failed=True, inputs=inputs, correctness=correctness
             )
     return CorrectnessRoundsResult(
         failed=False, inputs=inputs, correctness=correctness
     )
+
+
+def _check_observed_round(
+    request: WorkloadEvaluationRequest,
+    workload: Workload,
+    row_index: int,
+    round_index: int,
+    emitter: WorkloadTraceEmitter,
+    case: ReferenceCase,
+    user_outputs: list[torch.Tensor],
+    correctness: Correctness,
+) -> tuple[Correctness, bool]:
+    check_start = time.monotonic()
+    if round_index == 0 and _first_round_failed(
+        emitter,
+        workload,
+        case.outputs,
+        user_outputs,
+    ):
+        _observe_round(
+            request, row_index, round_index, user_outputs, check_start, None
+        )
+        return correctness, True
+    correctness, failed = _compare_outputs(
+        request.definition,
+        case.inputs,
+        case.outputs,
+        user_outputs,
+        workload,
+        correctness,
+        round_index,
+    )
+    _observe_round(
+        request, row_index, round_index, user_outputs, check_start, not failed
+    )
+    if failed:
+        emitter.emit_status(
+            workload,
+            EvaluationStatus.INCORRECT_NUMERICAL,
+            correctness=correctness,
+        )
+    return correctness, failed
+
+
+def _observe_round(
+    request: WorkloadEvaluationRequest,
+    row_index: int,
+    round_index: int,
+    outputs: list[torch.Tensor],
+    check_start: float,
+    numeric_passed: bool | None,
+) -> None:
+    """Observe actual outputs after incumbent checks, without replacing verdicts.
+
+    The default evaluator has no observer. Research drivers may inject a sink;
+    sink failures propagate rather than manufacturing a successful evaluation.
+    No candidate or reference callable is invoked by this seam.
+    """
+    observer = request.dependencies.correctness_observer
+    if observer is not None:
+        observer(
+            row_index,
+            round_index,
+            outputs,
+            time.monotonic() - check_start,
+            numeric_passed,
+        )
 
 
 def _candidate_outputs(
