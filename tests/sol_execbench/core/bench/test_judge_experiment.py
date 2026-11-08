@@ -21,8 +21,10 @@ from scripts.internal.solar.e2_contracts import (
     schedule,
 )
 from scripts.internal.solar.e2_postprocess import diagnose_incumbent
+from scripts.internal.solar.e2_runner import _session_result
 from scripts.internal.solar.e2_service import ObservationService
 from scripts.internal.solar.e2_staging import instrument_drivers, package
+from sol_execbench.cli.evaluation.runtime import EvaluationRuntimeSuccess
 from sol_execbench.core.bench.judge.candidate_catalog import candidate_callable
 from sol_execbench.core.bench.judge.contracts import (
     JudgeCase,
@@ -32,7 +34,9 @@ from sol_execbench.core.bench.judge.contracts import (
     JudgeTask,
 )
 from sol_execbench.core.bench.reference_service import ReferenceRequestError
+from sol_execbench.core.data.trace import EvaluationStatus
 from sol_execbench.core.process import run_in_process_group_to_files
+from tests.sol_execbench_type_helpers import make_trace, make_workload
 
 ROOT = Path(__file__).resolve().parents[4]
 
@@ -245,3 +249,63 @@ def test_activity_stop_retains_every_unreached_denominator(
     assert ledger["logical_units"] == 432
     assert ledger["correctness_sessions"] == 1296
     assert ledger["cost_sessions"] == 144
+
+
+@pytest.mark.parametrize(
+    ("status", "stops"),
+    [
+        pytest.param(
+            EvaluationStatus.RUNTIME_ERROR, True, id="runtime-error-stops"
+        ),
+        pytest.param(
+            EvaluationStatus.INVALID_REFERENCE, True, id="reference-error-stops"
+        ),
+        pytest.param(EvaluationStatus.TIMEOUT, True, id="trace-timeout-stops"),
+        pytest.param(
+            EvaluationStatus.REWARD_HACK, False, id="policy-rejection-retained"
+        ),
+        pytest.param(
+            EvaluationStatus.INCORRECT_NUMERICAL,
+            False,
+            id="numeric-rejection-retained",
+        ),
+    ],
+)
+def test_zero_exit_trace_failures_stop_activity_without_dropping_verdict(
+    tmp_path, status, stops
+):
+    observation_dir = tmp_path / "judge-observations"
+    observation_dir.mkdir()
+    (observation_dir / "observations.json").write_text(
+        json.dumps(
+            {
+                "observations": [],
+                "stop_reason": None,
+                "pending_correctness": False,
+            }
+        )
+    )
+    trace = make_trace(
+        definition="diagnostic-fixture",
+        solution="diagnostic-fixture",
+        workload=make_workload(uuid="fixture", axes={}, inputs={}),
+        evaluation={
+            "status": status,
+            "environment": {"hardware": "cpu"},
+            "timestamp": "2026-11-08T00:00:00Z",
+            "correctness": {}
+            if status is EvaluationStatus.INCORRECT_NUMERICAL
+            else None,
+        },
+    )
+    runtime = EvaluationRuntimeSuccess(
+        traces=[trace],
+        stdout=trace.model_dump_json(),
+        stderr="",
+        filtered_stderr="",
+        returncode=0,
+        profile_result=None,
+    )
+    result = _session_result(_session(), tmp_path, runtime)
+    assert result["original_evaluator_verdict"] == status.value
+    assert (result["stop_reason"] is not None) is stops

@@ -28,6 +28,7 @@ from sol_execbench.core.bench.reward_hack.static_review import (
 )
 from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype
 from sol_execbench.core.data.json_utils import atomic_write_json_value
+from sol_execbench.core.data.trace import EvaluationStatus
 from sol_execbench.core.integrity import sha256_bytes
 from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_DEVICE,
@@ -130,6 +131,14 @@ def _session_result(
             result["stop_reason"] = "evaluation_missing"
         else:
             result["original_evaluator_verdict"] = trace.evaluation.status.value
+            if trace.evaluation.status in {
+                EvaluationStatus.RUNTIME_ERROR,
+                EvaluationStatus.INVALID_REFERENCE,
+                EvaluationStatus.TIMEOUT,
+            }:
+                result["stop_reason"] = (
+                    "runtime_or_reference_failure_requires_review"
+                )
     observation = output / "judge-observations/observations.json"
     if observation.exists():
         payload = json.loads(observation.read_text())
