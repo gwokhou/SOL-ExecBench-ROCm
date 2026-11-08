@@ -63,6 +63,13 @@ def _active_files() -> list[Path]:
 
 def _classification(relative_path: str, line: str) -> str | None:
     if (
+        relative_path == "src/sol_execbench/core/bench/judge/executor.py"
+        and line.strip() == '"CUDA_VISIBLE_DEVICES": "",'
+    ):
+        return (
+            "CPU judge worker hides GPUs through the compatibility environment"
+        )
+    if (
         relative_path == "scripts/internal/upgrade/torch_scope_workload.py"
         and line.strip() == "a, b = a_cpu.cuda(), b_cpu.cuda()"
     ):
@@ -480,6 +487,30 @@ def _classification(relative_path: str, line: str) -> str | None:
 @pytest.mark.parametrize(
     ("path", "line", "accepted"),
     [
+        pytest.param(
+            "src/sol_execbench/core/bench/judge/executor.py",
+            '    "CUDA_VISIBLE_DEVICES": "",',
+            True,
+            id="cpu-judge-hides-devices",
+        ),
+        pytest.param(
+            "src/sol_execbench/core/bench/judge/executor.py",
+            '"CUDA_VISIBLE_DEVICES": "0",',
+            False,
+            id="cpu-judge-does-not-allow-device-selection",
+        ),
+        pytest.param(
+            "src/sol_execbench/core/bench/judge/other.py",
+            '"CUDA_VISIBLE_DEVICES": "",',
+            False,
+            id="cpu-judge-classification-is-path-specific",
+        ),
+        pytest.param(
+            "src/sol_execbench/core/bench/judge/executor.py",
+            'subprocess.run(["nvidia-smi"])',
+            False,
+            id="cpu-judge-does-not-allow-tool-execution",
+        ),
         pytest.param(
             "scripts/internal/upgrade/torch_scope_workload.py",
             "a, b = a_cpu.cuda(), b_cpu.cuda()",
