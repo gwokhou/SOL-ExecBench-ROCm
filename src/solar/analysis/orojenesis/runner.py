@@ -60,6 +60,7 @@ from solar.analysis.orojenesis.regions import (
     multi_einsum_region_problem,
 )
 from solar.artifacts import sha256_file
+from solar.observation import ObservationStage, observed_stage
 
 __all__ = [
     "find_multi_einsum_chains",
@@ -401,6 +402,7 @@ class OrojenesisRunner:
         self.mapper = self.home / "bin" / "timeloop-mapper"
         self.toolchain_identity = self._validate_toolchain()
 
+    @observed_stage(ObservationStage.MAPPER)
     def _run_mapper(
         self,
         command: Sequence[str],

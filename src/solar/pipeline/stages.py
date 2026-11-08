@@ -18,6 +18,7 @@ from solar.ir.contracts import (
 )
 from solar.ir.conversion import convert_operator_graph
 from solar.ir.registry import ir_backend
+from solar.observation import observed_stage
 from solar.rocm.architecture import ArchitectureProfile
 from solar.types import DynamicValue
 from solar.verification import verify_callable_conversion
@@ -51,6 +52,7 @@ class AnalysisWorkflowRequest(VerificationWorkflowRequest, Protocol):
     def orojenesis_home(self) -> str | Path | None: ...
 
 
+@observed_stage(SolarStage.GRAPH_EXTRACTION)
 def extract_request_graph(
     request: IRConversionRequest,
     staging: Path,
@@ -66,6 +68,7 @@ def extract_request_graph(
     )
 
 
+@observed_stage(SolarStage.IR_CONVERSION)
 def convert_request_graph(
     request: IRConversionRequest,
     operator: OperatorGraphArtifact,
@@ -79,6 +82,7 @@ def convert_request_graph(
     )
 
 
+@observed_stage(SolarStage.CONVERSION_VERIFICATION)
 def verify_request_graph(
     request: VerificationWorkflowRequest,
     graph: IRGraphArtifact,
@@ -98,6 +102,7 @@ def verify_request_graph(
     )
 
 
+@observed_stage(SolarStage.FORMAL_ANALYSIS)
 def analyze_request_graph(
     request: AnalysisWorkflowRequest,
     profile: ArchitectureProfile,

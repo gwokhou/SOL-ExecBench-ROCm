@@ -12,6 +12,7 @@ from typing import cast
 import click
 from rich.console import Console
 
+from sol_execbench.cli.commands.research_iteration import judge_development_cli
 from sol_execbench.cli.error_translation import (
     CliErrorRule,
     translate_cli_errors,
@@ -1076,3 +1077,6 @@ __all__ = [
     "release_package_cli",
     "release_verify_cli",
 ]
+
+
+diagnostics_cli.add_command(judge_development_cli)

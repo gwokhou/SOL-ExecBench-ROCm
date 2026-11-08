@@ -386,6 +386,56 @@ def _validate_materialized_distribution(
         raise ValueError("generated slots must have nine distinct axes")
 
 
+def validate_materialized_rule(
+    definition: Definition,
+    rule: WorkloadGenerationRule,
+    facts: ModelArchitectureFacts,
+    target: StaticTargetDescriptor,
+    cohort_id: str,
+    rule_distribution_id: str,
+    maximum_peak: int,
+    workloads: tuple[Workload, ...],
+    records: tuple[GeneratedWorkloadRecord, ...],
+) -> None:
+    """Validate existing metadata using its owning rules; allocate no inputs."""
+    if not records:
+        raise ValueError("materialized rule has no records")
+    _validate_materialized_distribution(
+        rule, facts, records[0].common_scale, workloads, records
+    )
+    for slot, workload, record in zip(
+        rule.slots, workloads, records, strict=True
+    ):
+        expected = _workload(
+            definition,
+            rule,
+            slot,
+            workload.axes,
+            cohort_id,
+            rule_distribution_id,
+        )
+        requirements = workload_requirements(
+            definition,
+            workload.axes,
+            rule.operation_family,
+            rule.quantization,
+            rule.capabilities,
+        )
+        expected_record = _record(
+            rule, slot, workload, requirements, records[0].common_scale
+        )
+        if workload != expected or record != expected_record:
+            raise ValueError(
+                "materialized workload payload differs from its generating rule"
+            )
+        if not _axes_within_limits(
+            workload.axes, facts
+        ) or not _requirements_fit(requirements, target, maximum_peak):
+            raise ValueError(
+                "materialized workload exceeds its declared resources"
+            )
+
+
 def _workload(
     definition: Definition,
     rule: WorkloadGenerationRule,

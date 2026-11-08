@@ -1,6 +1,6 @@
 # SOLAR 演进线：现状综合与下一阶段设计
 
-制定日期：2026-11-05。本文是调研综合加设计提案，不是已完成工作的验收记录。输入：
+制定日期：2026-11-05；规划更新：2026-11-08。本文是调研综合加设计提案，不是已完成工作的验收记录。输入：
 [SOLAR 边界](../SOLAR-BOUNDARY.md)、[阶段任务规格](solar-evolution-tasks.md)、
 [升级机会分析](solar-upgrade-opportunities-2026-10-11.md)、[阶段 1–5 交付](solar-resume-2026-10-26.md)、
 [mapper 后续与 GPU 提案](solar-mapper-followup-2026-10-26.md)、HANDSOFF 的 2026-10-26/29 条目，
@@ -8,38 +8,42 @@
 （`97355a7a` 等五个）。仓库级进度仍只在 [HANDSOFF](../../HANDSOFF.md#solar-evolution) 维护；
 本文若与其冲突，以 HANDSOFF 为准。
 
+当前执行顺序由 [下一轮迭代计划](solar-next-iteration-plan-2026-11-07.md) 细化：
+版本基线 → 裁判辨错 / LLM_CORE 覆盖 → 证据驱动的后续决策。
+2026-11-08 已按后续授权完成 E1/C1 的实现和 CPU 检查，详见
+[CPU 验收记录](solar-e1-c1-cpu-acceptance-2026-11-08.md)；没有运行 GPU、真实 mapper、容量探针或生成留出实例。
+§2 保留 L0–L5 的历史设计与日期记录。
+
+**M0 已于 2026-11-08 完成只读清点与文档冻结**：
+[B0](solar-m0-baseline-evidence-2026-11-07.md)、[E0](solar-m0-judge-preregistration-2026-11-07.md)、
+[C0](solar-m0-llm-core-coverage-spec-2026-11-07.md)。旧 full 的489个引用工件字节匹配，但语义源码身份
+已漂移；刷新仍在 B1/B2。E0 冻结432个候选—case单元；C0 固定core20项、合格视图180槽/360行。
+E1/C1 的最小诊断执行器、对照实现和 target-view 审计接缝已完成 CPU 验证；
+当前下一依赖是 B1 的执行提交与环境冻结，随后才是 B2。当前工作树的 CPU 结果不授予硬件资格。
+E1 开发集保留11项 LayerNorm P3 与 CPU reference 的原容差分歧；它们尚非已确认合法对照误拒，
+不得通过删项、换种子或改正式容差清除。真实 LLM_CORE 矩阵仍待 C2/C3。
+
 ## 0. 现状判定（哪些门已关、哪些开着）
 
-已闭合（有证据绑定）：
+规划锚点为 main `8641b9dc78d00250ba1cf75d5e9434f9839e5ef4`。
+提交说明记录 CPU 整合检查，没有当前合并版本 GPU 验收；下表的历史闭合不自动转移到该 SHA。
 
-- 阶段 1–5（访问区域并集、复用与三视图、反向需求与扫描、受限计算、收缩顺序搜索）
-  已落 main；`final-f32-01` 采集 32/32 槽位零数学差异，关闭 BASE-01 的 F04/F08/F06。
-- 真实受信 Orojenesis mapper 四点验证通过（F03-D）；GPU canary 两路径已通过
-  （CHECKPOINT-0553，2026-10-26 05:53 UTC）。早期文档"GPU canary 未执行"的叙述已被取代。
-  注意：该 checkpoint 证据存于外部研究工作树
-  `~/workspace/archive/2026-10-26/io/solar-stages1-5/data/outputs/`，本仓库 `data/outputs/`
-  无副本；HANDSOFF 中的仓库相对路径不指向现存文件。已决策（2026-11-05）：外部证据
-  不复制入仓库，L0 只登记路径与内容摘要。
-- 2026-10-29 科学快照：R 组 14 份 readiness 回执、12 个可计价、12 个完整 cache-aware 模型结果；
-  语义运行时身份 `005d6c03…` 未变，允许严格复用 `5d37` GPU 回执。
-- P0 资源审计已刷新到 ROCm 10.1 / Torch 2.14（`rx9060xt-amd-resource-v6`）。
-- 生产 eager 范围资格：`evaluate --profile rocprofv3-scope` 已验收（34 workload × 2 seed 扩大
-  验收全合格）。BASE-01 时期的一项提取回归测试当前通过（2026-11-05 复验）。
-
-开着的门（按主题归组，均为各文档明确声明，不是本文新发现）：
-
-| 组 | 缺口 | 出处 |
+| 主题 | 截至 2026-11-07 的已登记状态 | 下一步 |
 | --- | --- | --- |
-| A 正式资格 | R06 两个动态读取未计价、R08 两个边界拒绝（L0 已判终态：合法域外预期拒绝，保留于分母）；R04 已恢复（5d37 回执严格复用，L0 复核）；完整 corpus 发布资格未取得 | ACCEPTANCE-LEDGER（L0 登记）、10-29 快照 |
-| B 调度因果 | 受限域已闭合（2026-11-07，见 L2 执行结果）：复制域/默认 stream/事件边资格成立，`schedule_complete` 可资格；Graph、后台线程、跨进程维持拒绝；M-d 生产供数管道遗留 | L2 验收规格 + HANDSOFF 2026-11-07 |
-| C 表达能力 | 动态形状（ShapesSpec → 自有形状域契约）、静态 fake 取图、2.14 算子覆盖差分 | 升级机会 P1 |
-| D 吞吐工程 | mapper CPU 配额（当前每 mapper 全核）、有界批处理；均要求先测各 stage 时间 | 升级机会 P2 |
-| E 架构扩展 | gfx942/CDNA3 非正式适配需真机核验（counter 拼写、MFMA 探针、MI300X profile、内存类工作集） | HANDSOFF P1 |
-| F 研究对照 | Origami 分析式 tile 选择、grouped GEMM/CK 对照 | 升级机会 P3 |
+| 阶段 1–5 / L0 | 已集成；早期 mapper 与 GPU checkpoint 有历史记录 | B0 核对身份与索引；不重启阶段开发 |
+| L1 / AKA 资格 | R06 证明域已闭合；make_fx 在 `39329249` 上完成 static 163 → canary 112 → full 163 ready | B1/B2 冻结当前执行版本并刷新必要资格；不将 ready 等同完整形式回放 |
+| 外部读取证明 | 原 128 行阻塞清零；127 行 G4 完整，1 行大卷积回放内存 miss | 保留缺口和原分母，不裸跑重试 |
+| L2 调度与 M-d | 受限 eager 域及 opt-in 生产供数均闭合；Graph/IPC/跨进程仍拒绝 | 作为基线能力；不重复建设 M-d |
+| L3-a / L3-b | fake-static 已生产接入；形状域阶段 1 闭合 | 请求级形状域/符号化 mapper 仍未启动 |
+| L3-c / L4 | AKA 矩阵闭合；吞吐配额、有界提交审计闭合 | C 线扩至 LLM_CORE core；按实测成本再提优化 |
+| 裁判辨错 | 已有数值覆盖审计提案，没有本计划的有效性实验结果 | E 线固定三类任务、对照和独立 oracle |
+| L3-d / L5 / 研究对照 | 新前端默认延后；gfx942 非正式且仍需真机 | 只按明确覆盖缺口或真实消费者另行立项 |
 
-推断而非证明的事项：阶段 1–5 与 176 路径整合演练"已通过 10-30 的
-`f9d0d994`/`cb41d916` 落 main"是从提交内容与 HANDSOFF 时间线推断的；
-严格对应关系需按整合 handoff 的 main preimage 复核后再声称。
+外部阶段 1–5 checkpoint 仍在
+`<external-solar-workspace>/data/outputs/`；
+继承 2026-11-05 决策：只登记路径与内容摘要，不复制文件本体。
+若需声称旧 176 路径整合演练与 main 的严格对应，B0 仍须核对 handoff preimage；
+时间线或提交标题不足以代替该证明。
 
 ## 1. 设计原则（继承自既有边界，不新增放宽）
 
@@ -54,27 +58,28 @@
 
 ## 2. 演进线设计
 
-六条线（L0–L5），线间依赖见 §3。编号是文档引用号，不是公共 API 或 schema 标识。
+六条线（L0–L5）保留既有设计编号，不是公共 API 或 schema 标识。
+下列旧目标和带日期结果是历史脉络；当前待办以 §0、§3 和下一轮计划为准。
 
 ### L0 状态账实对齐（立即，纯 CPU/文档）
 
 HANDSOFF 最新条目已领先于多份 10-26 文档的"未执行 GPU"叙述。交付：HANDSOFF 与
 resume/mapper-followup 文档的交叉引用修正（追加状态不改写历史值）；
 `97355a7a` 等 main 新提交在 HANDSOFF 的对应登记；按整合 handoff
-（`~/workspace/archive/2026-10-26/io/solar-integration-prep-20261029/`）的
+（`<external-integration-workspace>/`）的
 main preimage 复核"176 路径整合已落 main"的推断并登记结论；登记外部工作树中
 GPU checkpoint / 整合 handoff 证据的路径与内容摘要（已决策：不复制文件本体，
 2026-11-05）；对 R04/R06/R08 逐槽位
 建立"当前状态 + 下一步动作 + 所需前置"的台账。不修改任何生产实现。
 
-优先级声明：[升级机会分析](solar-upgrade-opportunities-2026-10-11.md)（10-11）把形状域
+历史优先级声明（2026-11-05）：[升级机会分析](solar-upgrade-opportunities-2026-10-11.md)（10-11）把形状域
 列为 P1 主要投资；本路线把 L1 资格闭合排在 L3 之前。差异原因是排序时点：该分析的
 优先级产生于 R16 已 12 ready 与 GPU canary 通过之前——资格闭合的边际成本在当时
 被高估。若 L1 因硬件窗口不可得而停摆，L3-b 自动回到首要位置。
 
-### L1 正式资格闭合线（最高优先；硬件窗口是唯一硬前置）
+### L1 正式资格闭合线（历史 make_fx 链已闭合；新版本刷新归 B 线）
 
-目标：把 R 组 16 槽位推向终态并取得（或明确拒绝）完整 corpus 正式发布资格。
+原目标：把 R 组 16 槽位推向终态并取得（或明确拒绝）完整 corpus 正式发布资格。
 
 - L1-a（L0 已改判）容器 EROFS 环境前置：R04 两槽位经 5d37 回执严格复用已是
   ready/priceable/cache-aware 终态，EROFS（容器默认 `/home/sol-execbench/.triton`
@@ -94,7 +99,7 @@ GPU checkpoint / 整合 handoff 证据的路径与内容摘要（已决策：不
   （`SOLAR_GPU_APPROVED`、STABLE_PEAK、原生 L1/L2 锁）下跑完，
   复用 `evaluate --profile rocprofv3-scope` 的生产范围资格作为逐 workload 佐证。
   **2026-11-07 追记：全分母链闭合（make_fx 分母）**——L1-d 延迟的全分母
-qualify-canary/full 已在重建于 HEAD 的 workspace 上经生产 CLI 三级链
+qualify-canary/full 已在重建于当时 HEAD `39329249` 的 workspace 上经生产 CLI 三级链
 （static 163 → canary 112/112 ready → full **163/163 ready**）完成，
 证据 `data/outputs/solar-qualification-mfx-20261107/`；torchview 分母链
 仍开放（42 就绪缺口，见 L3-c 矩阵），不构成本闭合前置。详见 HANDSOFF
@@ -121,7 +126,7 @@ qualify-canary/full 已在重建于 HEAD 的 workspace 上经生产 CLI 三级�
 目标：在受控执行器域内把"完整跨 lane 调度"从永久开放变为受限域可资格；
 性能模型获得已验证调度边（`schedule_evidence.py` 的 unverified 路径出现 verified 分支）。
 
-**2026-11-07 执行结果（终态：受限域闭合；M-d 生产供数管道遗留）**：预固定验收规格
+**2026-11-07 执行结果（受限域闭合；M-d 随后也已闭合，见后文）**：预固定验收规格
 [solar-l2-schedule-causality-acceptance-2026-11-06.md](solar-l2-schedule-causality-acceptance-2026-11-06.md)。
 SDK 回执上游不可得判定成立，按 sanctioned 替代路径扩展受控执行器账本域：
 `hip_sdk_ledger` v2 新增引擎复制完成行与 launch/memcpy 原始 stream 句柄；
@@ -132,10 +137,14 @@ SDK 回执上游不可得判定成立，按 sanctioned 替代路径扩展受控�
 `data/outputs/solar-l2-schedule-20261106/`。`performance_schedule_evidence`
 v3 增加 `event_wait` 边与 `cross_lane_event_dependencies` 状态；
 `predict_hw` 消费 verified 边（无边时行为不变）。M-d 的生产供数管道
-（scope↔counter dispatch 标识桥、显式 opt-in）按规格 §7.4 登记遗留。
+（scope↔counter dispatch 标识桥、显式 opt-in）当时按规格 §7.4 登记遗留。
 Graph/IPC/跨进程维持拒绝。详见 HANDSOFF 2026-11-07 L2 条目。
 
-里程碑（顺序）：
+**2026-11-07 后续闭合**：[M-d 验收](solar-l2-md-feed-acceptance-2026-11-07.md)
+已完成生产 scope archive bridge、显式 `--schedule-scope` 和真实双采集核验；
+默认无 opt-in 行为保持不变，`performance_authority=false`。M-d 不再是遗留待办。
+
+原里程碑（已执行的顺序）：
 
 1. M-a 内存复制域依赖资格：dispatch 归属已验证，复制域依赖关系未验证——
    按 torch-scope 验收声明的缺口设计账本/回执核对。
@@ -153,7 +162,7 @@ Graph capture 与 IPC 在本线内保持显式拒绝。
 
 ### L3 表达能力线（中期；CPU 为主，可与其他线并行）
 
-按升级机会 P1 的三步，顺序固定：
+原升级机会 P1 的分步设计与历史结果：
 
 - L3-a 静态 fake 取图试点：仅 `make_fx_aten` 路径，默认路径不动。先测
   输入生成/trace/转换/回放/Orojenesis 各 stage 耗时与峰值内存，再决定改造。
@@ -162,8 +171,11 @@ Graph capture 与 IPC 在本线内保持显式拒绝。
   [solar-l3a-fake-static-pilot-acceptance-2026-11-05.md](solar-l3a-fake-static-pilot-acceptance-2026-11-05.md)
   （含一项日期勘误：R08/make_fx 声明为第二个预期失败）。测量 gate 16/16
   通过（与 L4 第 1 项同一活动交付）；试点 D1–D4 全过、adopt=true（8/8 槽
-  O1+O2+O3 全绿，提取墙钟 11–196×，GPU 峰值不升）。生产改造为后续线，
+  O1+O2+O3 全绿，提取墙钟 11–196×，GPU 峰值不升）。当时将生产改造列为后续线，
   另立验收。详见 HANDSOFF 2026-11-05 L3-a 条目。
+  **2026-11-07 后续闭合**：[生产接入](solar-lineb-fake-production-acceptance-2026-11-07.md)
+  已完成 163/163 图字节对账和 3 个代表槽 GPU 验证；4 个 rope 槽使用声明式真实取图回退。
+  11–196× 是先前试点的提取时间收益，不是整条分析链或当前合并版本的新测量。
 - L3-b 形状域契约：自有约束 AST（symbol、range、派生、整除、assumptions、
   source binding）；张量计算与形状/断言节点分离计价；第一阶段只在域验证后的
   具体 shape 上实例化现有 IR，artifact 记录实例与来源域。
@@ -183,12 +195,15 @@ Graph capture 与 IPC 在本线内保持显式拒绝。
   [solar-l3c-coverage-matrix-acceptance-2026-11-06.md](solar-l3c-coverage-matrix-acceptance-2026-11-06.md)。
   326 行全量矩阵 + canary 对账 0 漂移 + 家族 7/8（mutation 诚实为零）。
   头条：make_fx 就绪覆盖 163/163 严格优于 torchview 121/163；形式边界层
-  128 行 external-reads 未证明（normalization 家族主导）；conv 家族在
+  当时 128 行 external-reads 未证明（normalization 家族主导）；conv 家族在
   torchview 侧撞 mapper 7200s 生产预算（5/5）。可执行缺口清单已产出；
-  全分母资格链仍为 L1 延迟项，现被矩阵解锁。详见 HANDSOFF 2026-11-06 条目。
+  当时全分母资格链仍为 L1 延迟项，被矩阵解锁。详见 HANDSOFF 2026-11-06 条目。
+  **截至 2026-11-07 的后续状态**：128 行证明阻塞已清，127 个完整 G4 与 1 个内存 miss 分列；
+  make_fx 全分母资格链闭合。下一轮 C 线测 LLM_CORE，不复用 AKA 的 163/163 作为新语料结论。
 - L3-d 新前端（阶段 6，默认延后）：Affine Loop IR／LLM 修复／JAX 前端
   （stage0 C11 归 P3、"由实际覆盖缺口驱动"）。触发条件是 L3-c 覆盖矩阵指出
-  两条现有路径的系统性缺口；[论文演进记录](solar-paper-evolution-2026-10-19.md)
+  两条现有路径的系统性缺口；后续判断以 C 线的真实高价值模式及层级归因为依据，
+  不把容量不足或 adapter 未接通当作前端缺陷。[论文演进记录](solar-paper-evolution-2026-10-19.md)
   指出 v2 论文的真实跃迁正是可执行 Affine Loop IR 流程，故本项有论文对齐意义。
   在触发前不投入。
 
@@ -206,7 +221,8 @@ Graph capture 与 IPC 在本线内保持显式拒绝。
 
 现状修正：mapper 并发上限框架**已存在**——`solar_bridge/resource_policy.py` 的
 `formal_mapper_job_limit`（可见逻辑核÷单 mapper 线程数）已被
-`release_solar_runner` 与 `solar_bridge/scan.py` 消费。剩余真实缺口收窄为：
+`release_solar_runner` 与 `solar_bridge/scan.py` 消费。以下是闭合前的任务分解，
+完成状态见上段；不再作为当前待办：
 
 1. 各 stage 时间/内存测量报告（取图、验证、转换、分析、Orojenesis、发布），
    作为一切后续优化的前置；
@@ -231,36 +247,37 @@ gfx1200-only；不与 L1 争抢 gfx1200 窗口。
 
 ## 3. 依赖、排序与并行
 
+2026-11-07 起采用 [下一轮计划](solar-next-iteration-plan-2026-11-07.md) 的 B/E/C/D 任务：
+
 ```text
-L0 ──► L1 ──────────► (正式发布资格)
- │        └─ L1-c 自含（阶段 1/4 证明域扩展），不依赖 L3
- │   L4测量 ──► L4实施 ─┐（服务 L1 批量、L3 扫描）
- ├──► L3-a ──► L3-b ──► L3-c ──► (L3-d 新前端，仅当覆盖矩阵触发)
- └──► L2 规格/SDK 调研 ──► L2 M-a ──► M-b ──► M-c ──► M-d
-L5 独立硬件，随时可并行
+B0 ─┬─ E0 → E1 ─┐
+    └─ C0 → C1 ─┴→ B1 → B2 ─┬─ E2 ───────┐
+                             └─ C2 → C3 ─┴→ D0
 ```
 
-- 关键路径：L0 → L1（唯一硬前置是 gfx1200 独占窗口的可得性）。
-- L3-a/L4-测量立即可做（纯 CPU），不与 L1 争资源。
-- L2 前期是规格与 SDK 能力调研；M-a 不依赖 L1/L3。
-- L1-b 的判定结果决定 R08 是否转化为 L3-c 的覆盖项。
-- 建议节奏：L0 立即；L1 与 L3-a/L4 并行启动；L2 规格与 L3-b 设计评审合并进行。
+- P0：版本基线与身份闭合；必要接入代码先完成，再统一冻结，避免采集中改树使资格失效。
+- P1：三任务辨错实验与单配置 LLM_CORE core 全阶段矩阵；CPU 准备可并行，GPU 段串行。
+- 里程碑：规格冻结 → 执行基线 → 两项证据报告 → 后续决策；各 gate 见下一轮计划。
+- 条件项：L3-b 阶段 2、L3-d、新 DP、L5 与研究对照保持未启动，由 D0 提出独立范围。
+- E1/C1 的授权实现和 CPU 检查已完成；B1 尚未冻结执行提交，后续硬件活动不因路线图更新而获得授权。
 
 ## 4. 风险与开放问题
 
 | 风险 | 影响 | 缓解 |
 | --- | --- | --- |
-| gfx1200 独占窗口不可得 | L1 全线停摆 | L3/L4/L2 规格不受阻；窗口按维护窗口协调（README 锁协议） |
-| 容器 EROFS 在 L1-d 复现 | 资格链新跑失败被误判为代码回归 | 资格链运行前落实有界 tmpfs；失败时先对照 CHECKPOINT-0553 已知症状 |
-| SDK 回执上游不提供 | L2 M-a 起无法按首选路径验证 | 替代：受控执行器账本域扩展；Graph/IPC 维持拒绝 |
-| 形状域范围蔓延 | L3-b 吞噬多个周期 | 首批词汇冻结在升级机会文档所列；超出即另立任务 |
-| R06 证明域扩展蔓延 | 为单槽位过度建设动态索引词汇 | 已决策建设但词汇冻结在 top-k 路由类按 K 限界读取；无法覆盖则回退显式拒绝 |
-| 整合对应关系未严格证明 | 现状叙述失真 | L0 中按整合 handoff 的 preimage 复核后登记 |
-| gfx942 证据停留 spec-derived | 非正式结论被误引用 | 全部 `inexact` 标注；正式资格链不消费 |
+| 旧 GPU 证据被套到合并 HEAD | 基线结论失真 | B0 身份对照、B1 冻结、B2 刷新必要资格 |
+| oracle/比较精度不足 | 把裁判误差归给候选 | E1 独立自检；不确定单列；原契约与更强保证分开 |
+| 留出结果参与修规则 | 确认结果失去独立性 | 记录暴露；修复后换新预登记确认集 |
+| LLM_CORE 与 AKA 契约混用 | 虚假分母或未经验证的通过 | C0/C1 显式接入，保留生成及身份门禁 |
+| 容量/mapper/回放成本超预算 | OOM 或只剩容易样本 | 固定资源上限；原分母保留，INCOMPLETE 不改写为通过 |
+| gfx1200 独占窗口不可得 | B2/E2/C2/C3 GPU 段停留待执行 | 完成 CPU 准备和证据索引，不替代硬件验收 |
+| 单配置结果被外推 | 新语料/跨硬件主张过宽 | 分 profile/路径/阶段/配置报告；L5 另行立项 |
 
 ## 5. 与既有文档的关系
 
-本文不替代任何验收文档；各线进入实施时按惯例另立预固定验收规格
+本文不替代任何验收文档；下一轮任务分解和验收标准见
+[迭代计划](solar-next-iteration-plan-2026-11-07.md)，其 E0/C0/B1 负责在运行前补全冻结件。
+各线进入实施时按惯例固定验收规格
 （分母、oracle、负例先行），实施进度只登记进 HANDSOFF。
 阶段 1–5 的既有接口（reuse/scan/order/restricted）保持现合同；
 本文所有新能力均以"新增受限域"方式接入，不修改已验收语义。

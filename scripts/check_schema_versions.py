@@ -60,6 +60,8 @@ CURRENT_NUMERIC_SCHEMA_VERSIONS = MappingProxyType(
 READ_ONLY_MAPPING_TYPE = type(MappingProxyType({}))
 EXECBENCH_SCHEMA_REGISTRIES = frozenset(
     {
+        Path("src/sol_execbench/core/bench/judge/schema_versions.py"),
+        Path("src/sol_execbench/core/solar_bridge/schema_versions.py"),
         Path(
             "src/sol_execbench/core/bench/performance_model/diagnostic_schema_versions.py"
         ),

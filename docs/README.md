@@ -61,6 +61,12 @@ release-status claims.
 
 ## SOLAR evolution
 
+- [Current roadmap](internal/solar-evolution-roadmap-2026-11-05.md)
+- [Next iteration: version baseline, judge discrimination, and LLM_CORE coverage](internal/solar-next-iteration-plan-2026-11-07.md)
+- M0 freeze: [baseline evidence](internal/solar-m0-baseline-evidence-2026-11-07.md),
+  [judge preregistration](internal/solar-m0-judge-preregistration-2026-11-07.md),
+  [LLM_CORE coverage specification](internal/solar-m0-llm-core-coverage-spec-2026-11-07.md)
+- [E1/C1 implementation and CPU acceptance, 2026-11-08](internal/solar-e1-c1-cpu-acceptance-2026-11-08.md)
 - [Stage 0: capabilities, assumptions, and baseline](internal/solar-evolution-stage0.md)
 - [Acceptance sample specifications](internal/solar-evolution-acceptance.md)
 - [Stage 1–3 task specifications](internal/solar-evolution-tasks.md)
@@ -70,10 +76,12 @@ release-status claims.
 - [Stages 1–5 isolated CPU implementation and current evidence](internal/solar-resume-2026-10-26.md)
 - [Real mapper small-sample follow-up and proposed GPU validation](internal/solar-mapper-followup-2026-10-26.md)
 
-This isolated branch continues stages 1–5 under the user's renewed authorization.
-The original BASE-01 and archived stage reports remain historical snapshots.
-Current CPU completion and the separate real-mapper/R/GPU gates are recorded in
-[HANDSOFF](../HANDSOFF.md#solar-evolution) and the current report above.
+Stages 1–5 are integrated; BASE-01 and the dated stage reports remain historical
+snapshots. Current implementation and evidence status are recorded in
+[HANDSOFF](../HANDSOFF.md#solar-evolution). The next-iteration document is a plan,
+not an execution record or authorization to start implementation or GPU work.
+The E1/C1 acceptance record covers the separately authorized implementation and
+CPU checks; B1/B2 and the real judge/LLM_CORE experiments remain pending.
 
 Public contracts in this tree describe the current implementation. Superseded contracts,
 completed readiness snapshots, and engineering history are available from Git

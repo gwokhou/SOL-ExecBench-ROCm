@@ -91,6 +91,69 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
+### Next iteration — E1/C1 CPU integration complete 2026-11-08; B1 next
+
+[Plan](docs/internal/solar-next-iteration-plan-2026-11-07.md) and
+[roadmap](docs/internal/solar-evolution-roadmap-2026-11-05.md) define B0–B2
+(version baseline), E0–E2 (judge discrimination), C0–C3 (LLM_CORE coverage),
+and D0 (evidence-based follow-ups). B0/E0/C0 are complete as read-only
+inventory and frozen specifications; E1/C1 implementation and targeted CPU
+checks are complete. B1/B2/E2/C2/C3/D0 remain planned. The planning
+anchor is `8641b9dc78d00250ba1cf75d5e9434f9839e5ef4`; earlier GPU receipts
+do not establish acceptance of that merged revision. Minimal experiment
+integration precedes the execution-source freeze and qualification refresh.
+The current authorization covered E1/C1 implementation and CPU checks only:
+no GPU, real mapper, capacity probe, h0 instance/key/commitment, or real
+LLM_CORE target view was produced. Official scoring contracts are unchanged.
+The start700 pause and deferred L3-d/L5 scope remain unchanged.
+
+| Task | Current state | Evidence / next dependency |
+| --- | --- | --- |
+| B0 / E0 / C0 | Complete; frozen documents below unchanged | Historical evidence and research specifications, not current hardware acceptance |
+| E1 | Complete within minimal CPU scope | 12 candidates; 72 development inputs / 288 candidate units; 36/36 mandatory P1/P2 witnesses certified; 11 LayerNorm P3 reference/oracle discrepancies retained |
+| C1 | Integration and CPU checks complete | Validated target-view reader, two explicit paths, ready-only formal dispatch, identity-bound resume and optional cost/resource observations; no real target-view scan |
+| B1 | Next, not started | Review/freeze reproducible execution commit and environment/budgets; include E1/C1 diff and discrepancy interpretation |
+| B2 / E2 / C2 / C3 / D0 | Not started | Existing dependency gates and subsequent hardware scope still apply |
+
+[E1/C1 CPU acceptance](docs/internal/solar-e1-c1-cpu-acceptance-2026-11-08.md)
+records 169 passing targeted tests plus quality guards. Evidence root:
+`data/outputs/solar-e1-c1-cpu-20261108/`; final `development-final/development.json`
+SHA-256 `7e66b09b58aa78fd10feb7d3ec14d410c1f5f83566ba822a253f8a9fdfcea65e`.
+The 739-file execution source manifest digest is
+`047b6fc082fd7450ca7d3a8f2555b0b90f63c2ccbd73b915401cc007afd7330d`.
+This is a working-tree CPU record, not a B1 frozen commit or E2 gate verdict.
+The 11 P3 disagreements cannot enter confirmed legal-control false-rejection
+statistics without resolving the actual reference/oracle label; no tolerance,
+seed, family, or candidate was adjusted to remove them.
+
+- [B0 evidence inventory](docs/internal/solar-m0-baseline-evidence-2026-11-07.md):
+  the prior full matrix's 489 referenced stage files match their hashes, but
+  all 163 semantic receipts bind the old implementation hash. Source and
+  qualification-runner identities also differ. Preserve the historical
+  evidence; refresh required gates in B1/B2. Missing direct fake-GPU artifacts,
+  the old workspace environment file, and the large-conv replay miss are explicit.
+- [E0 preregistration](docs/internal/solar-m0-judge-preregistration-2026-11-07.md):
+  four cross-task strategy groups / 12 implementations, 432 candidate-case
+  units, 1296 independent-process correctness repetitions; input mechanisms,
+  oracle rules, development/holdout split, verdicts, costs, and budgets frozen.
+  At M0 freeze no candidate, input instance, holdout key, or experimental result
+  had been generated; subsequent development-only exposure is recorded above.
+- [C0 coverage specification](docs/internal/solar-m0-llm-core-coverage-spec-2026-11-07.md):
+  72 source-file hashes match the frozen manifest; all 36 Definitions classified,
+  exactly 20 core-selected. A qualifying standard-16gb target view must contain
+  180 workloads / 360 path rows; a smaller generated view remains incomplete.
+  The AKA-specific audit boundary, required adapter, stage attribution,
+  exposure rules, and resource budgets are fixed. No target view was generated.
+
+M0 document byte digests (2026-11-08; subsequent substantive edits require a
+dated revision before candidate/holdout exposure):
+
+| Document | SHA-256 |
+| --- | --- |
+| B0 evidence inventory | `84422daf4a6202ed03a7bda3c8d1309e31450a4104c9ab5c386291e258408077` |
+| E0 preregistration r1 | `4e8bea92afed0c345bad1a335e0833969f394ed152c24048f27500aadde9bc19` |
+| C0 coverage specification r1 | `eb1016f9a770afc14d080cd1d3a077ed09e327e6926b955d8a8dadf524405ec5` |
+
 ### SOLAR L2 M-d production feed — 2026-11-07 (closed)
 
 The M-d scope-archive bridge landed and closed with all five gates green
@@ -1074,6 +1137,6 @@ recovery preregistration proof). start700 is fully fresh — no
 `record-exposure -> freeze-fragment -> compose-held-out` reuse route applies,
 and no held-out payload may be composed from any prior `accepted=false` corpus.
 
-Historical local continuation (2026-10-26 05:28 UTC): real GPU canary exposed an internal readiness-to-IPC bridge defect, now repaired with focused CPU regression passing. Full final-source CPU rerun and GPU canary/R16 remain pending; all owned GPU resources are released. See [safe continuation checkpoint](data/outputs/solar-resume-20261026/mapper-followup/gpu-proposal/CHECKPOINT-0528.md). Old source-bound CPU/F32/mapper receipts remain historical.
+Historical local continuation (2026-10-26 05:28 UTC): real GPU canary exposed an internal readiness-to-IPC bridge defect, now repaired with focused CPU regression passing. Full final-source CPU rerun and GPU canary/R16 remain pending; all owned GPU resources are released. See the [external checkpoint path and digest index](docs/internal/solar-m0-baseline-evidence-2026-11-07.md) for CHECKPOINT-0528. Old source-bound CPU/F32/mapper receipts remain historical.
 
-Historical local checkpoint (2026-10-26 05:53 UTC): final source 455e281d passes 1449 CPU tests and F32 32/32; GPU canary passes both paths. R16 retains 12 ready, two R08 boundary rejections and two R04 cache-write blockers (Triton EROFS). All owned GPU resources and the shared lock are released. See [current execution checkpoint](data/outputs/solar-resume-20261026/mapper-followup/gpu-proposal/CHECKPOINT-0553.md); do not treat readiness as full accounting or formal qualification.
+Historical local checkpoint (2026-10-26 05:53 UTC): final source 455e281d passes 1449 CPU tests and F32 32/32; GPU canary passes both paths. R16 retains 12 ready, two R08 boundary rejections and two R04 cache-write blockers (Triton EROFS). All owned GPU resources and the shared lock are released. See the [external checkpoint path and digest index](docs/internal/solar-m0-baseline-evidence-2026-11-07.md) for CHECKPOINT-0553; do not treat readiness as full accounting or formal qualification.

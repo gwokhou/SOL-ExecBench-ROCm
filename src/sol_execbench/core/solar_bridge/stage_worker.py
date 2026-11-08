@@ -9,13 +9,17 @@ import argparse
 from pathlib import Path
 
 from sol_execbench.core.data.json_utils import load_json_value
+from sol_execbench.core.solar_bridge.analyzer import audit_workload_stages
 from sol_execbench.core.solar_bridge.models import (
     SolarReadinessStatus,
     SolarStage,
     SolarStageAuditOutcome,
     SolarStageAuditRequest,
 )
-from sol_execbench.core.solar_bridge.stage_audit import audit_workload_stages
+from sol_execbench.core.solar_bridge.observation import (
+    add_worker_diagnostic_arguments,
+    worker_diagnostics,
+)
 from sol_execbench.core.solar_bridge.worker_io import write_worker_response
 
 
@@ -24,16 +28,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("request", type=Path)
     parser.add_argument("response", type=Path)
+    add_worker_diagnostic_arguments(parser)
     args = parser.parse_args()
     request = SolarStageAuditRequest.from_dict(load_json_value(args.request))
     try:
-        outcome = audit_workload_stages(
-            problem_dir=request.problem_dir,
-            workload_uuid=request.workload_uuid,
-            output_dir=request.output_dir,
-            device=request.device,
-            ir_path=request.ir_path,
-        )
+        with worker_diagnostics(args):
+            outcome = audit_workload_stages(
+                problem_dir=request.problem_dir,
+                workload_uuid=request.workload_uuid,
+                output_dir=request.output_dir,
+                device=request.device,
+                ir_path=request.ir_path,
+            )
     except Exception as exc:  # noqa: BLE001 -- isolated worker boundary
         outcome = SolarStageAuditOutcome(
             status=SolarReadinessStatus.FAILED,

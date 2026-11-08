@@ -8,6 +8,7 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import Final
 
+from sol_execbench.core.bench.judge.schema_versions import JudgeArtifactSchema
 from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
     DiagnosticArtifactSchema,
 )
@@ -30,9 +31,14 @@ from sol_execbench.core.dataset.schema_versions import (
 )
 from sol_execbench.core.platform.schema_versions import PlatformArtifactSchema
 from sol_execbench.core.scoring.schema_versions import ReleaseArtifactSchema
+from sol_execbench.core.solar_bridge.schema_versions import (
+    CoverageArtifactSchema,
+)
 from sol_execbench.tools.amd_isa.schema_versions import AMDISAArtifactSchema
 
 ARTIFACT_SCHEMA_REGISTRIES: Final[tuple[type[StrEnum], ...]] = (
+    JudgeArtifactSchema,
+    CoverageArtifactSchema,
     BenchmarkArtifactSchema,
     DatasetArtifactSchema,
     PlatformArtifactSchema,

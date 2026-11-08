@@ -1,6 +1,6 @@
 # SOLAR 真实 mapper 小样本验证与 GPU 待批准方案
 
-2026-10-26，本机 `rocm-bench-host-01`，隔离分支
+2026-10-26，本机 `<local-rocm-host>`，隔离分支
 `codex/solar-stages1-5-resume`。这是 [阶段 1–5 CPU 交付](solar-resume-2026-10-26.md)
 之后的独立增量验证；旧收据、F32 的原分母与原始日志保持不变。
 
@@ -11,7 +11,7 @@
 运行前后相同。没有安装、构建新工具或改变全局配置。
 
 可读的既有 mapper 位于：
-`/home/runner/workspace/external/crosssol-eval/out/paper-a-local-20261005-v3/infrastructure-amd-v3/prerequisites/external/amd-orojenesis`。
+`<external-crosssol-workspace>/out/paper-a-local-20261005-v3/infrastructure-amd-v3/prerequisites/external/amd-orojenesis`。
 它是 62767848 字节的静态链接 ELF；二进制 SHA-256
 `18591892b1ecec3264ec729b0e457ec9f22422993f656ece40dba809c032d77a`
 与本仓库受信列表一致。当前 `OrojenesisRunner` 完整校验了来源、构建和 artifact
@@ -44,8 +44,8 @@ hypothetical，`publication_eligible=false`。
 
 ## GPU canary 与 R16：仅准备，未执行
 
-当前只读 sysfs 身份：AMD 目标 PCI `0000:05:00.0`、`card1`、`renderD128`，
-设备 ID `1002:7590`，unique ID `0000000000000001`，显存 17095983104 字节。
+当前只读 sysfs 身份：AMD 目标 PCI `<redacted-pci-bdf>`、`card1`、`renderD128`，
+设备 ID `1002:7590`，unique ID `<redacted-unique-id>`，显存 17095983104 字节。
 目标卡 `gpu_busy_percent` 返回 `EBUSY (16)`，不能把它当作空闲证据。没有
 运行 GPU 探测 kernel、canary、R 输入或性能测试。
 
@@ -101,11 +101,11 @@ mapper 文件名枚举在宿主部分系统/容器目录及固定镜像的两个
 
 本文"GPU canary 与 R16 方案已生成但未执行"的叙述已被后续执行取代，历史值
 保持原样。GPU canary 两路径已通过（外部隔离树
-`~/workspace/archive/2026-10-26/io/solar-stages1-5/` 下
+`<external-solar-workspace>/` 下
 `data/outputs/solar-resume-20261026/mapper-followup/gpu-proposal/CHECKPOINT-0553.md`，
 sha256 `7bd325f1977f098838ad5bb2e57f96815ef0b1ec47a84780f76071f173ebdc40`）。
 最终 R16 逐槽位台账见
-`~/workspace/archive/2026-10-26/io/solar-integration-prep-20261029/ACCEPTANCE-LEDGER.json`：
+`<external-integration-workspace>/ACCEPTANCE-LEDGER.json`：
 12 完整 + 2（R06 ready 未计价）+ 2（R08 预期边界拒绝）。本仓库 `data/outputs/`
 不含上述目录，正文里的仓库相对路径以上述外部位置为规范指向。汇总登记见
 HANDSOFF 的 2026-11-05 L0 条目；演进后续按

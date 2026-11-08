@@ -21,6 +21,7 @@ from sol_execbench.core.process import (
     redacted_file_tail,
     run_in_process_group_to_files,
 )
+from sol_execbench.core.process.resource_guard import WorkerResourceBudget
 from sol_execbench.core.solar_bridge.models import (
     SolarAnalysisOutcome,
     SolarAnalysisStatus,
@@ -36,12 +37,16 @@ def run_solar_worker(
     request: SolarWorkerRequest,
     *,
     timeout_seconds: float = 14_400,
+    observation_path: Path | None = None,
+    resource_budget: WorkerResourceBudget | None = None,
 ) -> SolarAnalysisOutcome:
     """Run one analysis with process-group cleanup and file-backed logs."""
     payload, failure = _run_worker_payload(
         request.to_dict(),
         module="sol_execbench.core.solar_bridge.worker",
         timeout_seconds=timeout_seconds,
+        observation_path=observation_path,
+        resource_budget=resource_budget,
     )
     if failure is not None:
         return _failed_outcome(request, *failure)
@@ -65,12 +70,16 @@ def run_solar_stage_worker(
     request: SolarStageAuditRequest,
     *,
     timeout_seconds: float = 14_400,
+    observation_path: Path | None = None,
+    resource_budget: WorkerResourceBudget | None = None,
 ) -> SolarStageAuditOutcome:
     """Run one readiness audit with bounded isolated-process cleanup."""
     payload, failure = _run_worker_payload(
         request.to_dict(),
         module="sol_execbench.core.solar_bridge.stage_worker",
         timeout_seconds=timeout_seconds,
+        observation_path=observation_path,
+        resource_budget=resource_budget,
     )
     if failure is not None:
         return _failed_stage_outcome(request, *failure)
@@ -96,6 +105,8 @@ def _run_worker_payload(
     *,
     module: str,
     timeout_seconds: float,
+    observation_path: Path | None = None,
+    resource_budget: WorkerResourceBudget | None = None,
 ) -> tuple[Mapping[str, Any] | None, tuple[str, str] | None]:
     with tempfile.TemporaryDirectory(
         prefix="sol-execbench-solar-worker-",
@@ -113,6 +124,21 @@ def _run_worker_payload(
             str(request_path),
             str(response_path),
         ]
+        if observation_path is not None:
+            command.extend(["--observation", str(observation_path.resolve())])
+        if resource_budget is not None:
+            command.extend(
+                [
+                    "--memory-budget",
+                    str(resource_budget.memory_bytes),
+                    "--evidence-root",
+                    str(resource_budget.evidence_root),
+                    "--evidence-budget",
+                    str(resource_budget.evidence_bytes),
+                    "--budget-failure",
+                    str(root / "budget-failure.json"),
+                ]
+            )
         try:
             completed = run_in_process_group_to_files(
                 command,
@@ -128,6 +154,12 @@ def _run_worker_payload(
             )
         except Exception as exc:  # noqa: BLE001 -- isolated process boundary
             return None, ("worker_execution_failed", str(exc))
+        failure_path = root / "budget-failure.json"
+        if failure_path.is_file():
+            return None, (
+                str(load_json_value(failure_path)["reason"]),
+                "isolated worker resource guard stopped the process group",
+            )
         if response_path.is_file():
             try:
                 payload = load_json_value(response_path)

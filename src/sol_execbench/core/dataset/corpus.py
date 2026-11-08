@@ -62,7 +62,9 @@ TARGET_VIEW_MANIFEST_FILENAME = "target-view-manifest.yaml"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class _GenerationContext:
+class GenerationContext:
+    """Pure identities shared by generation and materialized-view validation."""
+
     capacity_bytes: int
     capacity_id: str | None
     entry_distributions: dict[str, str]
@@ -86,7 +88,7 @@ class _ViewRequest:
     target: StaticTargetDescriptor
     profiles: tuple[CorpusProfile, ...]
     capacity: GPUMemoryQuotaEvidence
-    context: _GenerationContext
+    context: GenerationContext
     state: _GenerationState
     strict: bool
 
@@ -176,7 +178,7 @@ def generate_corpus(
     unknown = set(profiles) - set(manifest.profiles)
     if unknown:
         raise ValueError(f"unknown corpus profiles: {sorted(unknown)}")
-    context = _generation_context(
+    context = resolve_generation_context(
         manifest_path,
         manifest,
         target,
@@ -275,13 +277,14 @@ def _load_rule(path: Path) -> WorkloadGenerationRule:
     return WorkloadGenerationRule.model_validate(raw)
 
 
-def _generation_context(
+def resolve_generation_context(
     manifest_path: Path,
     manifest: CorpusManifest,
     target: StaticTargetDescriptor,
     profiles: tuple[CorpusProfile, ...],
     capacity: GPUMemoryQuotaEvidence,
-) -> _GenerationContext:
+) -> GenerationContext:
+    """Resolve pure generation identities without generating or probing inputs."""
     capacity_bytes = capacity_class_bytes(
         capacity.usable_budget_bytes,
         manifest.generation_policy.capacity_classes_gib,
@@ -317,7 +320,7 @@ def _generation_context(
         max_tensor_bytes=target.max_tensor_bytes,
         reference_ipc_limit_bytes=target.reference_ipc_limit_bytes,
     )
-    return _GenerationContext(
+    return GenerationContext(
         capacity_bytes=capacity_bytes,
         capacity_id=(
             f"mem-{capacity_bytes // (1024**3)}gib" if capacity_bytes else None
@@ -355,7 +358,7 @@ def _generate_entries(
     manifest: CorpusManifest,
     target: StaticTargetDescriptor,
     profiles: tuple[CorpusProfile, ...],
-    context: _GenerationContext,
+    context: GenerationContext,
 ) -> tuple[dict[str, GeneratedRuleResult], tuple[GenerationDecision, ...]]:
     facts = {
         source.source_id: source.architecture_facts
@@ -469,7 +472,7 @@ def _missing_detail(values: set[Any]) -> str:
 
 def _decision(
     entry: CorpusEntry,
-    context: _GenerationContext,
+    context: GenerationContext,
     status: GenerationDecisionStatus,
     detail: str,
     result: GeneratedRuleResult | None,
@@ -540,7 +543,7 @@ def _write_generated_view(
             for entry in request.manifest.entries
             for record in _records(request.state.results, entry)
         )
-        view_digest = _workload_view_digest(
+        view_digest = workload_view_digest(
             request.manifest_path,
             request.manifest,
             request.context,
@@ -597,13 +600,14 @@ def _write_problems(
     return tuple(problems)
 
 
-def _workload_view_digest(
+def workload_view_digest(
     manifest_path: Path,
     manifest: CorpusManifest,
-    context: _GenerationContext,
+    context: GenerationContext,
     records: tuple[GeneratedWorkloadRecord, ...],
     decisions: tuple[GenerationDecision, ...],
 ) -> str:
+    """Hash the canonical generated view for both its writer and reader."""
     fingerprints = {
         entry.semantic_id: entry.semantic_fingerprint
         for entry in manifest.entries
@@ -692,9 +696,12 @@ def _write_yaml(path: Path, model: CorpusTargetViewManifest) -> None:
 
 __all__ = [
     "TARGET_VIEW_MANIFEST_FILENAME",
+    "GenerationContext",
     "generate_corpus",
     "load_corpus_manifest",
     "load_target_descriptor",
+    "resolve_generation_context",
     "semantic_fingerprint",
     "validate_corpus",
+    "workload_view_digest",
 ]

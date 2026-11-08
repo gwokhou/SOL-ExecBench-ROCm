@@ -11,6 +11,7 @@ from pathlib import Path
 import click
 from rich.console import Console
 
+from sol_execbench.cli.commands.research_iteration import target_coverage_cli
 from sol_execbench.cli.commands.solar_exploration import (
     requirements_cli,
     scan_cli,
@@ -101,6 +102,7 @@ def solar_cli() -> None:
     """Build formal SOLAR artifacts; never time or score candidates."""
 
 
+solar_cli.add_command(target_coverage_cli)
 solar_cli.add_command(reprice_cli)
 solar_cli.add_command(requirements_cli)
 solar_cli.add_command(scan_cli)
