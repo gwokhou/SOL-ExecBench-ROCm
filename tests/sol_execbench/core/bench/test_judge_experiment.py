@@ -23,7 +23,11 @@ from scripts.internal.solar.e2_contracts import (
 from scripts.internal.solar.e2_postprocess import diagnose_incumbent
 from scripts.internal.solar.e2_runner import _session_result
 from scripts.internal.solar.e2_service import ObservationService
-from scripts.internal.solar.e2_staging import instrument_drivers, package
+from scripts.internal.solar.e2_staging import (
+    LayerNormReference,
+    instrument_drivers,
+    package,
+)
 from sol_execbench.cli.evaluation.runtime import EvaluationRuntimeSuccess
 from sol_execbench.core.bench.judge.candidate_catalog import candidate_callable
 from sol_execbench.core.bench.judge.contracts import (
@@ -144,19 +148,42 @@ def test_private_service_retains_rejected_actual_output_once(
 
 
 @pytest.mark.parametrize(
-    "activity", list(Activity), ids=lambda activity: activity.value
+    ("mode", "activity", "layernorm_reference"),
+    [
+        *(
+            pytest.param(
+                mode,
+                activity,
+                LayerNormReference.INCUMBENT,
+                id=f"{mode}-{activity}",
+            )
+            for mode in Mode
+            for activity in Activity
+        ),
+        pytest.param(
+            Mode.DIAGNOSTIC,
+            Activity.CORRECTNESS,
+            LayerNormReference.CENTERED_FP64_V1,
+            id="layernorm-centered-fp64",
+        ),
+    ],
 )
-@pytest.mark.parametrize("mode", list(Mode), ids=lambda mode: mode.value)
 def test_cpu_subprocess_uses_original_gate_and_exact_call_counts(
-    tmp_path, mode, activity
+    tmp_path, mode, activity, layernorm_reference
 ):
-    session = replace(_session(), mode=mode, activity=activity)
+    case_session = (
+        _session(JudgeTask.LAYERNORM, JudgeFamily.L1)
+        if layernorm_reference is LayerNormReference.CENTERED_FP64_V1
+        else _session()
+    )
+    session = replace(case_session, mode=mode, activity=activity)
     with package(
         ROOT,
         tmp_path,
         session,
         workload_uuid="cpu-subprocess",
         private_seed=1701,
+        layernorm_reference=layernorm_reference,
     ) as packager:
         packager.config.lock_clocks = False
         (tmp_path / "config.json").write_text(packager.config.model_dump_json())

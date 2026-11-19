@@ -91,20 +91,194 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
-### Next iteration — B1 frozen 2026-11-08; B2 pending
+### Next iteration — M1 complete, E2 evidence delivered
+
+Repository maintenance on 2026-11-08 retired seven superseded documents/campaign
+scripts and repaired historical navigation; see the
+[retirement decisions](docs/internal/history-retirement-2026-11-08.md).
+Production source, frozen M0 specifications and the B1 execution checkout remain
+unchanged. This cleanup does not advance B2 or refresh hardware qualification.
+Related CPU checks: 143 passed, one pre-existing residue-audit failure reproduced
+on the unchanged B1 checkout. The subsequent authorized repair classifies only
+the CPU judge worker's exact empty `CUDA_VISIBLE_DEVICES` setting; four targeted
+cases retain rejection of nonempty values, other paths and device tools.
+Host and pinned container each passed 18 audit tests. See the
+[revised freeze](docs/internal/solar-b1-refreeze-2026-11-08.md).
 
 [Plan](docs/internal/solar-next-iteration-plan-2026-11-07.md) and
 [roadmap](docs/internal/solar-evolution-roadmap-2026-11-05.md) define B0–B2
 (version baseline), E0–E2 (judge discrimination), C0–C3 (LLM_CORE coverage),
 and D0 (evidence-based follow-ups). B0/E0/C0 are complete as read-only
 inventory and frozen specifications; E1/C1 implementation and targeted CPU
-checks are complete. B1 is now complete; B2/E2/C2/C3/D0 remain planned. The planning
+checks are complete. B1/B2 are complete and M1 is closed;
+E2 is now explicitly authorized; its optional observation integration is frozen at
+`622c6ba3ee3bdb63694ac7e3bba225c205eac9aa`. Host and device-free fixed-container
+CPU checks each passed 138 tests. B2 passed all 8 slots and the original
+163 → 112 → 163 chain for this identity, followed by device-free receipt replay.
+E2 was then frozen with 2764 bound files and its one-shot holdout commitment
+was recorded before input materialization. It stopped at the frozen 20 GiB
+evidence quota: 325 correctness sessions completed, one was interrupted and
+970 were not reached; all 144 cost sessions were not reached. Repeated
+per-session COMGR caches account for 93.8% of retained experiment bytes.
+The complete 432-unit denominator is retained; this is terminal INCOMPLETE,
+not E2 acceptance or a cost result. CPU evidence audit and native GPU cleanup
+passed. Any repair/confirmation belongs to a separately preregistered activity
+with a new holdout commitment; no same-activity retry is authorized. See the
+[E2 ledger](docs/internal/solar-e2-execution-2026-11-08.md).
+On 2026-11-18, the separate development preflight verified a 256 MiB scratch
+quota and interruption receipts, then completed three correctness samples and
+three cost pairs. Both arms started with empty per-session disk caches and ran
+their own warmups. LayerNorm L3 was the heaviest measured diagnostic arm at
+160.86 s and 418.97 MiB retained online. The full 1,440-session budget model
+projects 17.14 GiB and 4.15 h of GPU ownership under the original order.
+The pressure scenario reaches 21.06 GiB and 6.30 h. Moving deferred oracle
+work after handback gives 5.40 h of GPU ownership in that scenario. Evidence
+budget validation still needs the development slots and interruption probes
+listed in the [budget report](docs/internal/solar-e2-successor-budget-2026-11-18.md).
+The first development batch finished all 26 correctness, 18 online cost, and
+9 device-free replay sessions, with clean GPU handback and 1,332 verified
+offline diagnostics. Its 201 correctness observations were reviewed against
+retained raw outputs for strict margins under observed reference error. Two
+LayerNorm rejection examples remain indeterminate. The second batch finished 32
+online GEMM and sum sessions and 16 device-free replays. A separate CPU fixture
+verified compact output archives and replayed all 12 input identities. The
+full-roster pressure estimates are 21.08 GiB in the original format and 19.05
+GiB with compact archives and one pending offline write reserved. The measured
+GPU schedule projects 5.10 hours when offline diagnostics follow handback.
+The compact r2 development run completed eight online sessions, four
+device-free replays and an independent audit of all 1,520 actual inputs.
+Late interruption checks finished. The version with cumulative oracle CPU
+accounting is frozen separately for the same development slots. The new
+entry validated 190 existing GEMM diagnostics in the pinned device-free
+image after correcting working-directory import shadowing. Admission for
+the full experiment still requires measurements from that capture version.
+The bundle preparer and independent terminal auditor are implemented. Eleven
+of twelve readiness paths were checked, with the current development
+measurement the remaining input. The auditor preserves all 1,440 online and
+72 deferred rows, checks the original evidence and distinguishes missing
+replay material from an observed verdict.
+The current capture measured all eight GPU sessions within their per-slot
+pressure forecasts, and its native handback is clean. Four device-free
+replays verified 760 diagnosed calls, and the independent check reconciled
+1,520 actual inputs across the eight online sessions. The
+[host entry](scripts/internal/solar/e2_successor_host.py) binds the native
+profile, image tag, exact container commands and host source to the verified
+freeze. It verifies same-owner handback before starting the CPU phases and
+checks the audit and report denominators before recording completion.
+The fixed-image verifier accepted freeze `2465714d6b15e04380430e9ddfeae30ed172e659d9daba8b9b4e198126382161`;
+the reconciled host plan is `4a78789aa3bb64acccfbb1ddb102f626c85db0d5ca1c348bfea74c95221abe7f`.
+Their receipts are in `data/outputs/solar-e2-successor-audit-dev-20261118/`.
+The planned device-free mount layout also passed a read-only run through
+the host launcher, including Docker container cleanup
+(`data/outputs/solar-e2-successor-host-probe-20261118/verification.json`).
+The user explicitly authorized the new holdout on 2026-11-18. The native GPU
+owner and one-time holdout commitment were recorded before online execution.
+The retained evidence root is
+`data/outputs/solar-e2-successor-frozen-20261118/successor-confirmation/`.
+The frozen roster contains 1,296 correctness sessions, 144 cost sessions,
+and 72 deferred replays. The successor ended INCOMPLETE after 500 correctness
+sessions completed, one stopped during thread-monitor startup, and 795 were
+unreached. All 144 cost sessions and 72 deferred replays were unreached.
+The failed attempt retained ten correctness observations and no trace
+verdict. GPU handback passed and the independent audit reproduced 4,340
+input identities. The original E2 stop is archived separately.
+
+The stopped container's cgroup counters were unavailable after exit.
+A device-free reproduction of the same parent-exit and worker-adoption
+lifecycle grew one zombie per iteration and hit the same thread-start
+failure at the 512 PID limit. With Docker init the same fixture finished
+560 iterations, with zero PID limit events. The E2-specific host command
+now requests init without raising the PID limit. The stopped activity
+and its exact host source are retained in the sealed manifest under
+`data/outputs/solar-e2-successor-worker-reap-20261118/`. The real
+device-free development evaluator reproduced the same error after 40
+sessions at a 48-PID limit. With init, all 48 sessions completed with
+zero PID limit events. This comparison uses only development inputs.
+The fixed image accepted the independent repair freeze
+`5077e043805976ed817361650de8c09f5214db8fd1d101ed95e32ad86d427c94`.
+The host command and init binary identity are recorded with the readiness
+receipt. All 13,757 retained files from the stopped activity were reverified.
+The user authorized the independent repair activity on 2026-11-18. The
+observed Docker init binary matched the freeze, and the fresh commitment
+and roster were bound before execution. The completed evidence root is
+`data/outputs/solar-e2-successor-reaping-frozen-20261118/successor-confirmation/`.
+The 2026-11-19 closeout reconciled 1,296 correctness sessions, 144 cost
+sessions and 72 offline replays. GPU handback and the independent evidence
+audit passed. The judge missed the E0 repeat-consistency criterion on 15
+LayerNorm L1 units. All 81 certified mandatory violations were detected.
+The numerical correctness stage had zero confirmed false rejections among
+558 certified controls, with 90 indeterminate controls and three separate
+timing-validation rejections retained. The full cost denominator has 72
+pairs, of which 66 support a full-path wall-clock comparison. See the
+[E2 result and exception index](docs/internal/solar-e2-successor-results-2026-11-19.md).
+The opt-in LayerNorm research reference passed CPU acceptance on all 3,669
+retained LayerNorm calls. All five past timing rejections passed the same-input
+numeric comparison, and the eight true L1/P2 breaches still failed.
+The [CPU repair receipt](docs/internal/solar-e2-layernorm-reference-cpu-2026-11-19.md)
+records the retained-evidence comparison. A separate gfx1200 freeze then passed
+all 156 development sessions, including 24/24 same-byte groups, 24/24
+permutation groups, and 18/18 expected numerical rejections for each of P1
+and P2. Device-free audit and native GPU handback passed. See the
+[LayerNorm development GPU results](docs/internal/solar-e2-layernorm-gpu-results-2026-11-19.md).
+
+**LayerNorm independent holdout confirmation passed (`186/186` sessions).**
+Under freeze SHA-256
+`de52da67655a2cf9e6d091f1df79fc5037cd5ab1d12999de096319511b049a4d` and explicit
+`--open-holdout` authorization, `centered_fp64_v1` completed all 186 `h0`
+sessions and 1,866 observed call archives on RX 9060 XT (`gfx1200`) with zero
+failures, interruptions, indeterminate controls, or unreached sessions.
+
+- [Holdout confirmation protocol](docs/internal/solar-e2-layernorm-holdout-protocol-2026-11-19.md)
+  and [holdout results](docs/internal/solar-e2-layernorm-holdout-results-2026-11-19.md)
+  record the sealed `holdout-commitment.json` (SHA-256
+  `36385b8b851e63b2febaa9051714ff728341bc25a418bfb57e222f9c07fa3ab2`,
+  `instances_materialized_at_commitment=0`) and post-online key disclosure.
+- All acceptance gates passed: `168/168` P0/P3 controls (`PASSED`, 10 correctness
+  + 1 trusted timing call each, both sides within 4 ULP), `24/24` `fixed`
+  same-byte groups, `24/24` `permuted` groups (also bit-exact after inverse
+  shift on both sides), `24/24` `independent_draw` groups (`3×11` distinct
+  inputs, zero repeat inconsistency), `9/9` `P1/L3` and `9/9` `P2/L0`
+  expected numerical rejections (`6/6` negative units distinct across repeats).
+- Host GPU wrapper wall time was `1,624.67 s` (`27m 05s`), cumulative oracle
+  CPU time `421.78 s`, allocated evidence `2,121,461,760` bytes (`~1.98 GiB`),
+  and scratch peak `237,568` bytes (`232 KiB`). Native GPU handback
+  (`gpu-closeout.json` SHA-256
+  `3e90f02f30805eb6cec1e66b1c3390570ed96962ba961c27747ce83749452372`) and
+  device-free audit (`audit.json` SHA-256
+  `cdfbd3efb03f3ddda9255aeb8e7762da032bc376664e9f9655309a32b26ffdaf`, exit 0 in
+  `9.05 s`) both passed.
+  [Freeze](data/outputs/solar-e2-layernorm-gpu-holdout-20261119/freeze.json) ·
+  [Audit](data/outputs/solar-e2-layernorm-gpu-holdout-20261119/audit.json) ·
+  [GPU handback](data/outputs/solar-e2-layernorm-gpu-holdout-20261119/holdout-confirmation/gpu-closeout.json)
+- Completed E2 and LayerNorm bundles under `data/outputs/` retain their own
+  immutable execution-time `capsule/` copies (subsequent repository cleanup
+  enforcing `kw_only=True` on helper dataclasses leaves sealed run capsules
+  untouched). Keep the earlier E2 denominators, raw verdicts, stops and
+  indeterminate rows in their historical records, including the 15 inconsistent
+  LayerNorm units and 90 indeterminate controls. C2/C3 remain unstarted. The
+  official scoring contract is unchanged pending D0.
+  [Original E2 closeout](docs/internal/solar-e2-successor-results-2026-11-19.md)
+
+See the [development batch ledger](docs/internal/solar-e2-successor-dev-batch1-2026-11-18.md).
+C2/C3/D0 remain unstarted. The planning
 anchor is `8641b9dc78d00250ba1cf75d5e9434f9839e5ef4`; earlier GPU receipts
 do not establish acceptance of that merged revision. Minimal experiment
 integration precedes the execution-source freeze and qualification refresh.
-The follow-up covered B1 local source/environment freeze and CPU checks:
-no GPU, real mapper, capacity probe, h0 instance/key/commitment, or real
-LLM_CORE target view was produced. Official scoring contracts are unchanged.
+The initial B1 follow-up covered local source/environment freeze and CPU checks.
+The initial B2 attempt passed GPU admission, then stopped during
+representative regression. A historical make_fx-only conv success had been
+incorrectly frozen as ready on both paths; the exact torchview rejection is
+reproduced on both old and current sources. The
+[independent erratum](docs/internal/solar-b2-representative-erratum-2026-11-08.md)
+was explicitly approved by the user; the r4 failure remains historical.
+r6 refroze the accepted 8-slot denominator and exact rejection expectations,
+then passed all 8 slots (6 ready + 2 boundary rejections) and the original
+static 163 → canary 112/112 ready → full 163/163 ready chain.
+The production verifier passed both during execution and in an independent
+GPU-free, read-only container. See the [B2 acceptance](docs/internal/solar-b2-acceptance-2026-11-08.md).
+That original B2 activity produced no mapper run, capacity probe, h0
+instance/key/commitment or real LLM_CORE target view. The separately authorized
+E2 activity has now opened h0. Official scoring contracts are unchanged.
 The start700 pause and deferred L3-d/L5 scope remain unchanged.
 
 | Task | Current state | Evidence / next dependency |
@@ -112,14 +286,21 @@ The start700 pause and deferred L3-d/L5 scope remain unchanged.
 | B0 / E0 / C0 | Complete; frozen documents below unchanged | Historical evidence and research specifications, not current hardware acceptance |
 | E1 | Complete within minimal CPU scope | 12 candidates; 72 development inputs / 288 candidate units; 36/36 mandatory P1/P2 witnesses certified; 11 LayerNorm P3 reference/oracle discrepancies retained |
 | C1 | Integration and CPU checks complete | Validated target-view reader, two explicit paths, ready-only formal dispatch, identity-bound resume and optional cost/resource observations; no real target-view scan |
-| B1 | Complete | Execution commit `160b9988c0f1c6f28be514651918419a39f0d438`, pinned runtime image/mapper/resources; host and container each 288 CPU tests passed; approved E0 arithmetic erratum |
-| B2 / E2 / C2 / C3 / D0 | Not started | Existing dependency gates and subsequent hardware scope still apply |
+| B1 | Complete; revised after audit fix | Baseline commit `043a6820b263ae6b214ab3816f970dd7f64dee03`; original 739-file/image/mapper identity and host/container 288-test baseline retained; new audit checks 18 each; E2 successor identity is recorded separately |
+| B2 | Complete under approved r6 | GPU admission; 8/8 representative outcomes; static 163 → canary 112 → full 163; independent CPU receipt replay and owner cleanup passed |
+| Original E2 execution | Terminal INCOMPLETE; evidence closeout passed | `622c6ba3`, 138 CPU tests per environment, B2 refresh/replay passed; 325 complete + 1 interrupted + 970 unreached correctness sessions; 0/144 cost sessions; 20 GiB evidence stop, no repair/retry after holdout exposure |
+| E2 successor preflight | Development measurements, budget check and freeze verification complete | Eight current-capture online sessions, four device-free replays, 1,520 inputs verified. Revised pressure estimate 19.05 GiB and 5.10 GPU hours. Host plan matches the verified freeze |
+| E2 successor execution | Terminal INCOMPLETE | 500 complete + 1 failed + 795 unreached correctness sessions, 0/144 cost and 0/72 offline. Thread creation failed, handback and partial evidence audit passed |
+| E2 repair successor and research closeout | Complete; judge did not meet E0 | 432 units, 1,296 correctness and 144 cost sessions, 72 replays. 15 LayerNorm L1 units failed repeat consistency. [Terminal report](docs/internal/solar-e2-successor-results-2026-11-19.md) |
+| LayerNorm research reference | Development GPU acceptance passed | 156/156 frozen sessions, 24/24 groups in each consistency check, 36/36 expected negative-control rejections and clean GPU handback. [GPU results](docs/internal/solar-e2-layernorm-gpu-results-2026-11-19.md) |
+| LayerNorm independent holdout | Complete; independent holdout GPU acceptance passed | `186/186` `h0` sessions (`1,866` calls), `24/24` fixed/permuted/independent-draw groups, `18/18` expected negatives, clean GPU handback & device-free audit (`cdfbd3ef...`). [Holdout results](docs/internal/solar-e2-layernorm-holdout-results-2026-11-19.md) |
+| C2 / C3 / D0 | Not started | No capacity probe or LLM_CORE target view; outside this E2 instruction |
 
 [E1/C1 CPU acceptance](docs/internal/solar-e1-c1-cpu-acceptance-2026-11-08.md)
 records 169 passing targeted tests plus quality guards. Evidence root:
 `data/outputs/solar-e1-c1-cpu-20261108/`; final `development-final/development.json`
 SHA-256 `7e66b09b58aa78fd10feb7d3ec14d410c1f5f83566ba822a253f8a9fdfcea65e`.
-The 739-file execution source manifest digest is
+The pre-E2 739-file execution source manifest digest is
 `047b6fc082fd7450ca7d3a8f2555b0b90f63c2ccbd73b915401cc007afd7330d`.
 This was a working-tree CPU record; B1 verified the same source bytes against
 the execution commit below. It remains distinct from an E2 gate verdict.
@@ -127,8 +308,8 @@ The 11 P3 disagreements cannot enter confirmed legal-control false-rejection
 statistics without resolving the actual reference/oracle label; no tolerance,
 seed, family, or candidate was adjusted to remove them.
 
-[B1 execution freeze](docs/internal/solar-b1-execution-freeze-2026-11-08.md):
-use the detached checkout at
+[Original B1 execution freeze](docs/internal/solar-b1-execution-freeze-2026-11-08.md):
+the retained detached checkout is at
 `data/outputs/solar-b1-freeze-20261108/execution-source/`, fixed at
 `160b9988c0f1c6f28be514651918419a39f0d438`, not the evolving ledger branch HEAD.
 The release-source validator passes. The selected runtime image is
@@ -138,14 +319,23 @@ Host Python 3.14.3 and container Python 3.14.4 are separate identities; both
 use Torch 2.14.0+rocm10.1.0 and passed the same 288 CPU checks independently.
 Mapper binary/provenance were verified without execution; 32 mapper threads,
 jobs=1, and 16,081,639,424-byte worker memory cap are fixed. Expected device
-UUID/configuration still require B2 observation; no current GPU qualification
-or capacity claim is made.
+UUID/configuration were subsequently observed under B2 admission, including
+32 physical CUs / 16 reported WGPs. Current make_fx readiness qualification is
+complete; full formal-analysis and capacity claims remain separate.
+The revised clean execution checkout is
+`data/outputs/solar-b2-20261108/execution-source/`, fixed at `043a6820`.
+See the [historical B2 checkpoint](docs/internal/solar-b2-checkpoint-2026-11-08.md)
+for failed attempts and CPU diagnosis, and the [B2 acceptance](docs/internal/solar-b2-acceptance-2026-11-08.md)
+for final gates. Full gate SHA-256 is
+`329eac6a88553223e37e3d0c60feed5aa144509fb1259b9de58d173c3b201695`.
+All owners restored AUTO; no GPU processes or containers remain, admission is
+ready and the original shared L1/L2 lock inodes are available.
 
 The user approved [E0 r2-counts](docs/internal/solar-e0-cost-count-erratum-2026-11-08.md):
 144 cost sessions have `144 × 3 × (10+50) = 25,920` candidate warmup/timed calls,
 correcting r1's 23,040. Original M0 files remain byte-identical; session count,
 checks, candidates, holdout policy and the six-hour E2 GPU cap are unchanged.
-No holdout was generated. Evidence and command logs are indexed by
+No holdout was generated during B1. Its evidence and command logs are indexed by
 `data/outputs/solar-b1-freeze-20261108/freeze-manifest.json`.
 Its SHA-256 is `1ceb04b24674daf7ed19090044761e3be29eb6ce879cfd679eef79d5d2f8280c`.
 
@@ -914,7 +1104,7 @@ schema checks, with identical before/after source identity
 Each phase retains its own source archive, command logs, JUnit and earlier
 failed attempts under ignored `data/outputs/solar-resume-20261026/`.
 Final F32 collection and documentation closure are recorded in the
-[current implementation report](docs/internal/solar-resume-2026-10-26.md).
+[2026-10-26 CPU implementation report](docs/internal/solar-resume-2026-10-26.md).
 
 The fixed installed image uses CPU only, four CPU quota, 8 GiB memory, one test
 worker and no network. No software was installed. The primary worktree's 86
@@ -924,7 +1114,7 @@ snapshots; their counts are not substituted for these runs.
 
 A subsequent same-source F03-D real-mapper check passed both IR paths at
 64/4096 B capacity (420/196 B traffic). See the
-[mapper follow-up and proposed GPU validation](docs/internal/solar-mapper-followup-2026-10-26.md).
+[historical mapper follow-up and GPU proposal](docs/internal/solar-mapper-followup-2026-10-26.md).
 Broader real-mapper coverage, all 16 real-workload R slots, GPU validation
 and formal publication qualification remain open. CPU fixtures and model-only
 contraction search do not establish device speedups. The operator-paused

@@ -2,6 +2,8 @@
 
 import struct
 from dataclasses import replace
+from enum import StrEnum
+from functools import cache
 from pathlib import Path
 
 from scripts.internal.solar.e2_contracts import PRIVATE_FILE, Activity, Session
@@ -9,6 +11,7 @@ from sol_execbench.core.bench.config import BenchmarkConfig
 from sol_execbench.core.bench.judge.candidate_catalog import candidate_solution
 from sol_execbench.core.bench.judge.contracts import (
     JudgeInstance,
+    JudgeStrategy,
     JudgeTask,
     load_case_problem,
 )
@@ -20,15 +23,46 @@ from sol_execbench.driver.problem_packager import ProblemPackager
 FACTORY_NAME = "judge_experiment_inputs"
 
 
+class LayerNormReference(StrEnum):
+    """Explicit reference choice for staged E2 LayerNorm research."""
+
+    INCUMBENT = "incumbent"
+    CENTERED_FP64_V1 = "centered_fp64_v1"
+
+
+@cache
+def _centered_layernorm_source() -> str:
+    return (
+        Path(__file__)
+        .with_name("e2_layernorm_reference.py")
+        .read_text(encoding="utf-8")
+    )
+
+
 def problem(
-    repository: Path, session: Session, workload_uuid: str
+    repository: Path,
+    session: Session,
+    workload_uuid: str,
+    *,
+    layernorm_reference: LayerNormReference = LayerNormReference.INCUMBENT,
 ) -> tuple[Definition, Workload]:
     """Bind the original checks while keeping exposure roles out of public metadata."""
     case = session.case
+    layernorm_reference = LayerNormReference(layernorm_reference)
+    if (
+        layernorm_reference is not LayerNormReference.INCUMBENT
+        and case.task is not JudgeTask.LAYERNORM
+    ):
+        raise ValueError("the research reference requires a LayerNorm session")
     definition, workload = load_case_problem(
         repository, replace(case, instance=JudgeInstance.DEVELOPMENT_0)
     )
-    reference = definition.reference + (
+    reference = (
+        _centered_layernorm_source()
+        if layernorm_reference is LayerNormReference.CENTERED_FP64_V1
+        else definition.reference
+    )
+    reference += (
         f"\n\ndef {FACTORY_NAME}(axes_and_scalars, device):\n"
         "    from scripts.internal.solar.e2_inputs import factory\n"
         f"    return factory({case.task.value!r}, {case.family.value!r}, axes_and_scalars, device)\n"
@@ -82,15 +116,38 @@ def package(
     *,
     workload_uuid: str,
     private_seed: int,
+    layernorm_reference: LayerNormReference = LayerNormReference.INCUMBENT,
 ) -> ProblemPackager:
     """Prepare a one-shot evaluation, with private metadata removed before READY."""
-    definition, workload = problem(repository, session, workload_uuid)
+    layernorm_reference = LayerNormReference(layernorm_reference)
+    definition, workload = problem(
+        repository,
+        session,
+        workload_uuid,
+        layernorm_reference=layernorm_reference,
+    )
+    solution = candidate_solution(
+        session.case.task, session.strategy, definition.name
+    )
+    if (
+        layernorm_reference is LayerNormReference.CENTERED_FP64_V1
+        and session.strategy is JudgeStrategy.REFERENCE
+    ):
+        (source,) = solution.sources
+        solution = solution.model_copy(
+            update={
+                "name": f"{solution.name}-{layernorm_reference}",
+                "sources": [
+                    source.model_copy(
+                        update={"content": _centered_layernorm_source()}
+                    )
+                ],
+            }
+        )
     packager = ProblemPackager(
         definition,
         [workload],
-        candidate_solution(
-            session.case.task, session.strategy, definition.name
-        ),
+        solution,
         config(session),
         output,
         keep_output_dir=True,
