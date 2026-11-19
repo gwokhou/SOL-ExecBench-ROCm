@@ -63,6 +63,14 @@ def _active_files() -> list[Path]:
 
 def _classification(relative_path: str, line: str) -> str | None:
     if (
+        relative_path == "scripts/internal/solar/e2_successor_host.py"
+        and line.strip() == '"CUDA_VISIBLE_DEVICES": "",'
+    ):
+        return (
+            "E2 device-free CPU container hides GPUs through the compatibility "
+            "environment"
+        )
+    if (
         relative_path
         in {
             "src/sol_execbench/core/bench/judge/executor.py",
@@ -491,6 +499,24 @@ def _classification(relative_path: str, line: str) -> str | None:
 @pytest.mark.parametrize(
     ("path", "line", "accepted"),
     [
+        pytest.param(
+            "scripts/internal/solar/e2_successor_host.py",
+            '                "CUDA_VISIBLE_DEVICES": "",',
+            True,
+            id="e2-cpu-container-hides-devices",
+        ),
+        pytest.param(
+            "scripts/internal/solar/e2_successor_host.py",
+            '"CUDA_VISIBLE_DEVICES": "0",',
+            False,
+            id="e2-cpu-container-does-not-allow-device-selection",
+        ),
+        pytest.param(
+            "scripts/internal/solar/other.py",
+            '"CUDA_VISIBLE_DEVICES": "",',
+            False,
+            id="e2-cpu-container-classification-is-path-specific",
+        ),
         pytest.param(
             "tests/sol_execbench/core/bench/test_judge_experiment.py",
             '"CUDA_VISIBLE_DEVICES": "",',

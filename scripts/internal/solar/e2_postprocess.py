@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 import torch
 
+from scripts.internal.solar.e2_archive_arrays import read_output_arrays
 from scripts.internal.solar.e2_contracts import Session
 from scripts.internal.solar.e2_observation import (
     Observation,
@@ -47,10 +48,11 @@ def decode_observation(path: Path, coordinate: dict[str, Any]) -> Observation:
             },
         )
         dtype = dtypes[str(arrays["output_dtype"])]
+        outputs = read_output_arrays(arrays)
         return Observation(
             inputs=inputs,
-            reference=torch.tensor(arrays["reference"], dtype=dtype),
-            actual=torch.tensor(arrays["actual"], dtype=dtype),
+            reference=torch.tensor(outputs["reference"], dtype=dtype),
+            actual=torch.tensor(outputs["actual"], dtype=dtype),
             coordinate=coordinate,
         )
 

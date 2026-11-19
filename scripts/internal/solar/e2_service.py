@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import torch
 from safetensors.torch import load
 
@@ -50,6 +51,8 @@ from sol_execbench.core.integrity import sha256_bytes
 
 class ObservationService(ReferenceService):
     """Never import candidate code, send oracle data, or add candidate invocations."""
+
+    compact_output_evidence = False
 
     def __init__(self, staging_dir: Path, **kwargs: Any) -> None:
         """Consume private session state before the orchestrator starts the candidate."""
@@ -242,6 +245,17 @@ class ObservationService(ReferenceService):
             )
             self._record(observation)
 
+    def _diagnose_observation(
+        self, observation: Observation
+    ) -> tuple[dict[str, object], dict[str, np.ndarray]]:
+        return diagnose(
+            self.case,
+            self.strategy,
+            observation,
+            self.definition,
+            self.workloads[0],
+        )
+
     def _record(self, observation: Observation) -> None:
         if len(self.rows) >= MAX_SESSION_OBSERVATIONS:
             raise ReferenceRequestError("judge actual-call budget exceeded")
@@ -251,13 +265,7 @@ class ObservationService(ReferenceService):
         }
         if self.mode is Mode.DIAGNOSTIC and self.stop_reason is None:
             try:
-                diagnostic, extra = diagnose(
-                    self.case,
-                    self.strategy,
-                    observation,
-                    self.definition,
-                    self.workloads[0],
-                )
+                diagnostic, extra = self._diagnose_observation(observation)
             except (OracleUncertainError, TimeoutError, ValueError) as exc:
                 self.stop_reason = f"{type(exc).__name__}: {exc}"
                 diagnostic = {
@@ -265,7 +273,9 @@ class ObservationService(ReferenceService):
                     "message": self.stop_reason,
                 }
         encode_start = time.monotonic()
-        record, payload = encode_observation(observation, extra)
+        record, payload = encode_observation(
+            observation, extra, compact=self.compact_output_evidence
+        )
         record["evidence_encoding_wall_seconds"] = (
             time.monotonic() - encode_start
         )

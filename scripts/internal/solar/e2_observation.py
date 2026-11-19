@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 
+from scripts.internal.solar.e2_archive_arrays import compact_output_arrays
 from scripts.internal.solar.e2_contracts import ORACLE_TIMEOUT_SECONDS
 from sol_execbench.core.bench.judge.binary_oracle import exact_dyadic_output
 from sol_execbench.core.bench.judge.contracts import (
@@ -142,6 +143,8 @@ def _diagnose(
 def encode_observation(
     observation: Observation,
     extra_arrays: dict[str, np.ndarray],
+    *,
+    compact: bool = False,
 ) -> tuple[dict[str, object], bytes]:
     """Compress raw finite-precision tensors losslessly while still worker-private."""
     inputs = observation.inputs
@@ -167,8 +170,10 @@ def encode_observation(
             for key, value in inputs.construction.items()
         }
     )
+    if compact:
+        arrays = compact_output_arrays(arrays)
     with io.BytesIO() as buffer:
-        np.savez_compressed(buffer, **arrays)
+        np.savez_compressed(buffer, allow_pickle=False, **arrays)
         payload = buffer.getvalue()
     return {
         **observation.coordinate,
