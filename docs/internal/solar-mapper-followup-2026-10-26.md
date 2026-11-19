@@ -1,4 +1,10 @@
-# SOLAR 真实 mapper 小样本验证与 GPU 待批准方案
+# SOLAR 真实 mapper 小样本验证与历史 GPU 方案
+
+2026-11-08 路径核对：本文记录 2026-10-26 的隔离树快照，后续执行见文末追加，
+当前基线见 [B0](solar-m0-baseline-evidence-2026-11-07.md) 与
+[B1](solar-b1-execution-freeze-2026-11-08.md)。下文六个工件的相对路径使用外部根
+`<external-solar-workspace>/data/outputs/solar-resume-20261026/mapper-followup/`，
+六个原始工件仍存在；它们不在本仓库 `data/outputs/`。本次仅核对路径，未重跑或重新授予资格。
 
 2026-10-26，本机 `<local-rocm-host>`，隔离分支
 `codex/solar-stages1-5-resume`。这是 [阶段 1–5 CPU 交付](solar-resume-2026-10-26.md)
@@ -36,23 +42,23 @@ affinity 为 30、31，4 GiB 内存，单作业。内部总预算 260 秒、每�
 及其配置、日志、曲线和来源绑定。此前单元测试中的 392 B 是有意构造的合成
 曲线，不能代替本次 420 B 的实际工具结果。
 
-[真实执行结果](../../data/outputs/solar-resume-20261026/mapper-followup/real-mapper-01/result.json)
-与 [工具链校验记录](../../data/outputs/solar-resume-20261026/mapper-followup/real-mapper-01/toolchain.json)
+真实执行结果 `real-mapper-01/result.json`
+与工具链校验记录 `real-mapper-01/toolchain.json`
 在独立证据目录。此结果关闭 F03-D 两路径、两个容量点的最小真实工具验证；
 不代表全部图/容量域均通过，也没有 GPU 性能或正式发布资格。该情景为
 hypothetical，`publication_eligible=false`。
 
-## GPU canary 与 R16：仅准备，未执行
+## GPU canary 与 R16：2026-10-26 准备快照
 
 当前只读 sysfs 身份：AMD 目标 PCI `<redacted-pci-bdf>`、`card1`、`renderD128`，
 设备 ID `1002:7590`，unique ID `<redacted-unique-id>`，显存 17095983104 字节。
 目标卡 `gpu_busy_percent` 返回 `EBUSY (16)`，不能把它当作空闲证据。没有
 运行 GPU 探测 kernel、canary、R 输入或性能测试。
 
-[完整计划](../../data/outputs/solar-resume-20261026/mapper-followup/gpu-proposal/plan.json)
+完整计划 `gpu-proposal/plan.json`
 已经固定 8 个原 UUID × 两路径、输入文件摘要、最终源码摘要和 worker IPC v2。
-[控制器](../../data/outputs/solar-resume-20261026/mapper-followup/gpu-proposal/controller.py)
-及 [启动脚本](../../data/outputs/solar-resume-20261026/mapper-followup/gpu-proposal/proposed_gpu.sh)
+控制器 `gpu-proposal/controller.py`
+及启动脚本 `gpu-proposal/proposed_gpu.sh`
 已生成；无 GPU 容器内验证了 16 个请求 schema、输入/源码摘要及 Python 语法。
 未验证 GPU 运行，不能称它们已完成设备验收。
 
@@ -74,15 +80,9 @@ R07 最大矩阵为 1823×781×511、fp16；其余形状与 UUID 均见冻结验
 恰好一个 `gfx1200`，否则拒绝。固定已验证镜像、源码只读、无网络，沿用
 `expandable_segments:False`，不改时钟、不跑 profiler、不安装依赖。
 
-需要先确认 GPU 执行授权和独占窗口，并核对设备节点、资源占用、固定栈及现有
-audit 前置条件。Kernel-Cause 当前零 GPU 不等于目标卡已空闲；EBUSY 未解决前
-不能自行认定可用。批准后实际命令如下，当前没有执行：
-
-```bash
-SOLAR_GPU_APPROVED=yes bash data/outputs/solar-resume-20261026/mapper-followup/gpu-proposal/proposed_gpu.sh canary
-# 仅在 canary 两路径通过、资源窗口与 R16 范围获确认后：
-SOLAR_GPU_APPROVED=yes bash data/outputs/solar-resume-20261026/mapper-followup/gpu-proposal/proposed_gpu.sh r16
-```
+当时的执行前置条件为 GPU 授权和独占窗口，以及设备节点、资源占用、固定栈和
+audit 核对。旧启动命令保留在外部 `gpu-proposal/proposed_gpu.sh` 中；当前执行
+入口与版本应按 B1 及后续资格步骤确定，不从本历史提案直接续跑。
 
 所有新结果只写隔离树的 `gpu-proposal/outputs/`；输出目录必须不存在。旧
 start700 保持暂停，没有合并 main 或 push。
@@ -92,7 +92,7 @@ start700 保持暂停，没有合并 main 或 push。
 mapper 文件名枚举在宿主部分系统/容器目录及固定镜像的两个 `problems/local`
 目录遇到 OS `Permission denied`。这是读取拒绝，不是安装或执行审批拒绝。
 动作、已观察到的确切目标和原因列于
-[限制记录](../../data/outputs/solar-resume-20261026/mapper-followup/access-limits.json)。
+`access-limits.json` 限制记录。
 未对这些受拒目录提权重读或改道访问。宽范围枚举输出曾截断，故不能声称完成
 全机工具盘点；这不影响另一个可读、独立工件已通过正式校验并实际完成四点
 验证的确定结果。GPU 是否可独占使用仍不能确认。

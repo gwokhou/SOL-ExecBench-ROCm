@@ -89,6 +89,17 @@ For new generic helpers, search first with `rg`. Reuse the focused primitives
 under `core` and do not add a `core.utils` bucket. Use package resources for
 large production HIP/C++ source rather than Python string literals.
 
+First-party dataclasses are slotted and keyword-only; construct them with
+explicit field names and run `scripts/check_dataclass_policy.py` after changes.
+Persist objects through their explicit `to_dict()` method or canonical writer,
+not `__dict__`.
+
+The Einsum operation registry is immutable after construction. Composition
+roots use `builtin_einsum_registry()` from
+`solar.ir.extended_einsum.operations.handlers.registry`; tests and extensions
+build isolated registries with `EinsumOpRegistryBuilder`, register handlers,
+and call `build()`. Do not restore process-global registry mutation.
+
 ## Test scope
 
 - schema/logic: focused CPU unit tests;

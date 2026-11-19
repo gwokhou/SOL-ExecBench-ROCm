@@ -386,11 +386,12 @@ acquisition and receipt above supersede that status.
 
 ## Causal evidence boundary
 
-`performance_schedule_evidence.v2` emits only verified same-lane dependencies.
-Cross-lane timestamps no longer become `happens_before` dependencies. Until host
-event generations and dispatch scope can be bound, multi-lane predictions return
-`cross_lane_event_dependencies_unverified`. The profile event records deliberately
-retain partial information rather than reconstructing a causal graph from time
-coincidence. A future implementation needs exact scope and generation evidence
-before enabling cross-stream model predictions or recommending synchronization
-changes. Profiling remains opt-in pending a measured overhead comparison.
+The earlier same-lane-only checkpoint has been superseded by
+`performance_schedule_evidence.v3`: independently qualified scope and event
+generations can supply verified cross-lane `event_wait` edges in the audited
+eager domain. The production bridge is opt-in via `--schedule-scope`; without
+that evidence, cross-lane dependencies remain unverified. Timestamps alone do
+not establish causality, and Graph/IPC/cross-process scope remains outside this
+qualification. See the [scope acceptance](../../../docs/internal/hip-torch-scope-acceptance.md)
+and the L2/M-d entries in [HANDSOFF](../../../HANDSOFF.md) for the recorded scope
+and validation; historical measurements above do not qualify a changed source.
