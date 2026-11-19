@@ -18,6 +18,9 @@ HARDWARE_IDENTITY_FORMAT = "hardware_identity.v1"
 HARDWARE_RESOLUTION_POLICY = "hardware_context_resolution.v1"
 _PCI_BDF_PATTERN = r"[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]"
 _PCI_BDF_RE = re.compile(f"^{_PCI_BDF_PATTERN}$")
+_MAX_FIRMWARE_MEMORY_CARVEOUT_BYTES = 512 * 1024**2
+_MAX_FIRMWARE_MEMORY_CARVEOUT_DIVISOR = 32
+_RDNA_WGP_GFX_PREFIXES = ("gfx10", "gfx11", "gfx12")
 _HARDWARE_CONFIG = ConfigDict(
     extra="forbid",
     frozen=True,
@@ -397,6 +400,44 @@ class HardwareExecutionIdentity(FrozenArtifactModel):
         )
 
 
+def _resolve_compute_units(
+    template: HardwareConfiguration,
+    observation: HardwareObservation,
+) -> int | None:
+    if template.visible_compute_units is None:
+        return observation.visible_compute_units
+    if observation.visible_compute_units is None:
+        return template.visible_compute_units
+    if observation.visible_compute_units == template.visible_compute_units:
+        return template.visible_compute_units
+    if (
+        template.kind is HardwareConfigurationKind.CONFIGURATION_TEMPLATE
+        and template.gfx_target.startswith(_RDNA_WGP_GFX_PREFIXES)
+        and observation.visible_compute_units * 2
+        == template.visible_compute_units
+    ):
+        return template.visible_compute_units
+    raise ValueError("observed compute units differ from target configuration")
+
+
+def _matches_declared_memory(
+    template: HardwareConfiguration,
+    runtime_total_bytes: int,
+) -> bool:
+    if template.visible_memory_bytes is None:
+        return True
+    if runtime_total_bytes == template.visible_memory_bytes:
+        return True
+    if template.kind is not HardwareConfigurationKind.CONFIGURATION_TEMPLATE:
+        return False
+    carveout = template.visible_memory_bytes - runtime_total_bytes
+    limit = min(
+        _MAX_FIRMWARE_MEMORY_CARVEOUT_BYTES,
+        template.visible_memory_bytes // _MAX_FIRMWARE_MEMORY_CARVEOUT_DIVISOR,
+    )
+    return 0 <= carveout <= limit
+
+
 def resolve_hardware_configuration(
     template: HardwareConfiguration,
     observation: HardwareObservation,
@@ -422,18 +463,8 @@ def resolve_hardware_configuration(
         raise ValueError(
             "observed product SKU differs from target configuration"
         )
-    if (
-        template.visible_compute_units is not None
-        and observation.visible_compute_units is not None
-        and template.visible_compute_units != observation.visible_compute_units
-    ):
-        raise ValueError(
-            "observed compute units differ from target configuration"
-        )
-    if (
-        template.visible_memory_bytes is not None
-        and template.visible_memory_bytes != observation.runtime_total_bytes
-    ):
+    resolved_compute_units = _resolve_compute_units(template, observation)
+    if not _matches_declared_memory(template, observation.runtime_total_bytes):
         raise ValueError("observed memory differs from target configuration")
     if (
         template.l2_cache_bytes is not None
@@ -447,10 +478,7 @@ def resolve_hardware_configuration(
             "device_model": template.device_model or observation.gpu_name,
             "product_sku": template.product_sku or observation.product_sku,
             "kind": kind,
-            "visible_compute_units": (
-                observation.visible_compute_units
-                or template.visible_compute_units
-            ),
+            "visible_compute_units": resolved_compute_units,
             "visible_memory_bytes": observation.runtime_total_bytes,
             "l2_cache_bytes": observation.l2_cache_bytes
             or template.l2_cache_bytes,

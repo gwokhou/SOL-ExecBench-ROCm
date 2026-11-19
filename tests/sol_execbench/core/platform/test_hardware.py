@@ -308,3 +308,103 @@ def test_exact_rx9060xt_target_binds_sku_and_capacity() -> None:
 
     assert target.hardware.product_sku == "rx9060xt-standard"
     assert target.hardware.visible_memory_bytes == 16 * GIB
+
+
+def test_rx9060xt_standard_16gb_resolves_rdna4_wgp_and_firmware_carveout() -> (
+    None
+):
+    target = load_target_descriptor(
+        TARGETS / "configurations/rx9060xt/standard-16gb.yaml"
+    )
+    observation = HardwareObservation(
+        probe_method="torch_rocm_allocation_search.v1",
+        probe_version="torch_rocm_allocation_search.v1",
+        device="cuda:0",
+        device_index=0,
+        gpu_name="AMD Radeon RX 9060 XT",
+        gfx_target="gfx1200",
+        collected_at=datetime(2026, 11, 19, tzinfo=UTC),
+        torch_version="2.14.0+rocm10.1.0",
+        hip_version="7.16.26385",
+        visible_compute_units=16,
+        runtime_total_bytes=17_095_983_104,
+        runtime_free_bytes=16_800_000_000,
+        stable_allocatable_bytes=15_000_000_000,
+        usable_quota_bytes=12_000_000_000,
+        l2_cache_bytes=4_194_304,
+    )
+
+    resolved = resolve_hardware_configuration(target.hardware, observation)
+
+    assert resolved.visible_compute_units == 32
+    assert resolved.visible_memory_bytes == 17_095_983_104
+    assert resolved.product_sku == "rx9060xt-standard"
+    assert resolved.kind is HardwareConfigurationKind.OBSERVED_DEVICE
+
+
+@pytest.mark.parametrize(
+    ("template_path", "updates", "match"),
+    [
+        pytest.param(
+            "configurations/rx9060xt/standard-16gb.yaml",
+            {"visible_compute_units": 8},
+            "compute units",
+            id="wrong-rdna4-wgp",
+        ),
+        pytest.param(
+            "configurations/mi300x/spx-192gb.yaml",
+            {"visible_compute_units": 152},
+            "compute units",
+            id="cdna-half-cu",
+        ),
+        pytest.param(
+            "configurations/rx9060xt/standard-16gb.yaml",
+            {"runtime_total_bytes": 8 * GIB, "runtime_free_bytes": 8 * GIB},
+            "observed memory",
+            id="8gib-sku",
+        ),
+        pytest.param(
+            "configurations/rx9060xt/standard-16gb.yaml",
+            {"runtime_total_bytes": 16 * GIB - (512 * 1024**2 + 1)},
+            "observed memory",
+            id="excess-carveout",
+        ),
+        pytest.param(
+            "configurations/rx9060xt/standard-16gb.yaml",
+            {"runtime_total_bytes": 16 * GIB + 4096},
+            "observed memory",
+            id="above-nominal",
+        ),
+    ],
+)
+def test_configuration_template_rejects_mismatched_wgp_or_memory(
+    template_path: str,
+    updates: dict[str, int],
+    match: str,
+) -> None:
+    target = load_target_descriptor(TARGETS / template_path)
+    is_cdna = "mi300x" in template_path
+    total = 192 * GIB if is_cdna else 17_095_983_104
+    base_obs = HardwareObservation(
+        probe_method="test",
+        probe_version="test.v1",
+        device="cuda:0",
+        device_index=0,
+        gpu_name="AMD Instinct MI300X" if is_cdna else "AMD Radeon RX 9060 XT",
+        gfx_target="gfx942" if is_cdna else "gfx1200",
+        collected_at=datetime(2026, 11, 19, tzinfo=UTC),
+        torch_version="test",
+        hip_version="test",
+        visible_compute_units=304 if is_cdna else 16,
+        runtime_total_bytes=total,
+        runtime_free_bytes=min(
+            total, int(updates.get("runtime_total_bytes", total))
+        ),
+        stable_allocatable_bytes=8 * GIB,
+        usable_quota_bytes=4 * GIB,
+        l2_cache_bytes=4_194_304 if not is_cdna else None,
+    )
+    obs = base_obs.model_copy(update=updates)
+
+    with pytest.raises(ValueError, match=match):
+        resolve_hardware_configuration(target.hardware, obs)
