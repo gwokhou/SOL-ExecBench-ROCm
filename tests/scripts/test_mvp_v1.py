@@ -5,8 +5,10 @@ from __future__ import annotations
 import csv
 import json
 import subprocess
+import sys
 from importlib.resources import files
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 import torch
@@ -38,6 +40,11 @@ from scripts.mvp_v1.counter_capture import (
     parse_rocprof_mvp_passes,
 )
 from scripts.mvp_v1.report import compare_summaries_markdown
+from scripts.mvp_v1.triton_kernels import (
+    _build_moe_tile_schedule,
+    select_gqa_num_splits,
+)
+from scripts.mvp_v1.vendor_adapters import try_make_flashinfer_gqa_runner
 from scripts.mvp_v1.workloads import (
     SweepMode,
     build_workload_specs,
@@ -441,3 +448,76 @@ def test_execute_rocm_groups_splits_on_hardware_capability_limit(
         ["FETCH_SIZE"],
     ]
     assert len(csvs) == 2
+
+
+def test_splitk_gqa_split_selection_and_moe_tile_schedule_bijection() -> None:
+    assert select_gqa_num_splits(batch=2, kv_heads=2, total_pages=8) == 2
+    assert select_gqa_num_splits(batch=1, kv_heads=4, total_pages=256) == 64
+    assert select_gqa_num_splits(batch=16, kv_heads=4, total_pages=32768) == 4
+
+    # 20 tokens x top_k=2 = 40 pairs skewed heavily onto expert 2 (>16 rows) and
+    # expert 5, leaving experts 0, 1, 3, 4 completely empty.
+    logits = torch.full((20, 6), -10.0)
+    logits[:15, 2] = 5.0
+    logits[:15, 5] = 4.0
+    logits[15:, 2] = 5.0
+    logits[15:, 5] = 4.0
+    weights, tile_expert, tile_pairs = _build_moe_tile_schedule(logits, top_k=2)
+
+    assert weights.shape == (40,)
+    assert torch.allclose(weights.view(20, 2).sum(dim=-1), torch.ones(20))
+    valid_pairs = tile_pairs[tile_pairs >= 0].tolist()
+    assert sorted(valid_pairs) == list(range(40))
+    inactive = tile_expert >= 6
+    if inactive.any():
+        assert torch.all(tile_pairs[inactive] == -1)
+
+
+def test_flashinfer_gqa_adapter_self_validation_and_plan_once(
+    monkeypatch,
+) -> None:
+    plan_calls = {"count": 0, "corrupt": False}
+
+    class _FakeWrapper:
+        def __init__(self, workspace, layout, use_tensor_cores=True) -> None:
+            del workspace, layout, use_tensor_cores
+
+        def plan(self, *args, **kwargs) -> None:
+            del args, kwargs
+            plan_calls["count"] += 1
+
+        def run(self, q, kv_pair):
+            del kv_pair
+            return q + 99.0 if plan_calls["corrupt"] else q * 1.0
+
+    import types
+
+    fake_fi = types.SimpleNamespace(
+        BatchDecodeWithPagedKVCacheWrapper=_FakeWrapper
+    )
+    monkeypatch.setitem(sys.modules, "flashinfer", cast(Any, fake_fi))
+    monkeypatch.setattr(
+        "scripts.mvp_v1.vendor_adapters._is_rocm_torch", lambda: False
+    )
+
+    q = torch.ones((1, 4, 16), dtype=torch.bfloat16)
+    k = torch.ones((2, 16, 2, 16), dtype=torch.bfloat16)
+    indptr = torch.tensor([0, 2], dtype=torch.int32)
+    indices = torch.tensor([0, 1], dtype=torch.int32)
+    last_len = torch.tensor([16], dtype=torch.int32)
+    args: list[object] = [q, k, k, indptr, indices, last_len]
+
+    res = try_make_flashinfer_gqa_runner(
+        args, device="cuda:0", ref_fn=lambda q_in, *_rest: q_in, max_atol=1e-2
+    )
+    assert res is not None
+    runner, impl = res
+    assert impl == "flashinfer_paged_gqa"
+    assert torch.equal(runner(*args), q)
+    assert plan_calls["count"] == 1
+
+    plan_calls["corrupt"] = True
+    rejected = try_make_flashinfer_gqa_runner(
+        args, device="cuda:0", ref_fn=lambda q_in, *_rest: q_in, max_atol=1e-2
+    )
+    assert rejected is None

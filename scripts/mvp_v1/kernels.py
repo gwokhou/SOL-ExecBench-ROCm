@@ -13,11 +13,26 @@ from typing import Any
 
 import torch
 
+from scripts.mvp_v1.triton_kernels import (
+    allocate_fused_moe_workspace,
+    allocate_splitk_gqa_workspace,
+    run_fused_moe_triton,
+    run_gqa_paged_decode_splitk,
+    select_gqa_num_splits,
+    supports_splitk_gqa,
+)
+from scripts.mvp_v1.vendor_adapters import (
+    try_make_aiter_fp8_gemm_runner,
+    try_make_flashinfer_gqa_runner,
+    try_make_vendor_moe_runner,
+)
+
 
 class KernelBackend(StrEnum):
     """Execution backend preference for GPU runs."""
 
     AUTO = "auto"
+    VENDOR = "vendor"
     TRITON = "triton"
     PYTORCH = "pytorch"
 
@@ -29,16 +44,33 @@ def ref_skinny_gemm(x: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
 
 def make_skinny_gemm_runner(
     *,
+    prototype_args: list[Any],
     fp8: bool,
     device: str,
+    backend: KernelBackend = KernelBackend.AUTO,
     scale_a: torch.Tensor | None = None,
     scale_b: torch.Tensor | None = None,
-) -> Callable[..., torch.Tensor]:
-    """Build candidate runner for BF16 matmul or FP8 scaled_mm."""
+    max_atol: float = 5e-1,
+) -> tuple[Callable[..., torch.Tensor], str]:
+    """Build candidate runner for BF16 matmul, AITER FP8, or FP8 scaled_mm."""
     if not fp8:
-        return torch.matmul
+        return torch.matmul, "torch.matmul"
     if device == "cpu" or scale_a is None or scale_b is None:
-        return lambda x, w_t: (x.float() @ w_t.float()).to(torch.bfloat16)
+        return (
+            lambda x, w_t: (x.float() @ w_t.float()).to(torch.bfloat16),
+            "cpu_fp8_ref",
+        )
+    if backend in (KernelBackend.AUTO, KernelBackend.VENDOR):
+        aiter_match = try_make_aiter_fp8_gemm_runner(
+            prototype_args,
+            scale_a=scale_a,
+            scale_b=scale_b,
+            device=device,
+            ref_fn=ref_skinny_gemm,
+            max_atol=max_atol,
+        )
+        if aiter_match is not None:
+            return aiter_match
 
     def _run_fp8(x: torch.Tensor, weight_t: torch.Tensor) -> torch.Tensor:
         return torch._scaled_mm(
@@ -49,7 +81,7 @@ def make_skinny_gemm_runner(
             out_dtype=torch.bfloat16,
         )
 
-    return _run_fp8
+    return _run_fp8, "torch._scaled_mm"
 
 
 def ref_fused_moe(
@@ -116,6 +148,40 @@ def run_fused_moe_grouped(
         out.index_add_(0, t_idx, contrib)
         offset += count_t
     return out.to(torch.bfloat16)
+
+
+def make_fused_moe_runner(
+    *,
+    prototype_args: list[Any],
+    device: str,
+    backend: KernelBackend = KernelBackend.AUTO,
+    max_atol: float = 5e-2,
+) -> tuple[Callable[..., torch.Tensor], str]:
+    """Select vendor Fused MoE, fused Triton MoE, or grouped PyTorch fallback."""
+    if device == "cpu" or backend is KernelBackend.PYTORCH:
+        return run_fused_moe_grouped, "grouped_swiglu_moe"
+    if backend in (KernelBackend.AUTO, KernelBackend.VENDOR):
+        vendor = try_make_vendor_moe_runner(
+            prototype_args,
+            device=device,
+            ref_fn=ref_fused_moe,
+            max_atol=max_atol,
+        )
+        if vendor is not None:
+            return vendor
+    tokens, gate_w, _up, _down, _logits, top_k = prototype_args
+    workspace = allocate_fused_moe_workspace(
+        tokens, gate_w.shape[2], int(top_k)
+    )
+
+    def _run_triton_moe(*args: Any) -> torch.Tensor:
+        return run_fused_moe_triton(*args, workspace=workspace)
+
+    try:
+        _run_triton_moe(*prototype_args)
+        return _run_triton_moe, "triton_fused_swiglu_moe"
+    except Exception:  # noqa: BLE001 -- degrade cleanly if triton fails
+        return run_fused_moe_grouped, "grouped_swiglu_moe"
 
 
 def ref_gqa_paged_decode(
@@ -246,16 +312,53 @@ def run_gqa_paged_decode_triton(
     return out
 
 
+def _try_splitk_gqa(
+    prototype_args: list[Any],
+) -> tuple[Callable[..., torch.Tensor], str] | None:
+    q, k_cache, _v, _indptr, kv_indices, _last_len = prototype_args
+    if not supports_splitk_gqa(q, k_cache):
+        return None
+    num_splits = select_gqa_num_splits(
+        batch=q.shape[0],
+        kv_heads=k_cache.shape[2],
+        total_pages=kv_indices.numel(),
+    )
+    workspace = allocate_splitk_gqa_workspace(q, num_splits)
+
+    def _run_splitk(*args: Any) -> torch.Tensor:
+        return run_gqa_paged_decode_splitk(*args, workspace=workspace)
+
+    try:
+        _run_splitk(*prototype_args)
+        return _run_splitk, "triton_splitk_paged_gqa"
+    except Exception:  # noqa: BLE001 -- degrade to single-split kernel
+        return None
+
+
 def make_gqa_paged_decode_runner(
     *,
+    prototype_args: list[Any],
     device: str,
     backend: KernelBackend = KernelBackend.AUTO,
+    max_atol: float = 2e-2,
 ) -> tuple[Callable[..., torch.Tensor], str]:
-    """Select GPU Triton kernel or CPU PyTorch fallback."""
+    """Select FlashInfer, Split-KV Triton, single-split Triton, or CPU ref."""
     if device == "cpu" or backend is KernelBackend.PYTORCH:
         return ref_gqa_paged_decode, "pytorch_ref"
+    if backend in (KernelBackend.AUTO, KernelBackend.VENDOR):
+        vendor = try_make_flashinfer_gqa_runner(
+            prototype_args,
+            device=device,
+            ref_fn=ref_gqa_paged_decode,
+            max_atol=max_atol,
+        )
+        if vendor is not None:
+            return vendor
+    splitk = _try_splitk_gqa(prototype_args)
+    if splitk is not None:
+        return splitk
     try:
-        _load_triton_paged_decode_kernel()
+        run_gqa_paged_decode_triton(*prototype_args)
         return run_gqa_paged_decode_triton, "triton_paged_gqa"
     except Exception:  # noqa: BLE001 -- degrade cleanly if triton unavailable
         return ref_gqa_paged_decode, "pytorch_ref_fallback"

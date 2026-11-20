@@ -26,12 +26,12 @@ from scripts.mvp_v1.analytical_roofline import (
 )
 from scripts.mvp_v1.kernels import (
     KernelBackend,
+    make_fused_moe_runner,
     make_gqa_paged_decode_runner,
     make_skinny_gemm_runner,
     ref_fused_moe,
     ref_gqa_paged_decode,
     ref_skinny_gemm,
-    run_fused_moe_grouped,
 )
 from sol_execbench.core.data.definition import (
     AxisConst,
@@ -445,6 +445,7 @@ def build_runtime_case(
             device=device,
             ceiling=ceiling,
             empirical=empirical,
+            backend=backend,
             gen=gen,
             trace_def=trace_def,
             trace_wl=trace_wl,
@@ -455,6 +456,7 @@ def build_runtime_case(
             device=device,
             ceiling=ceiling,
             empirical=empirical,
+            backend=backend,
             gen=gen,
             trace_def=trace_def,
             trace_wl=trace_wl,
@@ -477,6 +479,7 @@ def _build_gemm_case(
     device: str,
     ceiling: HardwareCeiling,
     empirical: EmpiricalCeiling | None,
+    backend: KernelBackend,
     gen: torch.Generator,
     trace_def: Definition,
     trace_wl: Workload,
@@ -497,15 +500,24 @@ def _build_gemm_case(
         w = w_bf.to(fp8_dt).t()
         sa = torch.ones((), dtype=torch.float32, device=device)
         sb = torch.ones((), dtype=torch.float32, device=device)
-        cand = make_skinny_gemm_runner(
-            fp8=True, device=device, scale_a=sa, scale_b=sb
+        cand, impl = make_skinny_gemm_runner(
+            prototype_args=[x, w],
+            fp8=True,
+            device=device,
+            backend=backend,
+            scale_a=sa,
+            scale_b=sb,
+            max_atol=spec.tolerance.max_atol,
         )
-        impl = "torch._scaled_mm" if device != "cpu" else "cpu_fp8_ref"
     else:
         x = x_bf
         w = w_bf.t().contiguous()
-        cand = make_skinny_gemm_runner(fp8=False, device=device)
-        impl = "torch.matmul"
+        cand, impl = make_skinny_gemm_runner(
+            prototype_args=[x, w],
+            fp8=False,
+            device=device,
+            backend=backend,
+        )
     bound = bound_skinny_gemm(
         m,
         n,
@@ -533,6 +545,7 @@ def _build_moe_case(
     device: str,
     ceiling: HardwareCeiling,
     empirical: EmpiricalCeiling | None,
+    backend: KernelBackend,
     gen: torch.Generator,
     trace_def: Definition,
     trace_wl: Workload,
@@ -575,6 +588,13 @@ def _build_moe_case(
         torch.softmax(logits.float(), dim=-1), k=top_k, dim=-1
     ).indices
     active_experts = int(torch.unique(topk_ids).numel())
+    proto_args: list[Any] = [tokens, gate_w, up_w, down_w, logits, top_k]
+    cand_fn, impl = make_fused_moe_runner(
+        prototype_args=proto_args,
+        device=device,
+        backend=backend,
+        max_atol=spec.tolerance.max_atol,
+    )
     bound = bound_fused_moe(
         m,
         h,
@@ -589,10 +609,10 @@ def _build_moe_case(
     )
     return RuntimeCase(
         spec=spec,
-        prototype_args=[tokens, gate_w, up_w, down_w, logits, top_k],
+        prototype_args=proto_args,
         reference_fn=ref_fused_moe,
-        candidate_fn=run_fused_moe_grouped,
-        implementation_name="grouped_swiglu_moe",
+        candidate_fn=cand_fn,
+        implementation_name=impl,
         bound=bound,
         trace_definition=trace_def,
         trace_workload=trace_wl,
@@ -669,7 +689,12 @@ def _build_gqa_case(
     )
     kv_len, ps = spec.axes["kv_len"], spec.axes["page_size"]
     args = _make_gqa_paged_tensors(spec, device=device, gen=gen)
-    cand_fn, impl = make_gqa_paged_decode_runner(device=device, backend=backend)
+    cand_fn, impl = make_gqa_paged_decode_runner(
+        prototype_args=args,
+        device=device,
+        backend=backend,
+        max_atol=spec.tolerance.max_atol,
+    )
     bound = bound_gqa_paged_decode(
         b,
         hq,
