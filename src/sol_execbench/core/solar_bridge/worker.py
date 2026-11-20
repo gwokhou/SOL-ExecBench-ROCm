@@ -9,6 +9,7 @@ import argparse
 from pathlib import Path
 
 from sol_execbench.core.data.json_utils import load_json_value
+from sol_execbench.core.process.termination import cleanup_on_termination
 from sol_execbench.core.solar_bridge.analyzer import analyze_workload
 from sol_execbench.core.solar_bridge.models import (
     SolarAnalysisOutcome,
@@ -60,7 +61,7 @@ def main() -> None:
     try:
         if request.device_stage_lock_path is not None:
             _prefer_worker_as_oom_victim()
-        with worker_diagnostics(args):
+        with cleanup_on_termination(), worker_diagnostics(args):
             outcome = analyze_workload(
                 problem_dir=request.problem_dir,
                 workload_uuid=request.workload_uuid,

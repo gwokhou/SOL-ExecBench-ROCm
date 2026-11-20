@@ -137,18 +137,28 @@ def _wait_with_kqueue(
 
 def process_group_has_live_members(process_group_id: int) -> bool:
     """Return whether a session has a live member other than its leader."""
+    return bool(_session_members(process_group_id))
+
+
+def session_member_process_groups(session_id: int) -> set[int]:
+    """Return distinct live non-leader process group IDs in a session."""
+    return {pgid for _, pgid in _session_members(session_id)}
+
+
+def _session_members(session_id: int) -> list[tuple[int, int]]:
     if sys.platform.startswith("linux"):
-        return _linux_process_group_has_live_members(process_group_id)
+        return _linux_session_members(session_id)
     if sys.platform == "darwin":
-        return _darwin_process_group_has_live_members(process_group_id)
+        return _darwin_session_members(session_id)
     raise RuntimeError(
         f"process-group observation is unsupported on {sys.platform}"
     )
 
 
-def _linux_process_group_has_live_members(process_group_id: int) -> bool:
+def _linux_session_members(session_id: int) -> list[tuple[int, int]]:
+    members: list[tuple[int, int]] = []
     for entry in Path("/proc").iterdir():
-        if not entry.name.isdigit() or int(entry.name) == process_group_id:
+        if not entry.name.isdigit() or int(entry.name) == session_id:
             continue
         try:
             raw = (entry / "stat").read_text()
@@ -160,16 +170,12 @@ def _linux_process_group_has_live_members(process_group_id: int) -> bool:
             )
         except OSError, IndexError, ValueError:
             continue
-        if (
-            state != "Z"
-            and process_group == process_group_id
-            and session == process_group_id
-        ):
-            return True
-    return False
+        if state != "Z" and session == session_id:
+            members.append((int(entry.name), process_group))
+    return members
 
 
-def _darwin_process_group_has_live_members(process_group_id: int) -> bool:
+def _darwin_session_members(session_id: int) -> list[tuple[int, int]]:
     libproc = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
     process_count = libproc.proc_listallpids(None, 0)
     if process_count <= 0:
@@ -178,8 +184,9 @@ def _darwin_process_group_has_live_members(process_group_id: int) -> bool:
     listed = libproc.proc_listallpids(pids, ctypes.sizeof(pids))
     if listed < 0:
         raise OSError(ctypes.get_errno(), "proc_listallpids failed")
+    members: list[tuple[int, int]] = []
     for pid in pids[:listed]:
-        if pid <= 0 or pid == process_group_id:
+        if pid <= 0 or pid == session_id:
             continue
         info = _DarwinBSDInfo()
         size = libproc.proc_pidinfo(
@@ -195,10 +202,6 @@ def _darwin_process_group_has_live_members(process_group_id: int) -> bool:
             session = os.getsid(pid)
         except PermissionError, ProcessLookupError:
             continue
-        if (
-            info.pbi_pgid == process_group_id
-            and session == process_group_id
-            and (info.pbi_status != _DARWIN_ZOMBIE_STATUS)
-        ):
-            return True
-    return False
+        if session == session_id and info.pbi_status != _DARWIN_ZOMBIE_STATUS:
+            members.append((int(pid), int(info.pbi_pgid)))
+    return members

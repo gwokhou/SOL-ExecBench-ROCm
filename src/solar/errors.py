@@ -80,17 +80,28 @@ class NumericalEquivalenceError(ConversionVerificationError):
     reason_code = "numerical_equivalence_failed"
 
 
+MAPPER_TIMEOUT_REASON_CODE = "mapper_timeout"
+
+
 class ToolchainUnavailableError(SolarError):
     """A required external proof tool did not produce valid evidence."""
 
     reason_code = "toolchain_unavailable"
 
 
+class MapperTimeoutError(ToolchainUnavailableError):
+    """An external formal mapper exceeded its configured time budget."""
+
+    reason_code = MAPPER_TIMEOUT_REASON_CODE
+
+
 __all__ = [
+    "MAPPER_TIMEOUT_REASON_CODE",
     "ConversionVerificationError",
     "DynamicShapeUnboundedError",
     "GradientVerificationError",
     "IRReplayError",
+    "MapperTimeoutError",
     "NativeAttributeUnsupportedError",
     "NativeOperationUnsupportedError",
     "NumericalEquivalenceError",

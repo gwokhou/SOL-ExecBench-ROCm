@@ -104,6 +104,9 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
         return _failure(
             request, stage, pipeline_reason_code(stage, exc), str(exc)
         )
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
 
 
 def _attach_analysis_metadata(

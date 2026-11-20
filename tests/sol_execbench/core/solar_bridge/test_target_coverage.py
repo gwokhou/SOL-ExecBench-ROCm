@@ -387,3 +387,179 @@ def test_only_ready_enters_formal(
     assert len(calls) == 1
     assert calls[0].ir_path is row.ir_path
     assert attempt.status is CoverageStatus.UNPROVED
+
+
+def test_timeout_cleans_aborted_staging_and_allows_drift_free_resume(
+    synthetic_target_files, tmp_path, monkeypatch
+):
+    from sol_execbench.core.solar_bridge import coverage_resume
+    from sol_execbench.core.solar_bridge.models import (
+        SolarAnalysisOutcome,
+        SolarAnalysisStatus,
+        readiness_stage_artifacts,
+    )
+
+    source, view = synthetic_target_files
+    target = load_materialized_target_view(source, view)
+    _fake_mapper(monkeypatch)
+    options = CoverageOptions(orojenesis_home=tmp_path)
+
+    def ready(request, **kwargs):
+        stages = tuple(
+            {
+                "stage": stage,
+                "status": "passed",
+                "artifact": {"path": path, "sha256": "a" * 64},
+            }
+            for stage, path in readiness_stage_artifacts(
+                request.ir_path
+            ).items()
+        )
+        return SolarStageAuditOutcome(
+            status=SolarReadinessStatus.READY,
+            analysis_id=row_id_for(target, request.workload_uuid),
+            output_dir=request.output_dir,
+            ir_path=request.ir_path,
+            architecture_sha256="a" * 64,
+            stages=stages,
+        )
+
+    def row_id_for(tv, uuid):
+        for r in tv.rows if hasattr(tv, "rows") else ():
+            if r.workload_uuid == uuid:
+                return f"{tv.definitions[r.semantic_id].name}:{uuid}"
+        defn_name = next(iter(tv.definitions.values())).name
+        return f"{defn_name}:{uuid}"
+
+    call_count = 0
+
+    def formal(request, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        attempt_dir = target_coverage.Path(request.output_dir).parent
+        if call_count == 3:
+            aborted = attempt_dir / ".formal.aborted"
+            aborted.mkdir(parents=True)
+            (aborted / "oaves.csv").write_text("0,0,0\n", encoding="utf-8")
+            return SolarAnalysisOutcome(
+                status=SolarAnalysisStatus.FAILED,
+                analysis_id=request.workload_uuid,
+                ir_path=request.ir_path,
+                stage=SolarStage.OUTER_BRIDGE,
+                reason_code="worker_timeout",
+            )
+        return SolarAnalysisOutcome(
+            status=SolarAnalysisStatus.FAILED,
+            analysis_id=request.workload_uuid,
+            ir_path=request.ir_path,
+            stage=SolarStage.FORMAL_ANALYSIS,
+            reason_code="formal_bound_unproved",
+        )
+
+    monkeypatch.setattr(target_coverage, "run_solar_stage_worker", ready)
+    monkeypatch.setattr(target_coverage, "run_solar_worker", formal)
+    monkeypatch.setattr(
+        target_coverage, "verify_stage_outcome", lambda *args: {}
+    )
+    monkeypatch.setattr(
+        coverage_resume, "verify_stage_outcome", lambda *args: {}
+    )
+    monkeypatch.setattr(
+        target_coverage,
+        "verification_dimensions",
+        lambda *args: {"fixture": True},
+    )
+
+    audit_dir = tmp_path / "audit"
+    first = target_coverage._audit_validated_target(target, audit_dir, options)
+    assert first.rows[2].status is CoverageStatus.BUDGET_EXHAUSTED
+    assert first.rows[2].reason == "worker_timeout"
+    assert not any(audit_dir.rglob(".formal.*"))
+    assert not any(".formal." in k for k in first.rows[2].attempts[0].artifacts)
+
+    resumed = target_coverage._audit_validated_target(
+        target, audit_dir, options, resume=True
+    )
+    assert len(resumed.rows) == 18
+
+
+def test_mapper_timeout_classifies_as_budget_exhausted_and_resumes(
+    synthetic_target_files, tmp_path, monkeypatch
+):
+    from sol_execbench.core.solar_bridge import coverage_resume
+    from sol_execbench.core.solar_bridge.coverage_resume import (
+        authenticate_resumed_attempts,
+    )
+    from sol_execbench.core.solar_bridge.models import (
+        SolarAnalysisOutcome,
+        SolarAnalysisStatus,
+        readiness_stage_artifacts,
+    )
+    from solar.errors import MAPPER_TIMEOUT_REASON_CODE
+
+    source, view = synthetic_target_files
+    target = load_materialized_target_view(source, view)
+    _fake_mapper(monkeypatch)
+    options = CoverageOptions(orojenesis_home=tmp_path)
+
+    def ready(request, **kwargs):
+        stages = tuple(
+            {
+                "stage": stage,
+                "status": "passed",
+                "artifact": {"path": path, "sha256": "a" * 64},
+            }
+            for stage, path in readiness_stage_artifacts(
+                request.ir_path
+            ).items()
+        )
+        return SolarStageAuditOutcome(
+            status=SolarReadinessStatus.READY,
+            analysis_id=request.workload_uuid,
+            output_dir=request.output_dir,
+            ir_path=request.ir_path,
+            architecture_sha256="a" * 64,
+            stages=stages,
+        )
+
+    call_count = 0
+
+    def formal(request, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 3:
+            return SolarAnalysisOutcome(
+                status=SolarAnalysisStatus.FAILED,
+                analysis_id=request.workload_uuid,
+                ir_path=request.ir_path,
+                stage=SolarStage.FORMAL_ANALYSIS,
+                reason_code=MAPPER_TIMEOUT_REASON_CODE,
+                message="Orojenesis mapper exceeded 7200s timeout",
+            )
+        return SolarAnalysisOutcome(
+            status=SolarAnalysisStatus.FAILED,
+            analysis_id=request.workload_uuid,
+            ir_path=request.ir_path,
+            stage=SolarStage.FORMAL_ANALYSIS,
+            reason_code="formal_bound_unproved",
+        )
+
+    monkeypatch.setattr(target_coverage, "run_solar_stage_worker", ready)
+    monkeypatch.setattr(target_coverage, "run_solar_worker", formal)
+    monkeypatch.setattr(
+        target_coverage, "verify_stage_outcome", lambda *args: {}
+    )
+    monkeypatch.setattr(
+        coverage_resume, "verify_stage_outcome", lambda *args: {}
+    )
+    monkeypatch.setattr(
+        target_coverage,
+        "verification_dimensions",
+        lambda *args: {"fixture": True},
+    )
+
+    audit_dir = tmp_path / "audit-mapper-timeout"
+    report = target_coverage._audit_validated_target(target, audit_dir, options)
+    assert report.rows[2].status is CoverageStatus.BUDGET_EXHAUSTED
+    assert report.rows[2].reason == MAPPER_TIMEOUT_REASON_CODE
+    authenticate_resumed_attempts(target, report, audit_dir, options)

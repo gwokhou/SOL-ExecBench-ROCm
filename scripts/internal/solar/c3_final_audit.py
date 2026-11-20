@@ -46,6 +46,7 @@ from sol_execbench.core.solar_bridge.coverage_resume import (
 )
 from sol_execbench.tools.docker_process import _remove_owned_container
 from solar.analysis.orojenesis.runner import OrojenesisRunner
+from solar.errors import MAPPER_TIMEOUT_REASON_CODE
 from solar.ir.contracts import IRPath
 
 if TYPE_CHECKING:
@@ -210,6 +211,12 @@ def _failure_signature(
     row: CoverageRow, m0_subreason: str
 ) -> tuple[str, str, str]:
     if row.status is CoverageStatus.BUDGET_EXHAUSTED:
+        if row.reason in {MAPPER_TIMEOUT_REASON_CODE, "orojenesis_timeout"}:
+            return (
+                "formal_analysis:mapper_timeout_7200s",
+                "formal_analysis",
+                "orojenesis_mapspace_pruning_and_timeout_code",
+            )
         return (
             "outer_bridge:activity_budget_worker_timeout",
             "outer_bridge",

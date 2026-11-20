@@ -630,3 +630,30 @@ def test_verify_report_and_artifact_integrity_handles_timeout_transient_drift(
         c3_final_audit._verify_report_and_artifact_integrity(
             report, expected, cov
         )
+
+
+def test_c3_final_audit_maps_explicit_mapper_timeout_signature() -> None:
+    attempt = _failed_attempt(
+        stage="formal_analysis",
+        reason_code="mapper_timeout",
+        message="Orojenesis mapper exceeded 7200s timeout",
+        formal=True,
+    )
+    attempt.status = CoverageStatus.BUDGET_EXHAUSTED
+    attempt.wall_seconds = 7201.0
+    row = _make_row(
+        semantic_id="llm.attention.local_global.v2",
+        slot="throughput-high",
+        ir_path=IRPath.MAKE_FX_ATEN,
+        family="attention",
+        status=CoverageStatus.BUDGET_EXHAUSTED,
+        reason="mapper_timeout",
+        attempt=attempt,
+    )
+    cat, sub = c3_final_audit.classify_m0_reporting(row)
+    assert (cat, sub) == ("budget_exhausted", "mapper_timeout")
+    assert c3_final_audit._failure_signature(row, sub) == (
+        "formal_analysis:mapper_timeout_7200s",
+        "formal_analysis",
+        "orojenesis_mapspace_pruning_and_timeout_code",
+    )

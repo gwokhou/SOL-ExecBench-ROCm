@@ -15,12 +15,14 @@ import time
 from collections import deque
 from collections.abc import Mapping, Sequence
 from concurrent.futures import CancelledError
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Protocol
 
 from sol_execbench.core.process.process_observation import (
     process_group_has_live_members,
+    session_member_process_groups,
     wait_for_exit_without_reaping,
 )
 
@@ -358,10 +360,17 @@ def _signal_unreaped_process_group(
     try:
         if os.getsid(process.pid) != process.pid:
             return False
-        os.killpg(process.pid, signal_number)
     except PermissionError, ProcessLookupError:
         return False
-    return True
+    groups = {process.pid, *session_member_process_groups(process.pid)}
+    signaled = False
+    for pgid in sorted(groups):
+        try:
+            os.killpg(pgid, signal_number)
+        except PermissionError, ProcessLookupError:
+            continue
+        signaled = True
+    return signaled
 
 
 def _terminate_unreaped_process_group(
@@ -410,26 +419,51 @@ def _wait_for_process_group_members(
     return True
 
 
+def _extra_session_groups(
+    process: subprocess.Popen[str] | subprocess.Popen[bytes],
+) -> set[int]:
+    if process.returncode is not None:
+        return set()
+    try:
+        if os.getsid(process.pid) != process.pid:
+            return set()
+    except PermissionError, ProcessLookupError:
+        return set()
+    return session_member_process_groups(process.pid) - {process.pid}
+
+
+def _signal_groups(groups: set[int], signal_number: int) -> None:
+    for pgid in sorted(groups):
+        with suppress(PermissionError, ProcessLookupError):
+            os.killpg(pgid, signal_number)
+
+
 def _terminate_process_group(
     process: subprocess.Popen[str] | subprocess.Popen[bytes],
     *,
     drain_output: bool = True,
 ) -> None:
     """Terminate a session leader and its descendants, escalating if needed."""
+    extra_groups = _extra_session_groups(process)
     try:
         os.killpg(process.pid, signal.SIGTERM)
     except ProcessLookupError:
+        _signal_groups(extra_groups, signal.SIGTERM)
         return
+    _signal_groups(extra_groups, signal.SIGTERM)
     try:
         if drain_output:
             process.communicate(timeout=5)
         else:
             process.wait(timeout=5)
     except subprocess.TimeoutExpired:
+        more_groups = _extra_session_groups(process) | extra_groups
         try:
             os.killpg(process.pid, signal.SIGKILL)
         except ProcessLookupError:
+            _signal_groups(more_groups, signal.SIGKILL)
             return
+        _signal_groups(more_groups, signal.SIGKILL)
         if drain_output:
             process.communicate()
         else:

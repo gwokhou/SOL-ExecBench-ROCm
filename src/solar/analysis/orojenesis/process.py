@@ -130,7 +130,7 @@ def run_mapper_process(
         env=process_env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        start_new_session=True,
+        process_group=0,
     )
     readers: tuple[threading.Thread, ...] = ()
     try:

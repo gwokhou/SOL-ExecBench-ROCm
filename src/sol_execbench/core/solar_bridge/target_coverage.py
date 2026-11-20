@@ -1,6 +1,7 @@
 """Serial two-path audit of an existing LLM_CORE target view."""
 
 import os
+import shutil
 import time
 from pathlib import Path
 
@@ -208,6 +209,8 @@ def _execute_row(
             wall_seconds=time.monotonic() - start,
             reason=str(exc),
         )
+    finally:
+        _cleanup_aborted_staging(directory)
     attempt.wall_seconds = time.monotonic() - start
     report.elapsed_seconds += attempt.wall_seconds
     if row.slot == "smoke":
@@ -221,6 +224,18 @@ def _execute_row(
     row.status = attempt.status
     row.reason = attempt.reason or "completed; see original worker evidence"
     _save(output, report)
+
+
+def _cleanup_aborted_staging(directory: Path) -> None:
+    if not directory.is_dir():
+        return
+    for entry in directory.iterdir():
+        if (
+            entry.name.startswith((".formal.", ".readiness."))
+            and entry.is_dir()
+            and not entry.is_symlink()
+        ):
+            shutil.rmtree(entry, ignore_errors=True)
 
 
 def _audit_row(

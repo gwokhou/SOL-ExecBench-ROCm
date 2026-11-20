@@ -809,3 +809,60 @@ def test_selected_capacity_fast_path_requires_exact_architecture_units(
         selected_capacity_bytes=capacity,
     )
     assert plan.is_compulsory_witness is witness
+
+
+def test_orojenesis_runner_maps_timeout_to_explicit_reason_code(
+    tmp_path, monkeypatch
+):
+    from solar.contracts import SolarStage
+    from solar.errors import MAPPER_TIMEOUT_REASON_CODE
+    from solar.pipeline import pipeline_reason_code
+
+    runner = _runner(tmp_path)
+
+    def raise_timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(args[0], 7200)
+
+    monkeypatch.setattr(
+        orojenesis_runner, "_default_mapper_runner", raise_timeout
+    )
+    with pytest.raises(orojenesis.OrojenesisTimeoutError) as layer_exc:
+        runner.run_layer(
+            _matmul("x", "w", "y", m=2, k=3, n=4),
+            tmp_path / "layer",
+            word_bits=16,
+        )
+    assert (
+        pipeline_reason_code(SolarStage.FORMAL_ANALYSIS, layer_exc.value)
+        == MAPPER_TIMEOUT_REASON_CODE
+    )
+
+    chain = [
+        ("mm0", _matmul("x", "w0", "hidden", m=2, k=3, n=4)),
+        ("mm1", _matmul("hidden", "w1", "result", m=2, k=4, n=5)),
+    ]
+    with pytest.raises(orojenesis.OrojenesisTimeoutError):
+        runner.run_multi_chain(chain, tmp_path / "chain", word_bits=16)
+    with pytest.raises(orojenesis.OrojenesisTimeoutError):
+        runner.run_multi_region(
+            _batched_region(), tmp_path / "region", word_bits=16
+        )
+
+
+@pytest.mark.requires_linux
+def test_mapper_runner_isolates_pgid_within_caller_session(tmp_path):
+    import os
+
+    completed = orojenesis_process.run_mapper_process(
+        [
+            sys.executable,
+            "-c",
+            "import os; print(os.getpgrp(), os.getsid(os.getpid()))",
+        ],
+        cwd=tmp_path,
+        timeout=5,
+    )
+    assert completed.returncode == 0
+    pgid_text, sid_text = (tmp_path / "stdout.log").read_text().strip().split()
+    assert int(pgid_text) != os.getpgrp()
+    assert int(sid_text) == os.getsid(os.getpid())

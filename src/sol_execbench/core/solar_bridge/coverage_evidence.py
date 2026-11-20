@@ -34,12 +34,13 @@ from solar.artifacts.names import (
     MANIFEST_FILENAME,
 )
 from solar.contracts import SolarRequestManifest
+from solar.errors import MAPPER_TIMEOUT_REASON_CODE
 
 _BUDGET_REASONS = frozenset(
     {
         "worker_timeout",
         "orojenesis_timeout",
-        "mapper_timeout",
+        MAPPER_TIMEOUT_REASON_CODE,
         "memory_budget_exhausted",
         "evidence_budget_exhausted",
     }

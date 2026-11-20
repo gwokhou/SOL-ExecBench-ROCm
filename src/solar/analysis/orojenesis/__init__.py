@@ -28,7 +28,10 @@ from solar.analysis.orojenesis.curves import (
     parse_multi_einsum_region_curve,
     parse_multi_mapping_records,
 )
-from solar.analysis.orojenesis.errors import OrojenesisError
+from solar.analysis.orojenesis.errors import (
+    OrojenesisError,
+    OrojenesisTimeoutError,
+)
 from solar.analysis.orojenesis.multi_einsum import (
     find_multi_einsum_chains,
     multi_einsum_layer_problem,
@@ -66,6 +69,7 @@ __all__ = [
     "OROJENESIS_UBUNTU_SNAPSHOT",
     "OrojenesisError",
     "OrojenesisRunner",
+    "OrojenesisTimeoutError",
     "compose_multi_einsum_curve",
     "compose_multi_einsum_region_curve",
     "find_multi_einsum_chains",

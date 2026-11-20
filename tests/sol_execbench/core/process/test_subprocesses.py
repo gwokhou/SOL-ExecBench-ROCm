@@ -361,3 +361,70 @@ def test_cancel_during_post_exit_drain_reaps_descendants(
             int(pidfile.read_text())
         ):
             os.kill(int(pidfile.read_text()), signal.SIGKILL)
+
+
+@pytest.mark.requires_linux
+def test_file_runner_timeout_reaps_nested_process_group_and_stops_writes(
+    tmp_path,
+    monkeypatch,
+):
+    from sol_execbench.core.integrity import sha256_file
+
+    child_pid_path = tmp_path / "nested-child.pid"
+    oaves_path = tmp_path / "oaves.csv"
+    grandchild = (
+        "import pathlib, signal, time; "
+        "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+        f"p = pathlib.Path({str(oaves_path)!r}); "
+        "handle = p.open('a', encoding='utf-8'); "
+        "handle.write('0,0,0\\n'); handle.flush(); "
+        "i = 1\n"
+        "while True:\n"
+        "    time.sleep(0.01)\n"
+        "    handle.write(f'{i},{i},{i}\\n'); handle.flush(); i += 1\n"
+    )
+    leader = (
+        "import pathlib, subprocess, sys, time; "
+        f"child = subprocess.Popen([sys.executable, '-c', {grandchild!r}], process_group=0); "
+        f"pathlib.Path({str(child_pid_path)!r}).write_text(str(child.pid)); "
+        "time.sleep(60)"
+    )
+    real_popen = subprocess.Popen
+
+    def wait_for_nested_writer(*args, **kwargs):
+        proc = real_popen(*args, **kwargs)
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if (
+                child_pid_path.exists()
+                and oaves_path.exists()
+                and oaves_path.stat().st_size > 0
+            ):
+                return proc
+            time.sleep(0.01)
+        subprocesses._terminate_unreaped_process_group(proc)
+        pytest.fail("nested-PGID child did not start writing within 5 seconds")
+
+    monkeypatch.setattr(
+        subprocesses.subprocess, "Popen", wait_for_nested_writer
+    )
+    monkeypatch.setattr(subprocesses, "_PROCESS_GROUP_GRACE_SECONDS", 0.05)
+
+    with pytest.raises(subprocess.TimeoutExpired):
+        run_in_process_group_to_files(
+            (sys.executable, "-c", leader),
+            tmp_path / "stdout.log",
+            tmp_path / "stderr.log",
+            cwd=tmp_path,
+            timeout=0.1,
+        )
+
+    child_pid = int(child_pid_path.read_text())
+    try:
+        digest_at_return = sha256_file(oaves_path)
+        assert _wait_for_process_exit(child_pid)
+        time.sleep(0.1)
+        assert sha256_file(oaves_path) == digest_at_return
+    finally:
+        if not _wait_for_process_exit(child_pid):
+            os.kill(child_pid, signal.SIGKILL)

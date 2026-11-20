@@ -27,7 +27,11 @@ from solar.analysis.scan_grid import plan_grid, profile_at_point
 from solar.artifacts import sha256_file, stable_json_checksum
 from solar.artifacts.json import write_json_artifact
 from solar.artifacts.names import REUSE_FILENAME
-from solar.errors import SolarError, ToolchainUnavailableError
+from solar.errors import (
+    MapperTimeoutError,
+    SolarError,
+    ToolchainUnavailableError,
+)
 from solar.pipeline.reuse_projection import load_projection_profile
 from solar.pipeline.scan_artifacts import (
     check_projection,
@@ -159,19 +163,49 @@ class ScanExecutor:
         )
         self.points[point.index] = current
         try:
+            self.points[point.index] = self._execute_point(
+                session, point, remaining, current
+            )
+        finally:
+            current = self.points[point.index].model_copy(
+                update={"elapsed_seconds": monotonic() - started}
+            )
+            self.points[point.index] = current
+            write_json_artifact(
+                self.output / f"{point.point_id}.json",
+                current.model_dump(mode="json"),
+                max_bytes=MAX_SCAN_REPORT_BYTES,
+            )
+
+    def _execute_point(
+        self,
+        session: ReuseSession,
+        point: ScanPoint,
+        remaining: float,
+        current: ScanPoint,
+    ) -> ScanPoint:
+        try:
             with analysis_deadline(
                 min(self.request.budget.point_seconds, remaining)
             ):
-                current = self._project(session, point)
+                return self._project(session, point)
         except AnalysisDeadline:
-            current = current.model_copy(
+            return current.model_copy(
                 update={
                     "status": PointStatus.TIMEOUT,
                     "reason": "point_deadline",
                 }
             )
+        except MapperTimeoutError as exc:
+            return current.model_copy(
+                update={
+                    "status": PointStatus.TIMEOUT,
+                    "reason": exc.reason_code,
+                    "message": str(exc)[:MAX_SCAN_MESSAGE_CHARS],
+                }
+            )
         except ToolchainUnavailableError as exc:
-            current = current.model_copy(
+            return current.model_copy(
                 update={
                     "status": PointStatus.FAILED,
                     "reason": exc.reason_code,
@@ -179,7 +213,7 @@ class ScanExecutor:
                 }
             )
         except ValueError as exc:
-            current = current.model_copy(
+            return current.model_copy(
                 update={
                     "status": PointStatus.INVALID,
                     "reason": exc.reason_code
@@ -189,7 +223,7 @@ class ScanExecutor:
                 }
             )
         except OSError as exc:
-            current = current.model_copy(
+            return current.model_copy(
                 update={
                     "status": PointStatus.FAILED,
                     "reason": "point_io_failure",
@@ -203,17 +237,8 @@ class ScanExecutor:
                     "reason": "worker_terminated",
                 }
             )
-            raise
-        finally:
-            current = current.model_copy(
-                update={"elapsed_seconds": monotonic() - started}
-            )
             self.points[point.index] = current
-            write_json_artifact(
-                self.output / f"{point.point_id}.json",
-                current.model_dump(mode="json"),
-                max_bytes=MAX_SCAN_REPORT_BYTES,
-            )
+            raise
 
     def _project(self, session: ReuseSession, point: ScanPoint) -> ScanPoint:
         profile = profile_at_point(

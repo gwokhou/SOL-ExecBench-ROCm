@@ -4,11 +4,14 @@ import os
 import signal
 import threading
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 
 from sol_execbench.core.data.json_utils import atomic_write_json_value
+from sol_execbench.core.process.process_observation import (
+    session_member_process_groups,
+)
 
 _POLL_SECONDS = 0.1
 _PROC = Path("/proc")
@@ -37,7 +40,7 @@ def process_group_rss(group: int) -> int:
         try:
             stat = (path / "stat").read_text()
             fields = stat[stat.rfind(")") + 2 :].split()
-            if int(fields[2]) == group:
+            if int(fields[2]) == group or int(fields[3]) == group:
                 pages += int((path / "statm").read_text().split()[1])
         except FileNotFoundError, ProcessLookupError:
             continue
@@ -106,5 +109,9 @@ def _watch_budget(
         except OSError, ValueError, IndexError:
             reason = "resource_observation_failed"
         atomic_write_json_value(failure, {"reason": reason})
+        extra_groups = session_member_process_groups(group) - {group}
         os.killpg(group, signal.SIGTERM)
+        for pgid in sorted(extra_groups):
+            with suppress(PermissionError, ProcessLookupError):
+                os.killpg(pgid, signal.SIGTERM)
         return

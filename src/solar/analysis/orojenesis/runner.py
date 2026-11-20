@@ -31,7 +31,10 @@ from solar.analysis.orojenesis.curves import (
     compose_multi_einsum_curve,
     parse_multi_mapping_records,
 )
-from solar.analysis.orojenesis.errors import OrojenesisError
+from solar.analysis.orojenesis.errors import (
+    OrojenesisError,
+    OrojenesisTimeoutError,
+)
 from solar.analysis.orojenesis.identity import validate_toolchain_identity
 from solar.analysis.orojenesis.multi_einsum import (
     _divisors,
@@ -619,6 +622,10 @@ class OrojenesisRunner:
                 cwd=plan.output,
                 env=plan.environment,
             )
+        except subprocess.TimeoutExpired as exc:
+            raise OrojenesisTimeoutError(
+                f"Orojenesis mapper exceeded {self.timeout_seconds}s timeout",
+            ) from exc
         except (OSError, subprocess.SubprocessError) as exc:
             raise OrojenesisError("Orojenesis execution failed") from exc
         if completed.returncode != 0:
@@ -923,6 +930,11 @@ class OrojenesisRunner:
                 cwd=sweep_dir,
                 env=environment,
             )
+        except subprocess.TimeoutExpired as exc:
+            raise OrojenesisTimeoutError(
+                "multi-einsum Orojenesis mapper exceeded "
+                f"{self.timeout_seconds}s timeout for {context}, M={row_tile}",
+            ) from exc
         except (OSError, subprocess.SubprocessError) as exc:
             raise OrojenesisError(
                 "multi-einsum Orojenesis execution failed",
