@@ -377,13 +377,16 @@ def _cpu_gpu_lock_fixture_configuration(request, tmp_path_factory, monkeypatch):
     """Use temporary explicit UUID records for CPU tests, never host state."""
     if _has_real_gpu_marker(request.node):
         return
-    from sol_execbench.core.bench import clock_ownership
+    from sol_execbench.core.bench import clock_ownership, single_gpu_defaults
     from sol_execbench.core.bench.rocm_profiler.pmc_clock import (
         ENV_PMC_CLOCK_MODE,
         ENV_PMC_CLOCK_TARGET,
     )
 
     tmp_path = tmp_path_factory.mktemp("gpu-control")
+    monkeypatch.setattr(
+        single_gpu_defaults, "PCI_DEVICES_ROOT", tmp_path / "empty-pci"
+    )
     monkeypatch.setenv("GPU_LOCK_DIR", str(tmp_path / "gpu-locks"))
     monkeypatch.setenv("GPU_LOCK_UUID", "11111111-2222-3333-4444-555555555555")
     monkeypatch.setenv(

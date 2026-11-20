@@ -40,6 +40,9 @@ from sol_execbench.core.bench.rocm_profiler.evaluate_scope_models import (
 from sol_execbench.core.bench.rocm_profiler.pmc_clock import (
     configured_pmc_clock_options,
 )
+from sol_execbench.core.bench.single_gpu_defaults import (
+    host_single_gpu_defaults,
+)
 from sol_execbench.core.bench.static_kernel.evidence import (
     StaticKernelEvidenceSidecar,
 )
@@ -103,6 +106,7 @@ def evaluation_execution_boundary(
     nonce_name = ENV_SOL_EXECBENCH_INPUT_NONCE
     try:
         with (
+            host_single_gpu_defaults(),
             cleanup_on_termination()
             if threading.current_thread() is threading.main_thread()
             else nullcontext(),

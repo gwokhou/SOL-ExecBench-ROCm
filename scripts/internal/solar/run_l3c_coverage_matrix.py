@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from collections import Counter
@@ -264,11 +265,12 @@ def main() -> int:
     parser.add_argument(
         "--orojenesis-home",
         type=Path,
-        default=Path(
-            "/home/runner/workspace/external/crosssol-eval/out/"
-            "paper-a-local-20261005-v8/infrastructure-amd-v8/"
-            "prerequisites/external/amd-orojenesis"
+        default=(
+            Path(env_home)
+            if (env_home := os.environ.get("SOLAR_OROJENESIS_HOME"))
+            else None
         ),
+        required="SOLAR_OROJENESIS_HOME" not in os.environ,
     )
     parser.add_argument("--timeout", type=float, default=3600.0)
     parser.add_argument("--resume", action="store_true")

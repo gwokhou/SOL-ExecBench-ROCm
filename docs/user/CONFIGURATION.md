@@ -100,7 +100,12 @@ export SOL_EXECBENCH_PMC_CLOCK_MODE=required
 ## GPU ownership and recovery
 
 GPU execution requires `GPU_LOCK_DIR` (an absolute host directory) and
-`GPU_LOCK_UUID` (the full AMD-SMI UUID). The agreed local configuration is:
+`GPU_LOCK_UUID` (the full AMD-SMI UUID). On single-GPU AMD hosts, the
+`sol-execbench evaluate` boundary and `scripts/run_docker.sh` automatically
+derive omitted values (`GPU_LOCK_DIR=${XDG_STATE_HOME:-~/.local/state}`,
+`SOL_EXECBENCH_CLOCK_STATE_DIR=<GPU_LOCK_DIR>/gpu-leases/sol`, and the sole
+GPU's `GPU_LOCK_UUID` + `ROCR_VISIBLE_DEVICES`). On multi-GPU hosts—or to
+pin a specific card explicitly—set them explicitly:
 
 ```bash
 export GPU_LOCK_DIR=/home/runner/.local/state

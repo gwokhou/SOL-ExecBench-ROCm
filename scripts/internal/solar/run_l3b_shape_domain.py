@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -466,11 +467,12 @@ def main() -> int:
     parser.add_argument(
         "--orojenesis-home",
         type=Path,
-        default=Path(
-            "/home/runner/workspace/external/crosssol-eval/out/"
-            "paper-a-local-20261005-v8/infrastructure-amd-v8/"
-            "prerequisites/external/amd-orojenesis"
+        default=(
+            Path(env_home)
+            if (env_home := os.environ.get("SOLAR_OROJENESIS_HOME"))
+            else None
         ),
+        required="SOLAR_OROJENESIS_HOME" not in os.environ,
     )
     args = parser.parse_args()
     args.output_root.mkdir(parents=True, exist_ok=True)

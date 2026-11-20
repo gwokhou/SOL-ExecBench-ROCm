@@ -75,8 +75,17 @@ CONTAINER_OUTPUTS = "/outputs"
 CONTAINER_PYTHON = "/venv/bin/python"
 CAMPAIGN_MODULE = "scripts.internal.solar.c2_c3_campaign"
 CAMPAIGN_SOURCE = REPO / "scripts/internal/solar/c2_c3_campaign.py"
+
+
+def _default_admission_record(state_dir: Path) -> Path:
+    candidates = sorted((state_dir / "gpu-admission").glob("*.json"))
+    if len(candidates) == 1:
+        return candidates[0]
+    return state_dir / "gpu-admission/default.json"
+
+
 DEFAULT_LOCK_DIR = Path.home() / ".local/state"
-DEFAULT_ADMISSION = DEFAULT_LOCK_DIR / "gpu-admission/rx9060xt.json"
+DEFAULT_ADMISSION = _default_admission_record(DEFAULT_LOCK_DIR)
 DEFAULT_CLOCK_STATE = DEFAULT_LOCK_DIR / "gpu-leases/sol"
 CACHE_ENV = {
     "TRITON_CACHE_DIR": "/tmp/triton",
@@ -563,7 +572,9 @@ def _load_validated_config(
 
 def _native_env(cfg: HostConfig) -> dict[str, str]:
     lock_dir = Path(os.environ.get(GPU_LOCK_DIR_ENV, DEFAULT_LOCK_DIR))
-    admission = Path(os.environ.get(ADMISSION_ENV, DEFAULT_ADMISSION))
+    admission = Path(
+        os.environ.get(ADMISSION_ENV, _default_admission_record(lock_dir))
+    )
     clock_state = Path(os.environ.get(CLOCK_STATE_ENV, DEFAULT_CLOCK_STATE))
     device = cfg.spec["device"]
     unique_id = (

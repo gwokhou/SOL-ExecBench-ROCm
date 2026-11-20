@@ -40,10 +40,8 @@ IMAGE_TAG="${IMAGE_TAG:-}"
 CONTAINER_PROJECT="/sol-execbench"
 # UUID lock configuration is mandatory for GPU execution; no legacy defaults.
 GPU_LOCK_DIR="${GPU_LOCK_DIR:-}"
-# Keep the existing native history when no explicit private state was selected.
-# The host owner creates/validates this path under L1 before Docker starts.
-SOL_EXECBENCH_CLOCK_STATE_DIR="${SOL_EXECBENCH_CLOCK_STATE_DIR:-/tmp/sol-execbench-locks}"
-export SOL_EXECBENCH_CLOCK_STATE_DIR
+# Keep omitted state dir empty until single-GPU defaults run below.
+SOL_EXECBENCH_CLOCK_STATE_DIR="${SOL_EXECBENCH_CLOCK_STATE_DIR:-}"
 OUTPUT_DIR="${SOL_EXECBENCH_OUTPUT_DIR:-${REPO_ROOT}/data/outputs}"
 DOCKER_TARGET=""
 ALLOW_UNKNOWN_TARGET=false
@@ -553,7 +551,23 @@ if [ -t 0 ] && [ -t 1 ]; then
     TTY_ARGS=(-it)
 fi
 
-# Validate existing bind sources; deployment/host owner creates them beforehand.
+# Auto-derive single-GPU defaults when omitted, then validate bind sources.
+if [ "${DRY_RUN}" = "1" ]; then
+    _defaults_flags=()
+else
+    _defaults_flags=(--prepare-locks)
+fi
+while IFS='=' read -r _k _v; do
+    if [ -n "${_k}" ]; then
+        export "${_k}=${_v}"
+    fi
+done < <(run_host_python -m sol_execbench.core.bench.single_gpu_defaults ${_defaults_flags[@]+"${_defaults_flags[@]}"})
+if [ -n "${SOL_EXECBENCH_CLOCK_STATE_DIR:-}" ]; then
+    export SOL_EXECBENCH_CLOCK_STATE_DIR
+    if [ "${DRY_RUN}" != "1" ]; then
+        mkdir -p "${SOL_EXECBENCH_CLOCK_STATE_DIR}"
+    fi
+fi
 GPU_LOCK_UUID="$(run_host_python -c 'from sol_execbench.core.bench.gpu_lock_paths import configured_gpu_locks; print(configured_gpu_locks().uuid)')"
 export GPU_LOCK_UUID
 for layer in L1-ownership L2-execution; do

@@ -14,12 +14,20 @@ from sol_execbench.core.scoring.release_environment import (
     verify_release_source_state,
 )
 
+
+def _default_admission_record(state_dir: Path) -> Path:
+    candidates = sorted((state_dir / "gpu-admission").glob("*.json"))
+    if len(candidates) == 1:
+        return candidates[0]
+    return state_dir / "gpu-admission/default.json"
+
+
 CODE = Path(__file__).resolve().parent
 ROOT = CODE.parents[3]
 HISTORY = ROOT / "data/outputs/solar-e2-20261108-r2"
 STATE = Path.home() / ".local/state"
 CLOCK_STATE = STATE / "gpu-leases/sol"
-ADMISSION = STATE / "gpu-admission/rx9060xt.json"
+ADMISSION = _default_admission_record(STATE)
 GPU_SECONDS = 1800
 IMAGE_TAG = "solar-b1-20261108"
 SMI = "/usr/bin/amd-smi"
