@@ -49,3 +49,5 @@ pytest*
 .artifacts/
 .worktrees/
 .omc
+.agents
+.codex
