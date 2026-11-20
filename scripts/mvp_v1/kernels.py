@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Cross-vendor kernels and PyTorch references for the 3-operator MVP."""
+"""ROCm software-stack kernels and PyTorch references for the 3-operator MVP."""
 
 from __future__ import annotations
 
@@ -22,19 +22,61 @@ from scripts.mvp_v1.triton_kernels import (
     supports_splitk_gqa,
 )
 from scripts.mvp_v1.vendor_adapters import (
-    try_make_aiter_fp8_gemm_runner,
-    try_make_flashinfer_gqa_runner,
-    try_make_vendor_moe_runner,
+    PreparedRunner,
+    try_make_aiter_gemm_runner,
+    try_make_aiter_gqa_runner,
+    try_make_aiter_moe_runner,
+    try_make_vllm_gemm_runner,
+    try_make_vllm_gqa_runner,
+    try_make_vllm_moe_runner,
 )
 
 
 class KernelBackend(StrEnum):
-    """Execution backend preference for GPU runs."""
+    """ROCm software-stack tier selection for vertical SOL diagnosis."""
 
     AUTO = "auto"
-    VENDOR = "vendor"
-    TRITON = "triton"
+    TIER1_PORTABLE = "portable"
+    TIER2_VLLM = "vllm"
+    TIER3_AITER = "aiter"
     PYTORCH = "pytorch"
+
+
+def _cpu_unavailable(prototype_args: list[Any]) -> PreparedRunner:
+    return PreparedRunner(
+        fn=None,
+        implementation_name="unavailable:cpu_device",
+        candidate_args=prototype_args,
+        unavailable_reason="cpu_device",
+    )
+
+
+def _dispatch_vendor_tiers(
+    prototype_args: list[Any],
+    *,
+    device: str,
+    backend: KernelBackend,
+    make_aiter: Callable[[], PreparedRunner],
+    make_vllm: Callable[[], PreparedRunner],
+) -> PreparedRunner | None:
+    if backend is KernelBackend.TIER3_AITER:
+        return (
+            _cpu_unavailable(prototype_args)
+            if device == "cpu"
+            else make_aiter()
+        )
+    if backend is KernelBackend.TIER2_VLLM:
+        return (
+            _cpu_unavailable(prototype_args) if device == "cpu" else make_vllm()
+        )
+    if backend is KernelBackend.AUTO and device != "cpu":
+        aiter_res = make_aiter()
+        if aiter_res.fn is not None:
+            return aiter_res
+        vllm_res = make_vllm()
+        if vllm_res.fn is not None:
+            return vllm_res
+    return None
 
 
 def ref_skinny_gemm(x: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
@@ -55,8 +97,22 @@ def _probe_fp8_candidate(
             and tuple(out.shape) == expected_shape
             and bool(torch.isfinite(out).all().item())
         )
-    except Exception:  # noqa: BLE001 -- hipBLASLt/cuBLASLt shape probe
+    except Exception:  # noqa: BLE001 -- hipBLASLt shape probe
         return False
+
+
+def _make_dequant_fp8_gemm(
+    scale_a: torch.Tensor,
+    scale_b: torch.Tensor,
+) -> Callable[..., torch.Tensor]:
+    combined_scale = (scale_a.float() * scale_b.float()).to(torch.bfloat16)
+
+    def _run_dequant(x: torch.Tensor, weight_t: torch.Tensor) -> torch.Tensor:
+        return (x.to(torch.bfloat16) @ weight_t.to(torch.bfloat16)) * (
+            combined_scale
+        )
+
+    return _run_dequant
 
 
 def _select_gpu_fp8_gemm_runner(
@@ -101,16 +157,10 @@ def _select_gpu_fp8_gemm_runner(
         if _probe_fp8_candidate(_run_fp8_pad16, prototype_args, expected_shape):
             return _run_fp8_pad16, "torch._scaled_mm_pad16"
 
-    combined_scale = (scale_a.float() * scale_b.float()).to(torch.bfloat16)
-
-    def _run_dequant_fallback(
-        x: torch.Tensor, weight_t: torch.Tensor
-    ) -> torch.Tensor:
-        return (
-            x.to(torch.bfloat16) @ weight_t.to(torch.bfloat16)
-        ) * combined_scale
-
-    return _run_dequant_fallback, "bf16_dequant_matmul_fallback"
+    return (
+        _make_dequant_fp8_gemm(scale_a, scale_b),
+        "bf16_dequant_matmul_fallback",
+    )
 
 
 def make_skinny_gemm_runner(
@@ -122,30 +172,57 @@ def make_skinny_gemm_runner(
     scale_a: torch.Tensor | None = None,
     scale_b: torch.Tensor | None = None,
     max_atol: float = 5e-1,
-) -> tuple[Callable[..., torch.Tensor], str]:
-    """Build candidate runner for BF16 matmul, AITER FP8, or FP8 scaled_mm."""
-    if not fp8:
-        return torch.matmul, "torch.matmul"
-    if device == "cpu" or scale_a is None or scale_b is None:
-        return (
-            lambda x, w_t: (x.float() @ w_t.float()).to(torch.bfloat16),
-            "cpu_fp8_ref",
-        )
-    if backend in (KernelBackend.AUTO, KernelBackend.VENDOR):
-        aiter_match = try_make_aiter_fp8_gemm_runner(
+) -> PreparedRunner:
+    """Build candidate runner for Tier 1..3 ROCm stacks or pure PyTorch."""
+    vendor_res = _dispatch_vendor_tiers(
+        prototype_args,
+        device=device,
+        backend=backend,
+        make_aiter=lambda: try_make_aiter_gemm_runner(
             prototype_args,
+            fp8=fp8,
             scale_a=scale_a,
             scale_b=scale_b,
-            device=device,
             ref_fn=ref_skinny_gemm,
             max_atol=max_atol,
+        ),
+        make_vllm=lambda: try_make_vllm_gemm_runner(
+            prototype_args,
+            fp8=fp8,
+            scale_a=scale_a,
+            scale_b=scale_b,
+            ref_fn=ref_skinny_gemm,
+            max_atol=max_atol,
+        ),
+    )
+    if vendor_res is not None:
+        return vendor_res
+
+    if not fp8:
+        return PreparedRunner(
+            fn=torch.matmul,
+            implementation_name="torch.matmul",
+            candidate_args=prototype_args,
         )
-        if aiter_match is not None:
-            return aiter_match
-    return _select_gpu_fp8_gemm_runner(
+    if device == "cpu" or scale_a is None or scale_b is None:
+        return PreparedRunner(
+            fn=lambda x, w_t: (x.float() @ w_t.float()).to(torch.bfloat16),
+            implementation_name="cpu_fp8_ref",
+            candidate_args=prototype_args,
+        )
+    if backend is KernelBackend.PYTORCH:
+        return PreparedRunner(
+            fn=_make_dequant_fp8_gemm(scale_a, scale_b),
+            implementation_name="bf16_dequant_matmul",
+            candidate_args=prototype_args,
+        )
+    fn, impl = _select_gpu_fp8_gemm_runner(
         prototype_args,
         scale_a=scale_a,
         scale_b=scale_b,
+    )
+    return PreparedRunner(
+        fn=fn, implementation_name=impl, candidate_args=prototype_args
     )
 
 
@@ -221,19 +298,29 @@ def make_fused_moe_runner(
     device: str,
     backend: KernelBackend = KernelBackend.AUTO,
     max_atol: float = 5e-2,
-) -> tuple[Callable[..., torch.Tensor], str]:
-    """Select vendor Fused MoE, fused Triton MoE, or grouped PyTorch fallback."""
+) -> PreparedRunner:
+    """Select Tier 3 AITER, Tier 2 vLLM, Tier 1 Triton, or grouped PyTorch."""
+    vendor_res = _dispatch_vendor_tiers(
+        prototype_args,
+        device=device,
+        backend=backend,
+        make_aiter=lambda: try_make_aiter_moe_runner(
+            prototype_args, ref_fn=ref_fused_moe, max_atol=max_atol
+        ),
+        make_vllm=lambda: try_make_vllm_moe_runner(
+            prototype_args, ref_fn=ref_fused_moe, max_atol=max_atol
+        ),
+    )
+    if vendor_res is not None:
+        return vendor_res
+
     if device == "cpu" or backend is KernelBackend.PYTORCH:
-        return run_fused_moe_grouped, "grouped_swiglu_moe"
-    if backend in (KernelBackend.AUTO, KernelBackend.VENDOR):
-        vendor = try_make_vendor_moe_runner(
-            prototype_args,
-            device=device,
-            ref_fn=ref_fused_moe,
-            max_atol=max_atol,
+        return PreparedRunner(
+            fn=run_fused_moe_grouped,
+            implementation_name="grouped_swiglu_moe",
+            candidate_args=prototype_args,
         )
-        if vendor is not None:
-            return vendor
+
     tokens, gate_w, _up, _down, _logits, top_k = prototype_args
     workspace = allocate_fused_moe_workspace(
         tokens, gate_w.shape[2], int(top_k)
@@ -244,9 +331,17 @@ def make_fused_moe_runner(
 
     try:
         _run_triton_moe(*prototype_args)
-        return _run_triton_moe, "triton_fused_swiglu_moe"
+        return PreparedRunner(
+            fn=_run_triton_moe,
+            implementation_name="triton_fused_swiglu_moe",
+            candidate_args=prototype_args,
+        )
     except Exception:  # noqa: BLE001 -- degrade cleanly if triton fails
-        return run_fused_moe_grouped, "grouped_swiglu_moe"
+        return PreparedRunner(
+            fn=run_fused_moe_grouped,
+            implementation_name="grouped_swiglu_moe",
+            candidate_args=prototype_args,
+        )
 
 
 def ref_gqa_paged_decode(
@@ -412,24 +507,45 @@ def make_gqa_paged_decode_runner(
     device: str,
     backend: KernelBackend = KernelBackend.AUTO,
     max_atol: float = 2e-2,
-) -> tuple[Callable[..., torch.Tensor], str]:
-    """Select FlashInfer, Split-KV Triton, single-split Triton, or CPU ref."""
+) -> PreparedRunner:
+    """Select Tier 3 AITER, Tier 2 vLLM, Split-KV Triton, or PyTorch ref."""
+    vendor_res = _dispatch_vendor_tiers(
+        prototype_args,
+        device=device,
+        backend=backend,
+        make_aiter=lambda: try_make_aiter_gqa_runner(
+            prototype_args, ref_fn=ref_gqa_paged_decode, max_atol=max_atol
+        ),
+        make_vllm=lambda: try_make_vllm_gqa_runner(
+            prototype_args, ref_fn=ref_gqa_paged_decode, max_atol=max_atol
+        ),
+    )
+    if vendor_res is not None:
+        return vendor_res
+
     if device == "cpu" or backend is KernelBackend.PYTORCH:
-        return ref_gqa_paged_decode, "pytorch_ref"
-    if backend in (KernelBackend.AUTO, KernelBackend.VENDOR):
-        vendor = try_make_flashinfer_gqa_runner(
-            prototype_args,
-            device=device,
-            ref_fn=ref_gqa_paged_decode,
-            max_atol=max_atol,
+        return PreparedRunner(
+            fn=ref_gqa_paged_decode,
+            implementation_name="pytorch_ref",
+            candidate_args=prototype_args,
         )
-        if vendor is not None:
-            return vendor
     splitk = _try_splitk_gqa(prototype_args)
     if splitk is not None:
-        return splitk
+        return PreparedRunner(
+            fn=splitk[0],
+            implementation_name=splitk[1],
+            candidate_args=prototype_args,
+        )
     try:
         run_gqa_paged_decode_triton(*prototype_args)
-        return run_gqa_paged_decode_triton, "triton_paged_gqa"
+        return PreparedRunner(
+            fn=run_gqa_paged_decode_triton,
+            implementation_name="triton_paged_gqa",
+            candidate_args=prototype_args,
+        )
     except Exception:  # noqa: BLE001 -- degrade cleanly if triton unavailable
-        return ref_gqa_paged_decode, "pytorch_ref_fallback"
+        return PreparedRunner(
+            fn=ref_gqa_paged_decode,
+            implementation_name="pytorch_ref_fallback",
+            candidate_args=prototype_args,
+        )

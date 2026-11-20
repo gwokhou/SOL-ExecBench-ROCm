@@ -1,16 +1,19 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Canonical Trace, JSON, CSV, and Markdown reporting for MVP v0.1."""
+"""Canonical Trace, JSON, CSV, and ROCm vertical stack SOL report helpers."""
 
 from __future__ import annotations
 
 import csv
 import json
 import re
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+
+import torch
 
 from scripts.mvp_v1.analytical_roofline import EmpiricalCeiling, HardwareCeiling
 from scripts.mvp_v1.anti_distortion import (
@@ -36,10 +39,14 @@ from sol_execbench.core.data.trace import (
 )
 from sol_execbench.core.timestamps import utc_timestamp
 
+_DISPATCH_GAP_RATIO = 1.25
+_LOW_EMP_SOL_PCT = 35.0
+_HIGH_TRAFFIC_AMP = 1.50
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class WorkloadMeasurementRow:
-    """Flattened benchmark + Spec/Empirical SOL + counter row."""
+    """Flattened benchmark + Spec/Empirical SOL + ROCm counter row."""
 
     workload_id: str
     operator: str
@@ -63,7 +70,6 @@ class WorkloadMeasurementRow:
     counter_status: str
     observed_mem_bytes: float | None
     traffic_amplification: float | None
-    tensor_core_pct: float | None
     mfma_instructions: float | None
 
 
@@ -115,8 +121,51 @@ def build_measurement_row(
         counter_status=counters.status,
         observed_mem_bytes=counters.memory_bytes,
         traffic_amplification=amp,
-        tensor_core_pct=counters.tensor_core_pct,
         mfma_instructions=counters.mfma_instructions,
+    )
+
+
+def build_unavailable_row(case: RuntimeCase) -> WorkloadMeasurementRow:
+    """Build an explicit non-fallback row when a stack tier is unavailable."""
+    b = case.bound
+    return WorkloadMeasurementRow(
+        workload_id=case.spec.workload_id,
+        operator=case.spec.operator.value,
+        precision=case.spec.precision.value,
+        implementation=case.implementation_name,
+        correctness_passed=False,
+        max_abs_err=0.0,
+        max_rel_err=0.0,
+        median_ms=0.0,
+        mean_ms=0.0,
+        p90_ms=0.0,
+        flops=b.flops,
+        compulsory_bytes=b.compulsory_bytes,
+        arithmetic_intensity=b.arithmetic_intensity,
+        t_sol_ms_spec=b.t_sol_ms_spec,
+        sol_pct_spec=0.0,
+        bottleneck_spec=b.bottleneck_spec,
+        t_sol_ms_empirical=b.t_sol_ms_empirical,
+        sol_pct_empirical=None,
+        bottleneck_empirical=b.bottleneck_empirical,
+        counter_status="skipped_unavailable",
+        observed_mem_bytes=None,
+        traffic_amplification=None,
+        mfma_instructions=None,
+    )
+
+
+def _make_environment(
+    ceiling: HardwareCeiling,
+    *,
+    clocks_locked: bool,
+) -> Environment:
+    return Environment(
+        hardware=f"{ceiling.device_name} ({ceiling.architecture})",
+        libs={"torch": str(torch.__version__)},
+        execution_isolation="mvp_v1_standalone",
+        clocks_locked=clocks_locked,
+        timing_protocol="device_events_llc_rotating_flush",
     )
 
 
@@ -179,16 +228,32 @@ def build_trace_record(
         solution=case.implementation_name,
         evaluation=Evaluation(
             status=status,
-            environment=Environment(
-                hardware=f"{ceiling.device_name} ({ceiling.architecture})",
-                libs={"torch": str(__import__("torch").__version__)},
-                execution_isolation="mvp_v1_standalone",
-                clocks_locked=clocks_locked,
-                timing_protocol="device_events_llc_rotating_flush",
-            ),
+            environment=_make_environment(ceiling, clocks_locked=clocks_locked),
             timestamp=utc_timestamp(),
             correctness=enriched,
             performance=performance,
+        ),
+    )
+
+
+def build_unavailable_trace(
+    case: RuntimeCase,
+    *,
+    ceiling: HardwareCeiling,
+    clocks_locked: bool,
+) -> Trace:
+    """Emit a valid schema ``Trace`` for an unavailable stack tier."""
+    return Trace(
+        definition=case.trace_definition.name,
+        workload=case.trace_workload,
+        solution=case.implementation_name,
+        evaluation=Evaluation(
+            status=EvaluationStatus.RUNTIME_ERROR,
+            environment=_make_environment(ceiling, clocks_locked=clocks_locked),
+            timestamp=utc_timestamp(),
+            log=case.unavailable_reason or case.implementation_name,
+            correctness=None,
+            performance=None,
         ),
     )
 
@@ -204,12 +269,14 @@ def render_report_markdown(
     dvfs: DVFSWindowReceipt,
     rows: list[WorkloadMeasurementRow],
     env_probe: RuntimeEnvironmentProbe | None = None,
+    backend_name: str = "auto",
 ) -> str:
     """Render concise human-readable dual-denominator SOL Markdown report."""
     lines = [
         f"# v0.1 MVP 3-Operator Roofline Report — {ceiling.target_id}",
         "",
         f"- **Device**: `{ceiling.device_name}` (`{ceiling.architecture}`)",
+        f"- **Stack Tier**: `{backend_name}`",
         (
             f"- **Spec Limits**: HBM `{ceiling.hbm_bandwidth_bytes_per_s / 1e12:.2f} TB/s`, "
             f"BF16 `{ceiling.peak_bf16_flops_per_s / 1e12:.1f} TFLOPS`, "
@@ -244,17 +311,26 @@ def render_report_markdown(
         ]
     )
     for r in rows:
-        spec_cell = f"{r.t_sol_ms_spec:.4f} / {r.sol_pct_spec:.1f}%"
+        unavail = r.implementation.startswith("unavailable")
+        med_cell = "-" if unavail else f"{r.median_ms:.4f}"
+        spec_cell = (
+            f"{r.t_sol_ms_spec:.4f} / -"
+            if unavail
+            else f"{r.t_sol_ms_spec:.4f} / {r.sol_pct_spec:.1f}%"
+        )
         emp_cell = (
             f"{r.t_sol_ms_empirical:.4f} / {r.sol_pct_empirical:.1f}%"
-            if r.t_sol_ms_empirical is not None
+            if not unavail
+            and r.t_sol_ms_empirical is not None
             and r.sol_pct_empirical is not None
             else "- / -"
         )
-        amp_cell = _format_opt(r.traffic_amplification, ".2f")
+        amp_cell = (
+            "-" if unavail else _format_opt(r.traffic_amplification, ".2f")
+        )
         lines.append(
             f"| `{r.workload_id}` | `{r.implementation}` | `{r.correctness_passed}` | "
-            f"{r.median_ms:.4f} | {spec_cell} | {emp_cell} | "
+            f"{med_cell} | {spec_cell} | {emp_cell} | "
             f"{r.arithmetic_intensity:.1f} | {r.bottleneck_spec} | {amp_cell} |"
         )
     lines.append("")
@@ -270,11 +346,13 @@ def write_mvp_outputs(
     rows: list[WorkloadMeasurementRow],
     traces: list[Trace],
     env_probe: RuntimeEnvironmentProbe | None = None,
+    backend_name: str = "auto",
 ) -> dict[str, Path]:
     """Atomically write summary.json, summary.csv, traces.jsonl, and report.md."""
     output_dir.mkdir(parents=True, exist_ok=True)
     summary_payload: dict[str, Any] = {
         "created_at": utc_timestamp(),
+        "backend": backend_name,
         "target": asdict(ceiling),
         "environment_probe": asdict(env_probe)
         if env_probe is not None
@@ -305,6 +383,7 @@ def write_mvp_outputs(
             dvfs=dvfs,
             rows=rows,
             env_probe=env_probe,
+            backend_name=backend_name,
         ),
         encoding="utf-8",
     )
@@ -317,6 +396,7 @@ def write_mvp_outputs(
 
 
 _REPORT_TITLE_TARGET_RE = re.compile(r"^#\s+.*?(?:—|-)\s+([A-Za-z0-9_.-]+)\s*$")
+_REPORT_BACKEND_RE = re.compile(r"^-\s+\*\*Stack Tier\*\*:\s+`([^`]+)`\s*$")
 
 
 def _parse_pct_cell(cell: str) -> float | None:
@@ -325,19 +405,66 @@ def _parse_pct_cell(cell: str) -> float | None:
     pct_part = cell.split("/", maxsplit=1)[1].strip()
     if not pct_part or pct_part.startswith("-"):
         return None
-    return float(pct_part.rstrip("%").strip())
+    return round(float(pct_part.rstrip("%").strip()), 1)
+
+
+def _parse_opt_float(raw: str, decimals: int) -> float | None:
+    cleaned = raw.strip()
+    if not cleaned or cleaned == "-":
+        return None
+    return round(float(cleaned), decimals)
+
+
+def _load_json_comparison_source(payload: dict[str, Any]) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    for row in payload.get("rows", []):
+        impl = str(row.get("implementation", ""))
+        unavail = impl.startswith("unavailable")
+        emp_raw = row.get("sol_pct_empirical")
+        amp_raw = row.get("traffic_amplification")
+        rows.append(
+            {
+                "workload_id": str(row["workload_id"]),
+                "implementation": impl,
+                "median_ms": None
+                if unavail
+                else round(float(row["median_ms"]), 4),
+                "sol_pct_spec": None
+                if unavail
+                else round(float(row["sol_pct_spec"]), 1),
+                "sol_pct_empirical": (
+                    None
+                    if unavail or emp_raw is None
+                    else round(float(emp_raw), 1)
+                ),
+                "traffic_amplification": (
+                    None
+                    if unavail or amp_raw is None
+                    else round(float(amp_raw), 2)
+                ),
+            }
+        )
+    return {
+        "target_id": str(payload["target"]["target_id"]),
+        "backend": str(payload.get("backend") or "portable"),
+        "rows": rows,
+    }
 
 
 def _load_comparison_source(path: Path) -> dict[str, Any]:
     text = path.read_text(encoding="utf-8")
     if path.suffix.lower() != ".md":
-        return json.loads(text)
+        return _load_json_comparison_source(json.loads(text))
     target_id = path.stem
+    backend = "portable"
     rows: list[dict[str, Any]] = []
     for raw_line in text.splitlines():
         line = raw_line.strip()
         if not rows and (m := _REPORT_TITLE_TARGET_RE.match(line)):
             target_id = m.group(1)
+            continue
+        if not rows and (bm := _REPORT_BACKEND_RE.match(line)):
+            backend = bm.group(1)
             continue
         if not line.startswith("|"):
             continue
@@ -351,50 +478,178 @@ def _load_comparison_source(path: Path) -> dict[str, Any]:
         wid = cells[0].strip("`")
         if not wid:
             continue
+        impl = cells[1].strip("`")
+        unavail = impl.startswith("unavailable")
+        med = None if unavail else _parse_opt_float(cells[3], 4)
+        amp = (
+            None if unavail or len(cells) < 9 else _parse_opt_float(cells[8], 2)
+        )
         rows.append(
             {
                 "workload_id": wid,
-                "median_ms": float(cells[3]),
-                "sol_pct_spec": _parse_pct_cell(cells[4]) or 0.0,
-                "sol_pct_empirical": _parse_pct_cell(cells[5]),
+                "implementation": impl,
+                "median_ms": med,
+                "sol_pct_spec": None if unavail else _parse_pct_cell(cells[4]),
+                "sol_pct_empirical": None
+                if unavail
+                else _parse_pct_cell(cells[5]),
+                "traffic_amplification": amp,
             }
         )
     if not rows:
         raise ValueError(f"No workload rows parsed from Markdown report {path}")
-    return {"target": {"target_id": target_id}, "rows": rows}
+    return {"target_id": target_id, "backend": backend, "rows": rows}
 
 
-def compare_summaries_markdown(left_path: Path, right_path: Path) -> str:
-    """Render side-by-side Spec & Empirical SOL comparison across two targets."""
-    left = _load_comparison_source(left_path)
-    right = _load_comparison_source(right_path)
-    l_id = left["target"]["target_id"]
-    r_id = right["target"]["target_id"]
-    r_map = {row["workload_id"]: row for row in right["rows"]}
+def _disambiguate_labels(raw_labels: list[str]) -> list[str]:
+    counts: dict[str, int] = {}
+    for label in raw_labels:
+        counts[label] = counts.get(label, 0) + 1
+    seen: dict[str, int] = {}
+    out: list[str] = []
+    for label in raw_labels:
+        if counts[label] == 1:
+            out.append(label)
+        else:
+            seen[label] = seen.get(label, 0) + 1
+            out.append(f"{label}#{seen[label]}")
+    return out
+
+
+def _format_tier_cell(row: dict[str, Any] | None) -> str:
+    if row is None or row["median_ms"] is None:
+        return "unavailable"
+    emp = row["sol_pct_empirical"]
+    amp = row["traffic_amplification"]
+    emp_str = f"{emp:.1f}%" if emp is not None else "-"
+    amp_str = f"{amp:.2f}" if amp is not None else "-"
+    return f"{row['median_ms']:.4f} / {emp_str} / {amp_str}"
+
+
+def _find_dispatch_pair_indices(
+    sources: list[dict[str, Any]],
+) -> tuple[int, int] | None:
+    backends = [str(s["backend"]) for s in sources]
+    vllm_idx = next((i for i, b in enumerate(backends) if b == "vllm"), None)
+    if vllm_idx is None and len(sources) == 3:
+        vllm_idx = 1
+    aiter_idx = max(
+        (i for i, b in enumerate(backends) if b == "aiter"), default=None
+    )
+    if aiter_idx is None and len(sources) == 3:
+        aiter_idx = len(sources) - 1
+    if vllm_idx is not None and aiter_idx is not None and vllm_idx < aiter_idx:
+        return vllm_idx, aiter_idx
+    return None
+
+
+def _diagnose_workload_tiers(
+    sources: list[dict[str, Any]],
+    col_labels: list[str],
+    tier_rows: list[dict[str, Any] | None],
+) -> str:
+    tags: list[str] = []
+    for label, row in zip(col_labels, tier_rows, strict=True):
+        if row is None or row["median_ms"] is None:
+            tags.append(f"TIER_UNAVAILABLE({label})")
+    dispatch_pair = _find_dispatch_pair_indices(sources)
+    if dispatch_pair is not None:
+        i_mid, i_top = dispatch_pair
+        r_mid, r_top = tier_rows[i_mid], tier_rows[i_top]
+        if (
+            r_mid is not None
+            and r_top is not None
+            and r_mid["median_ms"] is not None
+            and r_top["median_ms"] is not None
+            and r_top["median_ms"] > 0
+        ):
+            ratio = r_mid["median_ms"] / r_top["median_ms"]
+            if ratio >= _DISPATCH_GAP_RATIO:
+                tags.append(f"DISPATCH_GAP ({ratio:.2f}x)")
+    top_row = next(
+        (
+            r
+            for r in reversed(tier_rows)
+            if r is not None and r["median_ms"] is not None
+        ),
+        None,
+    )
+    if top_row is not None:
+        emp = top_row["sol_pct_empirical"]
+        amp = top_row["traffic_amplification"] or 0.0
+        if emp is not None and emp < _LOW_EMP_SOL_PCT:
+            tags.append(
+                "LOW_EMP_SOL+HIGH_AMP"
+                if amp >= _HIGH_TRAFFIC_AMP
+                else "LOW_EMP_SOL"
+            )
+        elif amp >= _HIGH_TRAFFIC_AMP:
+            tags.append("HIGH_AMP")
+    return "; ".join(tags) if tags else "OK"
+
+
+def compare_summaries_markdown(
+    *paths: Path,
+    labels: Sequence[str] | None = None,
+) -> str:
+    """Render a 2- or 3-tier vertical ROCm stack SOL diagnosis table."""
+    if not 2 <= len(paths) <= 3:
+        raise ValueError(
+            f"Expected 2 or 3 summary/report paths, got {len(paths)}"
+        )
+    if labels is not None and len(labels) != len(paths):
+        raise ValueError("labels length must match paths length")
+    sources = [_load_comparison_source(p) for p in paths]
+    targets = [str(s["target_id"]) for s in sources]
+    same_target = len(set(targets)) == 1
+    if labels is not None:
+        col_labels = list(labels)
+    else:
+        raw_labels = [
+            str(s["backend"])
+            if same_target
+            else f"{s['target_id']} ({s['backend']})"
+            for s in sources
+        ]
+        col_labels = _disambiguate_labels(raw_labels)
+    heading = (
+        f"# ROCm Vertical Stack SOL Diagnosis — {targets[0]} "
+        f"({' vs '.join(col_labels)})"
+        if same_target
+        else f"# ROCm Target SOL Comparison — {' vs '.join(col_labels)}"
+    )
+    header_cols = " | ".join(f"{lbl} (ms / %Emp / Amp)" for lbl in col_labels)
+    align_cols = " | ".join("---:" for _ in col_labels)
     lines = [
-        f"# Cross-Vendor SOL Comparison: {l_id} vs {r_id}",
+        heading,
         "",
-        f"| Workload | {l_id} ms (%Spec / %Emp) | {r_id} ms (%Spec / %Emp) | Speedup ({r_id}/{l_id}) |",
-        "| --- | ---: | ---: | ---: |",
+        f"| Workload | {header_cols} | Gain (top/base) | Diagnosis |",
+        f"| --- | {align_cols} | ---: | --- |",
     ]
-    for l_row in left["rows"]:
-        wid = l_row["workload_id"]
-        r_row = r_map.get(wid)
-        if r_row is None:
-            continue
-        l_str = (
-            f"{l_row['median_ms']:.4f} "
-            f"({l_row['sol_pct_spec']:.1f}% / {_format_opt(l_row['sol_pct_empirical'], '.1f')}%)"
+    maps = [{r["workload_id"]: r for r in s["rows"]} for s in sources]
+    seen_wids: list[str] = []
+    seen_set: set[str] = set()
+    for src in sources:
+        for r in src["rows"]:
+            wid = str(r["workload_id"])
+            if wid not in seen_set:
+                seen_set.add(wid)
+                seen_wids.append(wid)
+    for wid in seen_wids:
+        tier_rows = [m.get(wid) for m in maps]
+        cells = " | ".join(_format_tier_cell(r) for r in tier_rows)
+        base_ms = (
+            tier_rows[0]["median_ms"] if tier_rows[0] is not None else None
         )
-        r_str = (
-            f"{r_row['median_ms']:.4f} "
-            f"({r_row['sol_pct_spec']:.1f}% / {_format_opt(r_row['sol_pct_empirical'], '.1f')}%)"
+        top_ms = (
+            tier_rows[-1]["median_ms"] if tier_rows[-1] is not None else None
         )
-        speedup = (
-            l_row["median_ms"] / r_row["median_ms"]
-            if r_row["median_ms"] > 0
-            else 0.0
+        gain = (
+            f"{base_ms / top_ms:.2f}x"
+            if base_ms is not None and top_ms is not None and top_ms > 0
+            else "-"
         )
-        lines.append(f"| `{wid}` | {l_str} | {r_str} | {speedup:.2f}x |")
+        diag = _diagnose_workload_tiers(sources, col_labels, tier_rows)
+        lines.append(f"| `{wid}` | {cells} | {gain} | {diag} |")
     lines.append("")
     return "\n".join(lines)

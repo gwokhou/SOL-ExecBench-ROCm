@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Lightweight Phase 1 3-operator cross-vendor analytical Roofline MVP."""
+"""Lightweight ROCm vertical 3-tier analytical Roofline MVP."""
 
 from scripts.mvp_v1.py312_compat import install_py312_pep758_import_hook
 

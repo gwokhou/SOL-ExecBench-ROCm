@@ -15,15 +15,15 @@ one-time inventories belong in Git history.
 ## Current state
 
 - **2026-11-20 Strategic Stop-Loss & Pivot (Active Directive — Phase 1 Local Closeout Ready on `main`)**:
-  - **Sole active mainline (`v0.1` 跨阵营推理原语 SOL 对标收口)**: **Phase 1：3 算子跨阵营 MVP（`FP8/BF16 Skinny GEMM`、`Triton Fused SwiGLU MoE`、`Grouped Split-KV GQA Paged Decode`）** 已在 `scripts/mvp_v1/` 合入 `main` 并就绪云端采集（支持 `MI300X` / `MI308X` / `RX_9060_XT` / `H20` / `H100_SXM` / `B200` 与虚拟化云环境一键脚本 `scripts/mvp_v1/run_cloud_15min.sh`）。范围收敛至与 `flashinfer-bench` 同源的 **Collection #4（26 个核心推理原语）**，输入/输出复用现有 `FlashInfer-Trace` 契约（`definition.json` + `workload.jsonl` + `solution.json` + `Trace`）；SOL 理论上限统一采用透明可核算的解析式 Roofline（字节搬运量 + FLOPs + 硬件带宽/算力上限），彻底剥离 `Orojenesis` 重型搜索。
-  - **Hardware role switch**: 本地 `RX 9060 XT (gfx1200)` 正式降级为**免费本地开发、纯 CPU 单测与采集脚本联调机**；核心性能与计数器采集面向云端数据中心卡 **`AMD MI300X / MI308X (gfx942)` vs. `NVIDIA H20 / H100 / B200`**（本地定型脚本，云端 15 分钟一键采集即销毁）。
+  - **Sole active mainline (`v0.1` ROCm 推理原语纵向三层 SOL 诊断收口)**: **Phase 1：3 算子 MVP（`FP8/BF16 Skinny GEMM`、`Triton/vLLM/AITER Fused SwiGLU MoE`、`Grouped Split-KV/PagedAttention GQA Decode`）** 已在 `scripts/mvp_v1/` 合入 `main` 并就绪云端采集（支持 `MI300X` / `MI308X` / `RX_9060_XT` 与虚拟化云环境一键脚本 `scripts/mvp_v1/run_cloud_15min.sh`）。范围收敛至 ROCm 核心推理原语（以 `flashinfer-bench` Collection #4 同源算子族为参考边界），输入/输出复用现有 `FlashInfer-Trace` 契约（`definition.json` + `workload.jsonl` + `solution.json` + `Trace`）；SOL 理论上限统一采用透明可核算的解析式 Roofline（字节搬运量 + FLOPs + 硬件带宽/算力上限），彻底剥离 `Orojenesis` 重型搜索。
+  - **Hardware role switch**: 本地 `RX 9060 XT (gfx1200)` 正式降级为**免费本地开发、纯 CPU 单测与采集脚本联调机**；核心性能与计数器采集面向云端数据中心卡 **`AMD MI300X / MI308X (gfx942)`**（聚焦同卡 `PyTorch/Portable` vs. `vLLM` 默认路由 vs. `AITER` 最优算子三层纵向对比，本地定型脚本，云端短时一键采集即销毁）。
   - **Terminated / permanently frozen tracks**:
     - `F2`（嵌套 `PGID_2` 超时回收与 `mapper_timeout` 分类）已于纯 CPU 范围完成收口（`5153900d`），严禁以此触发任何 GPU 重跑或续跑；
     - **严禁启动 `C3 --resume`**，严禁再跑任何 `timeloop-mapper` / `Orojenesis` 长时扫描或 `gfx1200` 大批量 GPU 战役；
     - **取消 `F1`**：不再在本仓内部做 LayerNorm `centered_fp64_v1` 正式评测契约升版、Schema bump 或新留出集上机确认（E2 精度退化与容差案例仅作外部上游 Issue/PR 素材归档）；
     - **取消 `F3`**：停止攻克 `make_fx_aten` 在 `LLM_CORE` 上的 `incomplete_tile_aware_bound`、4D BMM 搜索剪枝及 `arange` / `rope_*` / `attention_sink` 形式化读取证明；
     - **永久冻结** `AMD_AKA`（含训练/卷积/Loss/反向算子）、`p1-successor-start700` 以及一切内部重型资格链/封存仪式；**严禁新增任何自定义 Artifact Schema 家族**。
-  - **Spin-off / upstream asset track**: 盘点并抽离现有硬件级防失真机制——dVFS `STABLE_PEAK` 锁频校验、L2/LLC Cache 刷新、防死代码消除（output GPU 驻留与 lazy-tensor 检查）及 E2 LayerNorm 容差退化案例——作为独立轻量模块或上游补丁输出，不再锁死在本仓重型管线内。
+  - **Spin-off / upstream asset track (deferred TODOs — research-gated)**: 潜在外部贡献与资产剥离项（`vLLM` / `AITER` 性能或路由 Issue/PR、零内部依赖防失真计时单文件微模块抽离、上游 `NVIDIA/SOL-ExecBench` 原版防作弊/精度边界 Issue 核验）统一归入下方 `## Active backlog` 的待深入调研 TODO 清单，需完成目标社区需求、上游源码差异与真实 ROI 评估后再立项实施。
 
 - Historical baseline notes (frozen / superseded for active scheduling):
 
@@ -104,12 +104,31 @@ one-time inventories belong in Git history.
 
 ## Active backlog
 
-### Sole active mainline — Phase 1: 3-operator cross-vendor MVP (v0.1)
+### Sole active mainline — MI300X ROCm vertical SOL diagnosis (`v0.1`)
 
-- **Active scope**: **Phase 1：3 算子跨阵营 MVP（`FP8/BF16 Skinny GEMM`、`Fused MoE`、`GQA/MLA Paged Attention` 或 `RMSNorm + RoPE`）**，面向 `flashinfer-bench` 同源 Collection #4（26 个核心推理原语）。
-- **Contracts & bounds**: 复用 `FlashInfer-Trace` (`definition.json` + `workload.jsonl` + `solution.json`)，**不引入任何新 Artifact Schema**；SOL 理论上限采用透明解析式 Roofline（字节搬运量 + FLOPs + 硬件带宽/算力上限），彻底旁路 `Orojenesis`。
-- **Execution model**: 本地 `RX 9060 XT (gfx1200)` 仅作纯 CPU 单测与脚本联调；核心实测对比目标为云端 `AMD MI300X (gfx942)` vs. `NVIDIA B200/H100`（15 分钟一键采集即销毁），并将 dVFS `STABLE_PEAK` 锁频校验、Cache 刷新、防死代码消除与 E2 LayerNorm 容差案例抽离为独立轻量资产/上游补丁。
-- **Gate**: 等待确认“第 1 周 3 算子 MVP 本地脚本改造清单”与最终 3 算子组合后启动开发；本转向下不再推进下述历史 M0–M3 / Post-D0 路线。
+- **Current Phase 1 progress (`4781ecd9` on `main`)**:
+  - `scripts/mvp_v1/`（3 算子 18-workload 集合、解析式双屋顶 Roofline、只读时钟降级遥测、FP8 `FNUZ`/`OCP` 与窄 `M` 三级兜底、云端前置体检 `cloud_preflight.py` 与一键脚本 `run_cloud_15min.sh`）已合入 `main`。
+  - 已在云端 `AMD MI300X (gfx942)` 完成 3 算子（`skinny_gemm` BF16/FP8、`fused_moe`、`gqa_paged_decode`）18/18 Portable 基线与 `rocprofv3` 流量放大系数（`Amp`）实采，结果留存于未入库的 `data/outputs/mi300x_devcloud/report.md`（原云端实例已销毁）。
+- **Scoped focus**: 因本仓相对上游 `NVIDIA/SOL-ExecBench` 已在题库、契约（`Trace` 扩展字段）与 SOL 分母模型上大幅重写并单向 ROCm 化，本仓 `v0.1` 收口不再强求与原版 NVIDIA 仓跨仓横向跑分拼表，聚焦于 **同卡 MI300X 软件栈纵向三层 SOL 诊断**（`PyTorch/hipBLASLt/Portable Triton` 下限 vs. `vLLM (ROCm)` 默认路由 vs. `ROCm/AITER` 最优算子天花板），并按需扩展至 `Collection #4` 核心推理原语，契约复用 `FlashInfer-Trace`（零新增 Schema，彻底旁路 `Orojenesis`）。
+- **Execution model**: 本地 `RX 9060 XT (gfx1200)` 仅作纯 CPU 单测与脚本联调；核心性能与计数器采集面向云端 `AMD MI300X (gfx942)`（优先带 `vLLM + AITER` 的官方 ROCm 镜像，按云端前置门禁一次采完并校验包完整性后销毁）；本转向下不再推进下述历史 M0–M3 / Post-D0 路线。
+- **Next closeout steps in-repo**:
+  1. 在 `scripts/mvp_v1/vendor_adapters.py` 与 `scripts/mvp_v1/report.py` 补齐 `vLLM` 默认路由层 Adapter 与同卡纵向 `--compare` 报表；
+  2. 围绕 ROCm 核心推理痛点原语扩展算子集，择机在带 `vLLM + AITER` 的 MI300X 容器上完成纵向三层实采并发布 `v0.1` 报告；
+  3. 同步更新 `README.md` 首页定位并清理历史草稿与工作区卫生。
+
+### Deferred upstream & spin-off TODOs (gated on deep value & ROI research)
+
+以下 3 项外部贡献与代码剥离方向均处于**待深入调研**状态，暂不直接排入当前阻塞里程碑；需先完成上游主干现状、社区真实需求与性价比评估后再决定是否立项推进：
+
+1. **`TODO-UPSTREAM-1` — 转化 1 个可落地的外部上游性能/路由 Issue 或 PR（潜在目标：`vllm-project/vllm`、`ROCm/aiter`）**
+   - **线索**：后续 MI300X 纵向三层对比若抓出具体的 Silent Fallback、Suboptimal Dispatch 或 Tuning 缺失（如窄 `M` FP8 GEMM 回退或小 Batch MoE/GQA 路由次优）。
+   - **调研门槛**：核查上游最新 `main` 主干是否已修复或重构、对应领域活跃 Maintainer/RFC 近期关注焦点，以及端到端 TTFT/TPOT 的真实改善幅度，确认高 ROI 后再构造最小复现或补丁。
+2. **`TODO-SPINOFF-2` — 解耦出“零内部依赖”的百余行防失真计时单文件模块**
+   - **线索**：当前 `scripts/mvp_v1/anti_distortion.py` 中的 `>=2x LLC` Rotating Buffer 刷新、只读时钟/功耗漂移采样与防死代码消除/惰性输出检查仍引用 `sol_execbench.core.*` 内部模块。
+   - **调研门槛**：先调研目标下游仓库（如 `vllm bench`、`ROCm/aiter` 等）现有 micro-benchmark 计时基建的真实痛点、维护者对防失真机制的接受度与依赖边界要求，避免闭门造出无人采用的孤立脚本。
+3. **`TODO-UPSTREAM-3` — 归档 2–3 份发往 `NVIDIA/SOL-ExecBench` 的轻量防作弊 / 精度边界 Issue**
+   - **线索**：移植阶段记录到的 `E2` LayerNorm 参考精度边界、退化输入分布（如全 1 权重 / 全 0 偏置）与评测容差盲区等线索。
+   - **调研门槛**：因本仓已大幅重写题库（`LLM_CORE` / `AMD_AKA`）与判题契约，提交前必须逐项比对上游 `NVIDIA/SOL-ExecBench` 当前 `main` 分支原始源码与公开题目，严格剥离仅存在于本仓内部派生题面的问题，并评估上游仓库维护活跃度与实际价值。
 
 <a id="solar-evolution"></a>
 

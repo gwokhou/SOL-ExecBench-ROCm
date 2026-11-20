@@ -592,9 +592,15 @@ def _validate_bundle_payload(
         raise ValueError(
             f"traces.jsonl count ({len(traces)}) != summary rows ({len(rows)})"
         )
-    all_passed = all(
-        bool(row.get("correctness_passed")) for row in rows
-    ) and all(trace.is_successful() for trace in traces)
+    executed_rows = [
+        (row, trace)
+        for row, trace in zip(rows, traces, strict=True)
+        if not str(row.get("implementation", "")).startswith("unavailable:")
+    ]
+    all_passed = bool(executed_rows) and all(
+        bool(row.get("correctness_passed")) and trace.is_successful()
+        for row, trace in executed_rows
+    )
     return str(target["target_id"]), len(rows), all_passed
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import os
 import re
 import socket
@@ -15,6 +16,12 @@ from pathlib import Path
 
 import pytest
 
+from scripts.mvp_v1.analytical_roofline import (
+    EmpiricalCeiling,
+    VendorBackend,
+    load_hardware_ceiling,
+)
+from scripts.mvp_v1.anti_distortion import DVFSWindowReceipt, TelemetrySample
 from scripts.mvp_v1.cloud_preflight import (
     ConnectivityVerdict,
     build_oneshot_cloud_script,
@@ -24,9 +31,18 @@ from scripts.mvp_v1.cloud_preflight import (
     validate_downloaded_bundle,
     verify_python312_twin,
 )
-from scripts.mvp_v1.cloud_runner import main as runner_main
-from scripts.mvp_v1.report import compare_summaries_markdown
+from scripts.mvp_v1.cloud_runner import (
+    main as runner_main,
+    run_benchmark_campaign,
+)
+from scripts.mvp_v1.kernels import KernelBackend
+from scripts.mvp_v1.report import (
+    WorkloadMeasurementRow,
+    compare_summaries_markdown,
+    write_mvp_outputs,
+)
 from scripts.mvp_v1.workloads import SweepMode
+from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 
 
@@ -236,8 +252,8 @@ def test_evidence_gate_rejects_html_forbidden_and_sha_mismatch(
 def test_compare_summaries_markdown_accepts_report_md_and_json_equivalently(
     tmp_path: Path,
 ) -> None:
-    mi_dir = tmp_path / "mi300x"
-    b2_dir = tmp_path / "b200"
+    pt_dir = tmp_path / "pytorch"
+    port_dir = tmp_path / "portable"
     assert (
         runner_main(
             [
@@ -245,10 +261,12 @@ def test_compare_summaries_markdown_accepts_report_md_and_json_equivalently(
                 "smoke",
                 "--device",
                 "cpu",
+                "--backend",
+                "pytorch",
                 "--target-override",
                 "MI300X",
                 "--output-dir",
-                str(mi_dir),
+                str(pt_dir),
             ]
         )
         == 0
@@ -260,24 +278,165 @@ def test_compare_summaries_markdown_accepts_report_md_and_json_equivalently(
                 "smoke",
                 "--device",
                 "cpu",
+                "--backend",
+                "portable",
                 "--target-override",
-                "B200",
+                "MI300X",
                 "--output-dir",
-                str(b2_dir),
+                str(port_dir),
             ]
         )
         == 0
     )
     from_json = compare_summaries_markdown(
-        mi_dir / "summary.json", b2_dir / "summary.json"
+        pt_dir / "summary.json", port_dir / "summary.json"
     )
     from_md = compare_summaries_markdown(
-        mi_dir / "report.md", b2_dir / "report.md"
+        pt_dir / "report.md", port_dir / "report.md"
     )
     assert from_md == from_json
+    assert (
+        "ROCm Vertical Stack SOL Diagnosis — MI300X (pytorch vs portable)"
+        in (from_json)
+    )
 
     saved_mi300x = Path("data/outputs/mi300x_devcloud/report.md")
     if saved_mi300x.is_file():
         hyphen_cmp = compare_summaries_markdown(saved_mi300x, saved_mi300x)
-        assert "MI300X vs MI300X" in hyphen_cmp
+        assert "ROCm Vertical Stack SOL Diagnosis — MI300X" in hyphen_cmp
         assert "gqa_paged_decode_bf16_b16_kv32768" in hyphen_cmp
+
+
+def test_explicit_tier_unavailable_and_three_way_vertical_diagnosis(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    for backend in (KernelBackend.TIER2_VLLM, KernelBackend.TIER3_AITER):
+        unavail_paths = run_benchmark_campaign(
+            mode=SweepMode.SMOKE,
+            device="cpu",
+            target_override="MI300X",
+            backend=backend,
+            output_dir=tmp_path / f"{backend.value}_unavail",
+            collect_counters=False,
+            lock_clocks=False,
+        )
+        unavail_summary = json.loads(
+            unavail_paths["summary_json"].read_text(encoding="utf-8")
+        )
+        assert unavail_summary["backend"] == backend.value
+        assert all(
+            r["implementation"].startswith("unavailable:")
+            and r["correctness_passed"] is False
+            and r["counter_status"] == "skipped_unavailable"
+            for r in unavail_summary["rows"]
+        )
+        assert "| - |" in unavail_paths["report_md"].read_text("utf-8")
+        traces = [
+            Trace.model_validate_json(line)
+            for line in unavail_paths["traces_jsonl"]
+            .read_text("utf-8")
+            .splitlines()
+            if line.strip()
+        ]
+        assert all(
+            t.evaluation is not None and not t.is_successful() for t in traces
+        )
+
+    mi300x = load_hardware_ceiling("MI300X")
+    dvfs_paths = run_benchmark_campaign(
+        mode=SweepMode.SMOKE,
+        device="cpu",
+        target_override="MI300X",
+        backend=KernelBackend.PYTORCH,
+        output_dir=tmp_path / "seed",
+        collect_counters=False,
+        lock_clocks=False,
+    )
+    seed_payload = json.loads(dvfs_paths["summary_json"].read_text("utf-8"))
+    tier_dirs = []
+    specs_map = {
+        "w_gap": (0.10, 0.08, 0.04, 60.0, 1.05, "aiter_ok"),
+        "w_low": (0.20, 0.19, 0.18, 12.0, 1.80, "aiter_amp"),
+        "w_miss": (0.30, 0.25, None, None, None, "unavailable:aiter_gqa"),
+        "w_ok": (0.12, 0.06, 0.06, 72.0, 1.02, "aiter_fast"),
+    }
+    emp_c = EmpiricalCeiling(
+        hbm_bandwidth_bytes_per_s=seed_payload["empirical_ceiling"][
+            "hbm_bandwidth_bytes_per_s"
+        ],
+        bf16_flops_per_s=seed_payload["empirical_ceiling"]["bf16_flops_per_s"],
+    )
+    dvfs_r = DVFSWindowReceipt(
+        lock_requested=False,
+        lock_acquired=False,
+        lock_note="telemetry_only",
+        before=TelemetrySample(vendor=VendorBackend.CPU),
+    )
+    for tier_name, idx in (("portable", 0), ("vllm", 1), ("aiter", 2)):
+        rows = []
+        for wid, (m0, m1, m2, emp, amp, impl) in specs_map.items():
+            med = (m0, m1, m2)[idx]
+            is_unavail = med is None
+            rows.append(
+                WorkloadMeasurementRow(
+                    workload_id=wid,
+                    operator="skinny_gemm",
+                    precision="bf16",
+                    implementation=impl if idx == 2 else f"{tier_name}_impl",
+                    correctness_passed=not is_unavail,
+                    max_abs_err=0.0,
+                    max_rel_err=0.0,
+                    median_ms=0.0 if is_unavail else float(med),
+                    mean_ms=0.0 if is_unavail else float(med),
+                    p90_ms=0.0 if is_unavail else float(med),
+                    flops=1e9,
+                    compulsory_bytes=1e6,
+                    arithmetic_intensity=10.0,
+                    t_sol_ms_spec=0.02,
+                    sol_pct_spec=0.0 if is_unavail else 50.0,
+                    bottleneck_spec="memory",
+                    t_sol_ms_empirical=0.024,
+                    sol_pct_empirical=emp if idx == 2 else 25.0,
+                    bottleneck_empirical="memory",
+                    counter_status="collected"
+                    if not is_unavail
+                    else "skipped_unavailable",
+                    observed_mem_bytes=1e6,
+                    traffic_amplification=amp if idx == 2 else 1.05,
+                    mfma_instructions=None,
+                )
+            )
+        tier_dirs.append(
+            write_mvp_outputs(
+                tmp_path / tier_name,
+                ceiling=mi300x,
+                empirical=emp_c,
+                dvfs=dvfs_r,
+                rows=rows,
+                traces=[],
+                backend_name=tier_name,
+            )
+        )
+
+    from_json = compare_summaries_markdown(
+        *(d["summary_json"] for d in tier_dirs)
+    )
+    from_md = compare_summaries_markdown(*(d["report_md"] for d in tier_dirs))
+    assert from_json == from_md
+    assert (
+        "ROCm Vertical Stack SOL Diagnosis — MI300X (portable vs vllm vs aiter)"
+        in (from_json)
+    )
+    assert "DISPATCH_GAP (2.00x)" in from_json
+    assert "LOW_EMP_SOL+HIGH_AMP" in from_json
+    assert "TIER_UNAVAILABLE(aiter)" in from_json
+    assert "| `w_ok` |" in from_json
+    assert "OK" in from_json
+
+    capsys.readouterr()
+    assert (
+        runner_main(["--compare", *(str(d["summary_json"]) for d in tier_dirs)])
+        == 0
+    )
+    assert "DISPATCH_GAP (2.00x)" in capsys.readouterr().out

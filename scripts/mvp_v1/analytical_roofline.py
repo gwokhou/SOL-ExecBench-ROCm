@@ -16,7 +16,7 @@ from solar.rocm.architecture import ArchitectureProfile
 
 
 class MVPOperator(StrEnum):
-    """Phase 1 3-operator cross-vendor MVP vocabulary."""
+    """Phase 1 3-operator ROCm vertical SOL MVP vocabulary."""
 
     SKINNY_GEMM = "skinny_gemm"
     FUSED_MOE = "fused_moe"
@@ -34,7 +34,6 @@ class VendorBackend(StrEnum):
     """Execution backend family for timing, dVFS telemetry, and counters."""
 
     AMD_ROCM = "amd_rocm"
-    NVIDIA_CUDA = "nvidia_cuda"
     CPU = "cpu"
 
 
@@ -118,45 +117,6 @@ _STATIC_CEILINGS: dict[str, HardwareCeiling] = {
         fp8_dtype_name="float8_e4m3fnuz",
         expected_compute_units=80,
     ),
-    "H20": HardwareCeiling(
-        target_id="H20",
-        device_name="NVIDIA H20",
-        vendor=VendorBackend.NVIDIA_CUDA,
-        architecture="sm_90",
-        hbm_bandwidth_bytes_per_s=4_000_000_000_000.0,
-        peak_bf16_flops_per_s=148_000_000_000_000.0,
-        peak_fp8_flops_per_s=296_000_000_000_000.0,
-        l2_bytes=62_914_560,
-        llc_bytes=62_914_560,
-        fp8_dtype_name="float8_e4m3fn",
-        expected_compute_units=78,
-    ),
-    "H100_SXM": HardwareCeiling(
-        target_id="H100_SXM",
-        device_name="NVIDIA H100 SXM5 80GB",
-        vendor=VendorBackend.NVIDIA_CUDA,
-        architecture="sm_90",
-        hbm_bandwidth_bytes_per_s=3_350_000_000_000.0,
-        peak_bf16_flops_per_s=989_500_000_000_000.0,
-        peak_fp8_flops_per_s=1_978_900_000_000_000.0,
-        l2_bytes=52_428_800,
-        llc_bytes=52_428_800,
-        fp8_dtype_name="float8_e4m3fn",
-        expected_compute_units=132,
-    ),
-    "B200": HardwareCeiling(
-        target_id="B200",
-        device_name="NVIDIA B200",
-        vendor=VendorBackend.NVIDIA_CUDA,
-        architecture="sm_100",
-        hbm_bandwidth_bytes_per_s=8_000_000_000_000.0,
-        peak_bf16_flops_per_s=2_250_000_000_000_000.0,
-        peak_fp8_flops_per_s=4_500_000_000_000_000.0,
-        l2_bytes=134_217_728,
-        llc_bytes=134_217_728,
-        fp8_dtype_name="float8_e4m3fn",
-        expected_compute_units=148,
-    ),
 }
 
 _TARGET_ALIASES = {
@@ -168,13 +128,6 @@ _TARGET_ALIASES = {
     "RX_9060_XT": "RX_9060_XT",
     "RX9060XT": "RX_9060_XT",
     "GFX1200": "RX_9060_XT",
-    "H20": "H20",
-    "NVIDIA_H20": "H20",
-    "H100": "H100_SXM",
-    "H100_SXM": "H100_SXM",
-    "SM_90": "H100_SXM",
-    "B200": "B200",
-    "SM_100": "B200",
 }
 
 
@@ -208,7 +161,7 @@ def _rocm_profile_to_ceiling(profile_name: str) -> HardwareCeiling:
 
 
 def load_hardware_ceiling(target_id: str) -> HardwareCeiling:
-    """Resolve target key (MI300X, MI308X, RX_9060_XT, H20, H100_SXM, B200)."""
+    """Resolve ROCm target key (MI300X, MI308X, RX_9060_XT)."""
     normalized = target_id.strip().upper().replace("-", "_").replace(" ", "_")
     canonical = _TARGET_ALIASES.get(normalized, normalized)
     if canonical in {"MI300X", "RX_9060_XT"}:
@@ -229,12 +182,6 @@ def _match_live_gpu_ceiling(props: object) -> HardwareCeiling:
         return load_hardware_ceiling("MI308X")
     if "MI300" in name:
         return load_hardware_ceiling("MI300X")
-    if "B200" in name:
-        return load_hardware_ceiling("B200")
-    if "H20" in name and "H200" not in name:
-        return load_hardware_ceiling("H20")
-    if "H100" in name:
-        return load_hardware_ceiling("H100_SXM")
     if "9060" in name or "1200" in gfx:
         return load_hardware_ceiling("RX_9060_XT")
     if "942" in gfx:
@@ -279,7 +226,7 @@ def detect_hardware_ceiling(
             peak_fp8_flops_per_s=1_000_000_000_000.0,
             l2_bytes=16_777_216,
             llc_bytes=33_554_432,
-            fp8_dtype_name="float8_e4m3fn",
+            fp8_dtype_name="float8_e4m3fnuz",
         )
     idx = torch.device(device).index or 0
     return _match_live_gpu_ceiling(torch.cuda.get_device_properties(idx))

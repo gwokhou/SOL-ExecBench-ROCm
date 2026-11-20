@@ -85,9 +85,11 @@ class RuntimeCase:
 
     spec: WorkloadSpec
     prototype_args: list[Any]
+    candidate_args: list[Any]
     reference_fn: Callable[..., torch.Tensor]
-    candidate_fn: Callable[..., torch.Tensor]
+    candidate_fn: Callable[..., torch.Tensor] | None
     implementation_name: str
+    unavailable_reason: str | None = None
     bound: AnalyticalBound
     trace_definition: Definition
     trace_workload: Workload
@@ -500,7 +502,7 @@ def _build_gemm_case(
         w = w_bf.to(fp8_dt).t()
         sa = torch.ones((), dtype=torch.float32, device=device)
         sb = torch.ones((), dtype=torch.float32, device=device)
-        cand, impl = make_skinny_gemm_runner(
+        prepared = make_skinny_gemm_runner(
             prototype_args=[x, w],
             fp8=True,
             device=device,
@@ -512,11 +514,12 @@ def _build_gemm_case(
     else:
         x = x_bf
         w = w_bf.t().contiguous()
-        cand, impl = make_skinny_gemm_runner(
+        prepared = make_skinny_gemm_runner(
             prototype_args=[x, w],
             fp8=False,
             device=device,
             backend=backend,
+            max_atol=spec.tolerance.max_atol,
         )
     bound = bound_skinny_gemm(
         m,
@@ -530,9 +533,11 @@ def _build_gemm_case(
     return RuntimeCase(
         spec=spec,
         prototype_args=[x, w],
+        candidate_args=prepared.candidate_args,
         reference_fn=ref_skinny_gemm,
-        candidate_fn=cand,
-        implementation_name=impl,
+        candidate_fn=prepared.fn,
+        implementation_name=prepared.implementation_name,
+        unavailable_reason=prepared.unavailable_reason,
         bound=bound,
         trace_definition=trace_def,
         trace_workload=trace_wl,
@@ -589,7 +594,7 @@ def _build_moe_case(
     ).indices
     active_experts = int(torch.unique(topk_ids).numel())
     proto_args: list[Any] = [tokens, gate_w, up_w, down_w, logits, top_k]
-    cand_fn, impl = make_fused_moe_runner(
+    prepared = make_fused_moe_runner(
         prototype_args=proto_args,
         device=device,
         backend=backend,
@@ -610,9 +615,11 @@ def _build_moe_case(
     return RuntimeCase(
         spec=spec,
         prototype_args=proto_args,
+        candidate_args=prepared.candidate_args,
         reference_fn=ref_fused_moe,
-        candidate_fn=cand_fn,
-        implementation_name=impl,
+        candidate_fn=prepared.fn,
+        implementation_name=prepared.implementation_name,
+        unavailable_reason=prepared.unavailable_reason,
         bound=bound,
         trace_definition=trace_def,
         trace_workload=trace_wl,
@@ -689,7 +696,7 @@ def _build_gqa_case(
     )
     kv_len, ps = spec.axes["kv_len"], spec.axes["page_size"]
     args = _make_gqa_paged_tensors(spec, device=device, gen=gen)
-    cand_fn, impl = make_gqa_paged_decode_runner(
+    prepared = make_gqa_paged_decode_runner(
         prototype_args=args,
         device=device,
         backend=backend,
@@ -710,9 +717,11 @@ def _build_gqa_case(
     return RuntimeCase(
         spec=spec,
         prototype_args=args,
+        candidate_args=prepared.candidate_args,
         reference_fn=ref_gqa_paged_decode,
-        candidate_fn=cand_fn,
-        implementation_name=impl,
+        candidate_fn=prepared.fn,
+        implementation_name=prepared.implementation_name,
+        unavailable_reason=prepared.unavailable_reason,
         bound=bound,
         trace_definition=trace_def,
         trace_workload=trace_wl,

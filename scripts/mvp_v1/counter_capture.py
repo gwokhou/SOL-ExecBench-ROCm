@@ -1,14 +1,12 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Lightweight dual-vendor hardware counter capture (rocprofv3 CSV / ncu)."""
+"""Lightweight ROCm hardware counter capture (rocprofv3 CSV)."""
 
 from __future__ import annotations
 
 import csv
-import io
 import os
-import statistics
 import subprocess
 import sys
 import tempfile
@@ -33,10 +31,7 @@ from sol_execbench.core.bench.rocm_profiler.counters import (
     select_counter_groups,
     write_counter_job,
 )
-from sol_execbench.core.platform.runtime import (
-    resolve_rocm_tool,
-    resolve_tool_path,
-)
+from sol_execbench.core.platform.runtime import resolve_rocm_tool
 from sol_execbench.core.process.environment import (
     ENV_HIP_VISIBLE_DEVICES,
     ENV_ROCR_VISIBLE_DEVICES,
@@ -44,11 +39,6 @@ from sol_execbench.core.process.environment import (
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 
 PROFILE_RANGE_MARKER = "MVP_MEASURE"
-_NCU_METRICS = (
-    "dram__bytes.sum,"
-    "sm__pipe_tensor_cycles_active.avg.pct_of_peak_sustained_elapsed,"
-    "gpu__time_duration.sum"
-)
 _TIMEOUT_SECONDS = 120.0
 _MAX_OUTPUT_BYTES = 128 * 1024
 
@@ -62,8 +52,6 @@ class CounterCaptureSummary:
     memory_bytes: float | None = None
     waves: float | None = None
     mfma_instructions: float | None = None
-    tensor_core_pct: float | None = None
-    kernel_duration_ns: float | None = None
     counters_used: tuple[str, ...] = ()
     note: str | None = None
 
@@ -118,84 +106,6 @@ def parse_rocprof_mvp_passes(
         mfma_instructions=mfma if mfma > 0 else None,
         counters_used=names,
         note=note,
-    )
-
-
-def _to_float_clean(raw: str | None) -> float | None:
-    if raw is None:
-        return None
-    cleaned = raw.strip().replace(",", "")
-    if not cleaned or cleaned in {"N/A", "nan"}:
-        return None
-    try:
-        return float(cleaned)
-    except ValueError:
-        return None
-
-
-def _unit_scale(metric_name: str, unit: str) -> float:
-    u = unit.strip().lower()
-    if "dram__bytes" in metric_name:
-        if u == "gbyte":
-            return 1e9
-        if u == "mbyte":
-            return 1e6
-        if u == "kbyte":
-            return 1e3
-    if "time_duration" in metric_name:
-        if u == "msecond":
-            return 1e6
-        if u == "usecond":
-            return 1e3
-        if u == "second":
-            return 1e9
-    return 1.0
-
-
-def parse_ncu_csv_metrics(csv_text: str) -> CounterCaptureSummary:
-    """Parse ``ncu --csv`` stdout into normalized DRAM bytes and Tensor pct."""
-    lines = [
-        line
-        for line in csv_text.splitlines()
-        if line.strip() and not line.lstrip().startswith("==")
-    ]
-    if not lines:
-        return CounterCaptureSummary(
-            status="empty",
-            backend=VendorBackend.NVIDIA_CUDA,
-            note="ncu output had no CSV rows",
-        )
-    reader = csv.DictReader(io.StringIO("\n".join(lines)))
-    dram_bytes = 0.0
-    tensor_pcts: list[float] = []
-    durations_ns: list[float] = []
-    seen_metrics: set[str] = set()
-    for row in reader:
-        name = (row.get("Metric Name") or "").strip()
-        val = _to_float_clean(row.get("Metric Value"))
-        if not name or val is None:
-            continue
-        seen_metrics.add(name)
-        scaled = val * _unit_scale(name, row.get("Metric Unit") or "")
-        if "dram__bytes" in name:
-            dram_bytes += scaled
-        elif "tensor_cycles_active" in name:
-            tensor_pcts.append(scaled)
-        elif "time_duration" in name:
-            durations_ns.append(scaled)
-    if not seen_metrics:
-        return CounterCaptureSummary(
-            status="empty",
-            backend=VendorBackend.NVIDIA_CUDA,
-            note="ncu CSV lacked recognized metrics",
-        )
-    return CounterCaptureSummary(
-        status="collected",
-        backend=VendorBackend.NVIDIA_CUDA,
-        memory_bytes=dram_bytes if dram_bytes > 0 else None,
-        tensor_core_pct=statistics.mean(tensor_pcts) if tensor_pcts else None,
-        kernel_duration_ns=sum(durations_ns) if durations_ns else None,
-        counters_used=tuple(sorted(seen_metrics)),
     )
 
 
@@ -400,46 +310,6 @@ def _collect_rocm_counters(
     return summary
 
 
-def _collect_nvidia_counters(
-    replay_command: Sequence[str],
-) -> CounterCaptureSummary:
-    ncu = resolve_tool_path("ncu")
-    if ncu is None:
-        return CounterCaptureSummary(
-            status="unavailable",
-            backend=VendorBackend.NVIDIA_CUDA,
-            note="ncu executable not found on PATH",
-        )
-    cmd = [
-        str(ncu),
-        "--csv",
-        "--target-processes",
-        "all",
-        "--nvtx",
-        "--nvtx-include",
-        f"{PROFILE_RANGE_MARKER}/",
-        "--metrics",
-        _NCU_METRICS,
-        *replay_command,
-    ]
-    res = run_in_process_group_bounded(
-        cmd, timeout=_TIMEOUT_SECONDS, max_capture_bytes=_MAX_OUTPUT_BYTES * 4
-    )
-    if res.returncode != 0:
-        perm_denied = "ERR_NVGPUCTRPERM" in (res.stderr + res.stdout)
-        note = (
-            "ncu permission denied (ERR_NVGPUCTRPERM)"
-            if perm_denied
-            else f"ncu exited {res.returncode}"
-        )
-        return CounterCaptureSummary(
-            status="unavailable" if perm_denied else "failed",
-            backend=VendorBackend.NVIDIA_CUDA,
-            note=note,
-        )
-    return parse_ncu_csv_metrics(res.stdout)
-
-
 def collect_hardware_counters(
     replay_command: Sequence[str],
     *,
@@ -447,15 +317,13 @@ def collect_hardware_counters(
     architecture: str,
     workload_id: str,
 ) -> CounterCaptureSummary:
-    """Collect hardware counters via rocprofv3 (ROCm) or ncu (CUDA)."""
+    """Collect hardware counters via rocprofv3 on ROCm GPUs."""
     if backend is VendorBackend.CPU:
         return CounterCaptureSummary(
             status="skipped_cpu",
             backend=backend,
             note="counter collection skipped on CPU",
         )
-    if backend is VendorBackend.AMD_ROCM:
-        return _collect_rocm_counters(
-            replay_command, architecture=architecture, workload_id=workload_id
-        )
-    return _collect_nvidia_counters(replay_command)
+    return _collect_rocm_counters(
+        replay_command, architecture=architecture, workload_id=workload_id
+    )

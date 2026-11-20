@@ -328,77 +328,17 @@ def _extract_amd_metrics(
     return sclk, mclk, power_w, temp_c
 
 
-def _sample_nvidia_telemetry(device: str) -> TelemetrySample:
-    idx = str(torch.device(device).index or 0) if device != "cpu" else "0"
-    res = run_in_process_group_bounded(
-        [
-            "nvidia-smi",
-            "-i",
-            idx,
-            "--query-gpu=clocks.sm,clocks.mem,power.draw,temperature.gpu,pstate",
-            "--format=csv,noheader,nounits",
-        ],
-        timeout=10,
-        max_capture_bytes=8192,
-    )
-    if res.returncode != 0 or not res.stdout.strip():
-        return TelemetrySample(vendor=VendorBackend.NVIDIA_CUDA)
-    parts = [p.strip() for p in res.stdout.splitlines()[0].split(",")]
-    while len(parts) < 5:
-        parts.append("")
-    return TelemetrySample(
-        vendor=VendorBackend.NVIDIA_CUDA,
-        sclk_mhz=_parse_float(parts[0]),
-        mclk_mhz=_parse_float(parts[1]),
-        power_w=_parse_float(parts[2]),
-        temp_c=_parse_float(parts[3]),
-        perf_level=parts[4] or None,
-    )
-
-
 def sample_gpu_telemetry(
     device: str,
     vendor: VendorBackend,
 ) -> TelemetrySample:
-    """Safely capture live GPU telemetry; return empty metrics on CPU/errors."""
+    """Safely capture live ROCm telemetry; return empty metrics on CPU/errors."""
     if vendor is VendorBackend.CPU or device == "cpu":
         return TelemetrySample(vendor=VendorBackend.CPU)
     try:
-        if vendor is VendorBackend.AMD_ROCM:
-            return _sample_amd_telemetry(device)
-        return _sample_nvidia_telemetry(device)
+        return _sample_amd_telemetry(device)
     except OSError:
         return TelemetrySample(vendor=vendor)
-
-
-def _try_nvidia_lock(device: str, *, lock: bool) -> tuple[bool, str]:
-    idx = str(torch.device(device).index or 0)
-    cmd = ["nvidia-smi", "-i", idx, "-rgc"]
-    if lock:
-        q = run_in_process_group_bounded(
-            [
-                "nvidia-smi",
-                "-i",
-                idx,
-                "--query-gpu=clocks.max.sm",
-                "--format=csv,noheader,nounits",
-            ],
-            timeout=10,
-            max_capture_bytes=4096,
-        )
-        max_sm = _parse_float(q.stdout.strip()) if q.returncode == 0 else None
-        if max_sm is None:
-            return False, "nvidia_max_sm_clock_unavailable"
-        cmd = ["nvidia-smi", "-i", idx, "-lgc", str(int(max_sm))]
-    try:
-        res = run_in_process_group_bounded(
-            cmd, timeout=10, max_capture_bytes=4096
-        )
-    except OSError as exc:
-        return False, f"nvidia_lock_unavailable:{exc}"
-    if res.returncode != 0:
-        return False, "nvidia_lock_permission_denied_degraded_to_telemetry"
-    return True, "nvidia_lgc_locked" if lock else "nvidia_lgc_reset"
 
 
 @contextmanager
@@ -408,7 +348,7 @@ def acquire_dvfs_telemetry_window(
     *,
     lock_clocks: bool,
 ) -> Iterator[dict[str, DVFSWindowReceipt]]:
-    """Attempt clock locking with graceful degradation and pre/post telemetry."""
+    """Attempt ROCm clock locking with graceful degradation and telemetry."""
     before = sample_gpu_telemetry(device, vendor)
     acquired = False
     note = "telemetry_only"
@@ -419,8 +359,6 @@ def acquire_dvfs_telemetry_window(
             note = "amd_stable_peak_locked"
         except Exception as exc:  # noqa: BLE001 -- cloud containers may lack sudo
             note = f"amd_clock_lock_degraded_to_telemetry:{type(exc).__name__}"
-    elif lock_clocks and vendor is VendorBackend.NVIDIA_CUDA:
-        acquired, note = _try_nvidia_lock(device, lock=True)
 
     holder = {
         "receipt": DVFSWindowReceipt(
@@ -435,8 +373,6 @@ def acquire_dvfs_telemetry_window(
     finally:
         if acquired and vendor is VendorBackend.AMD_ROCM:
             unlock_clocks()
-        elif acquired and vendor is VendorBackend.NVIDIA_CUDA:
-            _try_nvidia_lock(device, lock=False)
         after = sample_gpu_telemetry(device, vendor)
         holder["receipt"] = DVFSWindowReceipt(
             lock_requested=lock_clocks,

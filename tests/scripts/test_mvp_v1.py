@@ -43,7 +43,6 @@ from scripts.mvp_v1.counter_capture import (
     _execute_rocm_groups,
     _filter_pass_csv_to_marker,
     collect_hardware_counters,
-    parse_ncu_csv_metrics,
     parse_rocprof_mvp_passes,
 )
 from scripts.mvp_v1.kernels import KernelBackend, make_skinny_gemm_runner
@@ -59,7 +58,15 @@ from scripts.mvp_v1.triton_kernels import (
     _build_moe_tile_schedule,
     select_gqa_num_splits,
 )
-from scripts.mvp_v1.vendor_adapters import try_make_flashinfer_gqa_runner
+from scripts.mvp_v1.vendor_adapters import (
+    PreparedRunner,
+    try_make_aiter_gemm_runner,
+    try_make_aiter_gqa_runner,
+    try_make_aiter_moe_runner,
+    try_make_vllm_gemm_runner,
+    try_make_vllm_gqa_runner,
+    try_make_vllm_moe_runner,
+)
 from scripts.mvp_v1.workloads import (
     SweepMode,
     build_workload_specs,
@@ -132,9 +139,12 @@ def test_gfx942_counter_manifest_fallback_and_bytes() -> None:
 
 def test_analytical_roofline_bounds_and_dedup_moe() -> None:
     mi300x = load_hardware_ceiling("MI300X")
-    b200 = load_hardware_ceiling("B200")
+    mi308x = load_hardware_ceiling("MI308X")
     assert mi300x.hbm_bandwidth_bytes_per_s == pytest.approx(5.3e12)
-    assert b200.peak_fp8_flops_per_s == pytest.approx(4.5e15)
+    assert mi308x.peak_fp8_flops_per_s == pytest.approx(2.96e14)
+    for unsupported in ("B200", "H20", "H100_SXM"):
+        with pytest.raises(ValueError, match="Unsupported MVP target"):
+            load_hardware_ceiling(unsupported)
 
     gemm_fp8 = bound_skinny_gemm(16, 4096, 7168, PrecisionMode.FP8, mi300x)
     expected_bytes = float(16 * 7168 + 7168 * 4096 + 16 * 4096 * 2 + 8)
@@ -191,12 +201,12 @@ def test_anti_distortion_flush_ring_anti_dce_and_dvfs(monkeypatch) -> None:
     )
     assert mi300x_flush == 512 * 1024 * 1024
 
-    b200_flush = recommended_llc_flush_bytes(
-        128 * 1024 * 1024,
+    min_flush = recommended_llc_flush_bytes(
+        64 * 1024 * 1024,
         device="cuda:0",
-        free_memory_bytes=180 * 1024**3,
+        free_memory_bytes=16 * 1024**3,
     )
-    assert b200_flush == 256 * 1024 * 1024
+    assert min_flush == 256 * 1024 * 1024
 
     flusher = LLCRotatingFlusher("cpu", 64 * 1024)
     flusher.flush()
@@ -231,10 +241,7 @@ def test_anti_distortion_flush_ring_anti_dce_and_dvfs(monkeypatch) -> None:
     assert "degraded" in holder["receipt"].lock_note
 
 
-def test_counter_parsers_and_graceful_ncu_fallback(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
+def test_counter_parser_rocm_and_cpu_skip(tmp_path: Path) -> None:
     pass_csv = tmp_path / "pmc_1" / "out_counter_collection.csv"
     pass_csv.parent.mkdir(parents=True)
     pass_csv.write_text(
@@ -251,45 +258,21 @@ def test_counter_parsers_and_graceful_ncu_fallback(
     assert rocm_summary.waves == pytest.approx(128.0)
     assert rocm_summary.mfma_instructions == pytest.approx(512.0)
 
-    ncu_csv = (
-        "==PROF== Connected to process\n"
-        '"ID","Kernel Name","Metric Name","Metric Unit","Metric Value"\n'
-        '"0","ampere_bf16","dram__bytes.sum","Mbyte","2.5"\n'
-        '"0","ampere_bf16","sm__pipe_tensor_cycles_active.avg.pct_of_peak_sustained_elapsed","%","74.2"\n'
-        '"0","ampere_bf16","gpu__time_duration.sum","usecond","120.0"\n'
-    )
-    cuda_summary = parse_ncu_csv_metrics(ncu_csv)
-    assert cuda_summary.status == "collected"
-    assert cuda_summary.memory_bytes == pytest.approx(2.5e6)
-    assert cuda_summary.tensor_core_pct == pytest.approx(74.2)
-    assert cuda_summary.kernel_duration_ns == pytest.approx(120_000.0)
-
-    monkeypatch.setattr(
-        "scripts.mvp_v1.counter_capture.resolve_tool_path",
-        lambda _name: Path("/usr/bin/ncu"),
-    )
-    monkeypatch.setattr(
-        "scripts.mvp_v1.counter_capture.run_in_process_group_bounded",
-        lambda *_args, **_kwargs: subprocess.CompletedProcess(
-            ["ncu"], 1, "", "==ERROR== ERR_NVGPUCTRPERM"
-        ),
-    )
-    denied = collect_hardware_counters(
+    cpu_skip = collect_hardware_counters(
         ["python"],
-        backend=VendorBackend.NVIDIA_CUDA,
-        architecture="sm_100",
+        backend=VendorBackend.CPU,
+        architecture="cpu",
         workload_id="w1",
     )
-    assert denied.status == "unavailable"
-    assert "ERR_NVGPUCTRPERM" in (denied.note or "")
+    assert cpu_skip.status == "skipped_cpu"
 
 
-def test_end_to_end_cpu_smoke_runner_and_cross_vendor_compare(
+def test_end_to_end_cpu_smoke_runner_and_vertical_compare(
     tmp_path: Path,
     capsys,
 ) -> None:
-    mi_dir = tmp_path / "mi300x"
-    b2_dir = tmp_path / "b200"
+    pt_dir = tmp_path / "pytorch"
+    port_dir = tmp_path / "portable"
     assert (
         runner_main(
             [
@@ -297,10 +280,12 @@ def test_end_to_end_cpu_smoke_runner_and_cross_vendor_compare(
                 "smoke",
                 "--device",
                 "cpu",
+                "--backend",
+                "pytorch",
                 "--target-override",
                 "MI300X",
                 "--output-dir",
-                str(mi_dir),
+                str(pt_dir),
             ]
         )
         == 0
@@ -312,36 +297,42 @@ def test_end_to_end_cpu_smoke_runner_and_cross_vendor_compare(
                 "smoke",
                 "--device",
                 "cpu",
+                "--backend",
+                "portable",
                 "--target-override",
-                "B200",
+                "MI300X",
                 "--output-dir",
-                str(b2_dir),
+                str(port_dir),
             ]
         )
         == 0
     )
 
-    summary = json.loads((mi_dir / "summary.json").read_text("utf-8"))
+    summary = json.loads((port_dir / "summary.json").read_text("utf-8"))
     expected_count = len(build_workload_specs(SweepMode.SMOKE))
+    assert summary["backend"] == "portable"
     assert len(summary["rows"]) == expected_count
     assert all(row["correctness_passed"] for row in summary["rows"])
 
-    with (mi_dir / "summary.csv").open(newline="", encoding="utf-8") as f:
+    with (port_dir / "summary.csv").open(newline="", encoding="utf-8") as f:
         csv_rows = list(csv.DictReader(f))
     assert len(csv_rows) == expected_count
 
     traces = [
         Trace.model_validate_json(line)
-        for line in (mi_dir / "traces.jsonl").read_text("utf-8").splitlines()
+        for line in (port_dir / "traces.jsonl").read_text("utf-8").splitlines()
         if line.strip()
     ]
     assert len(traces) == expected_count
     assert all(trace.is_successful() for trace in traces)
 
     cmp_md = compare_summaries_markdown(
-        mi_dir / "summary.json", b2_dir / "summary.json"
+        pt_dir / "summary.json", port_dir / "summary.json"
     )
-    assert "MI300X vs B200" in cmp_md
+    assert (
+        "ROCm Vertical Stack SOL Diagnosis — MI300X (pytorch vs portable)"
+        in (cmp_md)
+    )
     assert "gqa_paged_decode_bf16_b2_kv64" in cmp_md
 
     capsys.readouterr()
@@ -349,13 +340,13 @@ def test_end_to_end_cpu_smoke_runner_and_cross_vendor_compare(
         runner_main(
             [
                 "--compare",
-                str(mi_dir / "summary.json"),
-                str(b2_dir / "summary.json"),
+                str(pt_dir / "summary.json"),
+                str(port_dir / "summary.json"),
             ]
         )
         == 0
     )
-    assert "MI300X vs B200" in capsys.readouterr().out
+    assert "MI300X (pytorch vs portable)" in capsys.readouterr().out
 
 
 def test_amd_smi_gpu_data_metric_extraction() -> None:
@@ -488,57 +479,176 @@ def test_splitk_gqa_split_selection_and_moe_tile_schedule_bijection() -> None:
         assert torch.all(tile_pairs[inactive] == -1)
 
 
-def test_flashinfer_gqa_adapter_self_validation_and_plan_once(
-    monkeypatch,
+def _assert_zero_copy_from_pool(
+    runner: PreparedRunner,
+    arg_index: int,
+    recorded_ptrs: list[int],
 ) -> None:
-    plan_calls = {"count": 0, "corrupt": False}
+    pool = RotatingBufferPool(
+        runner.candidate_args, min_ring_bytes=1, max_replicas=2
+    )
+    pool_args = pool.next_args()
+    recorded_ptrs.clear()
+    assert runner.fn is not None
+    runner.fn(*pool_args)
+    assert recorded_ptrs == [pool_args[arg_index].data_ptr()]
 
-    class _FakeWrapper:
-        def __init__(self, workspace, layout, use_tensor_cores=True) -> None:
-            del workspace, layout, use_tensor_cores
 
-        def plan(self, *args, **kwargs) -> None:
-            del args, kwargs
-            plan_calls["count"] += 1
-
-        def run(self, q, kv_pair):
-            del kv_pair
-            return q + 99.0 if plan_calls["corrupt"] else q * 1.0
-
+def test_rocm_vendor_adapters_prepack_once_and_validate(monkeypatch) -> None:
     import types
 
-    fake_fi = types.SimpleNamespace(
-        BatchDecodeWithPagedKVCacheWrapper=_FakeWrapper
-    )
-    monkeypatch.setitem(sys.modules, "flashinfer", cast(Any, fake_fi))
     monkeypatch.setattr(
-        "scripts.mvp_v1.vendor_adapters._is_rocm_torch", lambda: False
+        "scripts.mvp_v1.vendor_adapters._is_rocm_torch", lambda: True
     )
+    seen_ptrs: list[int] = []
+    corrupt = {"flag": False}
+
+    def _fake_wv_splitk(w_nk, x, cu):
+        del cu
+        seen_ptrs.append(w_nk.data_ptr())
+        out = x @ w_nk.t()
+        return out + 9.0 if corrupt["flag"] else out
+
+    fake_ops = types.SimpleNamespace(
+        wvSplitK=_fake_wv_splitk,
+        paged_attention_rocm=lambda out, *rest: (
+            seen_ptrs.append(rest[4].data_ptr()),
+            out.copy_(rest[3]),
+        ),
+    )
+    fake_vllm = types.SimpleNamespace(
+        _custom_ops=fake_ops,
+        model_executor=types.SimpleNamespace(
+            layers=types.SimpleNamespace(
+                fused_moe=types.SimpleNamespace(
+                    fused_moe=lambda t, w1, w2, lg, k, renormalize=True: (
+                        seen_ptrs.append(w1.data_ptr()),
+                        torch.zeros_like(t)
+                        + (99.0 if corrupt["flag"] else 0.0),
+                    )[-1]
+                )
+            )
+        ),
+    )
+    fake_aiter = types.SimpleNamespace(
+        gemm_a16w16=lambda x, w_nk, *_r: (
+            seen_ptrs.append(w_nk.data_ptr()),
+            x @ w_nk.t(),
+        )[-1],
+        gemm_a8w8_bpreshuffle=lambda x, w, sa, sb, *_r: (
+            seen_ptrs.append(w.data_ptr()),
+            ((x.float() @ w.t().float()) * (sa * sb)).to(torch.bfloat16),
+        )[-1],
+        fused_moe=lambda t, w1, w2, wn, ids: (
+            seen_ptrs.append(w1.data_ptr()),
+            torch.zeros_like(t),
+        )[-1],
+        pa_fwd_asm=lambda q, k, v, bt, sl, mb: (
+            seen_ptrs.append(k.data_ptr()),
+            q + (5.0 if corrupt["flag"] else 0.0),
+        )[-1],
+        ops=types.SimpleNamespace(
+            shuffle=types.SimpleNamespace(
+                shuffle_weight=lambda t, layout=(16, 16): t.clone()
+            )
+        ),
+    )
+    for name, mod in {
+        "vllm": fake_vllm,
+        "vllm._custom_ops": fake_ops,
+        "vllm.model_executor.layers.fused_moe": (
+            fake_vllm.model_executor.layers.fused_moe
+        ),
+        "aiter": fake_aiter,
+        "aiter.ops": fake_aiter.ops,
+        "aiter.ops.shuffle": fake_aiter.ops.shuffle,
+    }.items():
+        monkeypatch.setitem(sys.modules, name, cast(Any, mod))
+
+    x_bf = torch.ones((2, 16), dtype=torch.bfloat16)
+    w_t_bf = torch.full((16, 8), 0.5, dtype=torch.bfloat16).t().contiguous().t()
+    gemm_vllm = try_make_vllm_gemm_runner(
+        [x_bf, w_t_bf],
+        fp8=False,
+        ref_fn=lambda a, b: (a.float() @ b.float()).to(torch.bfloat16),
+        max_atol=1e-2,
+    )
+    assert gemm_vllm.implementation_name == "vllm_wvSplitK"
+    assert gemm_vllm.candidate_args[1].is_contiguous()
+    _assert_zero_copy_from_pool(gemm_vllm, 1, seen_ptrs)
+
+    gemm_a16 = try_make_aiter_gemm_runner(
+        [x_bf, w_t_bf],
+        fp8=False,
+        ref_fn=lambda a, b: (a.float() @ b.float()).to(torch.bfloat16),
+        max_atol=1e-2,
+    )
+    assert gemm_a16.implementation_name == "aiter_gemm_a16w16"
+    _assert_zero_copy_from_pool(gemm_a16, 1, seen_ptrs)
+
+    x_fp8 = x_bf.to(torch.float8_e4m3fnuz)
+    w_t_fp8 = w_t_bf.to(torch.float8_e4m3fnuz)
+    sa = torch.ones((), dtype=torch.float32)
+    sb = torch.ones((), dtype=torch.float32)
+    gemm_a8 = try_make_aiter_gemm_runner(
+        [x_fp8, w_t_fp8],
+        fp8=True,
+        scale_a=sa,
+        scale_b=sb,
+        ref_fn=lambda a, b: (a.float() @ b.float()).to(torch.bfloat16),
+        max_atol=2e-1,
+    )
+    assert gemm_a8.implementation_name == "aiter_gemm_a8w8_bpreshuffle"
+    _assert_zero_copy_from_pool(gemm_a8, 1, seen_ptrs)
+
+    tokens = torch.zeros((2, 8), dtype=torch.bfloat16)
+    gw = torch.zeros((4, 8, 4), dtype=torch.bfloat16)
+    dw = torch.zeros((4, 4, 8), dtype=torch.bfloat16)
+    logits = torch.ones((2, 4), dtype=torch.bfloat16)
+    moe_args: list[Any] = [tokens, gw, gw, dw, logits, 2]
+    moe_vllm = try_make_vllm_moe_runner(
+        moe_args, ref_fn=lambda *_r: tokens, max_atol=1e-2
+    )
+    moe_aiter = try_make_aiter_moe_runner(
+        moe_args, ref_fn=lambda *_r: tokens, max_atol=1e-2
+    )
+    assert moe_vllm.implementation_name == "vllm_fused_moe"
+    assert moe_aiter.implementation_name == "aiter_fused_moe"
+    assert moe_vllm.candidate_args[1].shape == (4, 8, 8)
+    _assert_zero_copy_from_pool(moe_vllm, 1, seen_ptrs)
+    _assert_zero_copy_from_pool(moe_aiter, 1, seen_ptrs)
 
     q = torch.ones((1, 4, 16), dtype=torch.bfloat16)
     k = torch.ones((2, 16, 2, 16), dtype=torch.bfloat16)
-    indptr = torch.tensor([0, 2], dtype=torch.int32)
-    indices = torch.tensor([0, 1], dtype=torch.int32)
-    last_len = torch.tensor([16], dtype=torch.int32)
-    args: list[object] = [q, k, k, indptr, indices, last_len]
-
-    res = try_make_flashinfer_gqa_runner(
-        args, device="cuda:0", ref_fn=lambda q_in, *_rest: q_in, max_atol=1e-2
+    gqa_args: list[Any] = [
+        q,
+        k,
+        k,
+        torch.tensor([0, 2], dtype=torch.int32),
+        torch.tensor([0, 1], dtype=torch.int32),
+        torch.tensor([16], dtype=torch.int32),
+    ]
+    gqa_vllm = try_make_vllm_gqa_runner(
+        gqa_args, ref_fn=lambda q_in, *_r: q_in, max_atol=1e-2
     )
-    assert res is not None
-    runner, impl = res
-    assert impl == "flashinfer_paged_gqa"
-    assert torch.equal(runner(*args), q)
-    assert plan_calls["count"] == 1
-
-    plan_calls["corrupt"] = True
-    rejected = try_make_flashinfer_gqa_runner(
-        args, device="cuda:0", ref_fn=lambda q_in, *_rest: q_in, max_atol=1e-2
+    gqa_aiter = try_make_aiter_gqa_runner(
+        gqa_args, ref_fn=lambda q_in, *_r: q_in, max_atol=1e-2
     )
-    assert rejected is None
+    assert gqa_vllm.implementation_name == "vllm_paged_attention_rocm"
+    assert gqa_aiter.implementation_name == "aiter_pa_fwd_asm"
+    assert gqa_aiter.candidate_args[1].shape == (2, 2, 2, 16, 8)
+    _assert_zero_copy_from_pool(gqa_vllm, 1, seen_ptrs)
+    _assert_zero_copy_from_pool(gqa_aiter, 1, seen_ptrs)
+
+    corrupt["flag"] = True
+    rejected = try_make_aiter_gqa_runner(
+        gqa_args, ref_fn=lambda q_in, *_r: q_in, max_atol=1e-2
+    )
+    assert rejected.fn is None
+    assert rejected.implementation_name.startswith("unavailable:")
 
 
-def test_mi308x_and_h20_ceilings_cu_aware_detection_and_splits(
+def test_mi308x_ceilings_cu_aware_detection_and_rejects_non_rocm(
     monkeypatch,
 ) -> None:
     import types
@@ -549,13 +659,6 @@ def test_mi308x_and_h20_ceilings_cu_aware_detection_and_splits(
     assert mi308x.hbm_bandwidth_bytes_per_s == pytest.approx(5.3e12)
     assert mi308x.peak_bf16_flops_per_s == pytest.approx(148.0e12)
     assert mi308x.peak_fp8_flops_per_s == pytest.approx(296.0e12)
-
-    h20 = load_hardware_ceiling("H20")
-    assert h20.expected_compute_units == 78
-    assert h20.fp8_torch_dtype() is torch.float8_e4m3fn
-    assert h20.hbm_bandwidth_bytes_per_s == pytest.approx(4.0e12)
-    assert h20.peak_bf16_flops_per_s == pytest.approx(148.0e12)
-    assert h20.peak_fp8_flops_per_s == pytest.approx(296.0e12)
 
     assert (
         select_gqa_num_splits(batch=1, kv_heads=4, total_pages=256, num_cus=80)
@@ -571,8 +674,6 @@ def test_mi308x_and_h20_ceilings_cu_aware_detection_and_splits(
         ("AMD Instinct MI308X", "gfx942", 80, "MI308X"),
         ("AMD Instinct", "gfx942:sramecc+:xnack-", 80, "MI308X"),
         ("AMD Instinct", "gfx942", 304, "MI300X"),
-        ("NVIDIA H20", "", 78, "H20"),
-        ("NVIDIA H100 80GB HBM3", "", 132, "H100_SXM"),
     ]
     for name, gfx, cus, expected_id in props_map:
         monkeypatch.setattr(
@@ -584,15 +685,16 @@ def test_mi308x_and_h20_ceilings_cu_aware_detection_and_splits(
         )
         assert detect_hardware_ceiling("cuda:0").target_id == expected_id
 
-    monkeypatch.setattr(
-        torch.cuda,
-        "get_device_properties",
-        lambda _idx: types.SimpleNamespace(
-            name="NVIDIA H200", gcnArchName="", multi_processor_count=132
-        ),
-    )
-    with pytest.raises(ValueError, match="Unrecognized GPU"):
-        detect_hardware_ceiling("cuda:0")
+    for bad_name in ("NVIDIA H20", "NVIDIA H200"):
+        monkeypatch.setattr(
+            torch.cuda,
+            "get_device_properties",
+            lambda _idx, n=bad_name: types.SimpleNamespace(
+                name=n, gcnArchName="", multi_processor_count=132
+            ),
+        )
+        with pytest.raises(ValueError, match="Unrecognized GPU"):
+            detect_hardware_ceiling("cuda:0")
 
 
 def test_campaign_counter_circuit_breaker_and_topology_report(
@@ -692,9 +794,19 @@ def test_py312_pep758_rewriter_preserves_ast_across_repo(
 def test_skinny_gemm_fp8_small_m_pad16_and_dequant_fallbacks(
     monkeypatch,
 ) -> None:
+    unavail = PreparedRunner(
+        fn=None,
+        implementation_name="unavailable:mock",
+        candidate_args=[],
+        unavailable_reason="mock",
+    )
     monkeypatch.setattr(
-        "scripts.mvp_v1.kernels.try_make_aiter_fp8_gemm_runner",
-        lambda *_a, **_kw: None,
+        "scripts.mvp_v1.kernels.try_make_aiter_gemm_runner",
+        lambda *_a, **_kw: unavail,
+    )
+    monkeypatch.setattr(
+        "scripts.mvp_v1.kernels.try_make_vllm_gemm_runner",
+        lambda *_a, **_kw: unavail,
     )
     x = torch.ones((4, 32), dtype=torch.bfloat16).to(torch.float8_e4m3fnuz)
     w_t = (
@@ -717,15 +829,16 @@ def test_skinny_gemm_fp8_small_m_pad16_and_dequant_fallbacks(
         return ((a.float() @ b.float()) * (scale_a * scale_b)).to(out_dtype)
 
     monkeypatch.setattr(torch, "_scaled_mm", _fake_scaled_mm_native)
-    fn_native, impl_native = make_skinny_gemm_runner(
+    res_native = make_skinny_gemm_runner(
         prototype_args=[x, w_t],
         fp8=True,
         device="cuda:0",
         scale_a=sa,
         scale_b=sb,
     )
-    assert impl_native == "torch._scaled_mm"
-    assert torch.allclose(fn_native(x, w_t), expected)
+    assert res_native.implementation_name == "torch._scaled_mm"
+    assert res_native.fn is not None
+    assert torch.allclose(res_native.fn(*res_native.candidate_args), expected)
 
     def _fake_scaled_mm_align16(
         a: torch.Tensor,
@@ -740,15 +853,16 @@ def test_skinny_gemm_fp8_small_m_pad16_and_dequant_fallbacks(
         return ((a.float() @ b.float()) * (scale_a * scale_b)).to(out_dtype)
 
     monkeypatch.setattr(torch, "_scaled_mm", _fake_scaled_mm_align16)
-    fn_pad16, impl_pad16 = make_skinny_gemm_runner(
+    res_pad16 = make_skinny_gemm_runner(
         prototype_args=[x, w_t],
         fp8=True,
         device="cuda:0",
         scale_a=sa,
         scale_b=sb,
     )
-    assert impl_pad16 == "torch._scaled_mm_pad16"
-    out_pad16 = fn_pad16(x, w_t)
+    assert res_pad16.implementation_name == "torch._scaled_mm_pad16"
+    assert res_pad16.fn is not None
+    out_pad16 = res_pad16.fn(*res_pad16.candidate_args)
     assert out_pad16.shape == (4, 64)
     assert out_pad16.is_contiguous()
     assert torch.allclose(out_pad16, expected)
@@ -759,12 +873,13 @@ def test_skinny_gemm_fp8_small_m_pad16_and_dequant_fallbacks(
         raise RuntimeError("hipBLASLt unsupported")
 
     monkeypatch.setattr(torch, "_scaled_mm", _fake_scaled_mm_broken)
-    fn_deq, impl_deq = make_skinny_gemm_runner(
+    res_deq = make_skinny_gemm_runner(
         prototype_args=[x, w_t],
         fp8=True,
         device="cuda:0",
         scale_a=sa,
         scale_b=sb,
     )
-    assert impl_deq == "bf16_dequant_matmul_fallback"
-    assert torch.allclose(fn_deq(x, w_t), expected)
+    assert res_deq.implementation_name == "bf16_dequant_matmul_fallback"
+    assert res_deq.fn is not None
+    assert torch.allclose(res_deq.fn(*res_deq.candidate_args), expected)

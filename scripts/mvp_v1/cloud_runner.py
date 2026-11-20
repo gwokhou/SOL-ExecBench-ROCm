@@ -37,6 +37,8 @@ from scripts.mvp_v1.report import (
     WorkloadMeasurementRow,
     build_measurement_row,
     build_trace_record,
+    build_unavailable_row,
+    build_unavailable_trace,
     compare_summaries_markdown,
     write_mvp_outputs,
 )
@@ -99,6 +101,33 @@ def _capture_counters_for_spec(
     )
 
 
+def _collect_case_counters(
+    spec: WorkloadSpec,
+    *,
+    mode: SweepMode,
+    device: str,
+    ceiling: HardwareCeiling,
+    backend: KernelBackend,
+    collect_counters: bool,
+    skip_counter_reason: str | None,
+) -> CounterCaptureSummary:
+    if skip_counter_reason is not None:
+        return CounterCaptureSummary(
+            status="skipped_circuit_breaker",
+            backend=ceiling.vendor,
+            note=skip_counter_reason,
+        )
+    if collect_counters:
+        return _capture_counters_for_spec(
+            spec,
+            mode=mode,
+            device=device,
+            ceiling=ceiling,
+            backend=backend,
+        )
+    return CounterCaptureSummary(status="not_requested", backend=ceiling.vendor)
+
+
 def _evaluate_one_case(
     spec: WorkloadSpec,
     *,
@@ -118,6 +147,14 @@ def _evaluate_one_case(
         empirical=empirical,
         backend=backend,
     )
+    cand_fn = case.candidate_fn
+    if cand_fn is None:
+        return (
+            build_unavailable_row(case),
+            build_unavailable_trace(
+                case, ceiling=ceiling, clocks_locked=clocks_locked
+            ),
+        )
     warmup = 2 if mode is SweepMode.SMOKE else 5
     rep = 5 if mode is SweepMode.SMOKE else 20
 
@@ -129,8 +166,8 @@ def _evaluate_one_case(
         corr_holder["res"] = (corr, not exceeds)
 
     timing = time_kernel_isolated(
-        case.candidate_fn,
-        case.prototype_args,
+        cand_fn,
+        case.candidate_args,
         device=device,
         llc_bytes=ceiling.llc_bytes,
         warmup=warmup,
@@ -138,25 +175,15 @@ def _evaluate_one_case(
         validate_first=_validate,
     )
     correctness, passed = corr_holder["res"]
-    if skip_counter_reason is not None:
-        counters = CounterCaptureSummary(
-            status="skipped_circuit_breaker",
-            backend=ceiling.vendor,
-            note=skip_counter_reason,
-        )
-    elif collect_counters:
-        counters = _capture_counters_for_spec(
-            spec,
-            mode=mode,
-            device=device,
-            ceiling=ceiling,
-            backend=backend,
-        )
-    else:
-        counters = CounterCaptureSummary(
-            status="not_requested",
-            backend=ceiling.vendor,
-        )
+    counters = _collect_case_counters(
+        spec,
+        mode=mode,
+        device=device,
+        ceiling=ceiling,
+        backend=backend,
+        collect_counters=collect_counters,
+        skip_counter_reason=skip_counter_reason,
+    )
     row = build_measurement_row(
         case,
         timing,
@@ -194,18 +221,21 @@ def run_single_op_replay(
         ceiling=ceiling,
         backend=backend,
     )
+    cand_fn = case.candidate_fn
+    if cand_fn is None:
+        return 0
     flush_bytes = recommended_llc_flush_bytes(ceiling.llc_bytes, device=device)
     flusher = LLCRotatingFlusher(device, flush_bytes)
-    pool = RotatingBufferPool(case.prototype_args, min_ring_bytes=1)
+    pool = RotatingBufferPool(case.candidate_args, min_ring_bytes=1)
     is_gpu = device != "cpu" and torch.cuda.is_available()
     with torch.no_grad():
-        _ = case.candidate_fn(*pool.next_args())
+        _ = cand_fn(*pool.next_args())
         flusher.flush()
         if is_gpu:
             torch.cuda.synchronize(device)
             torch.cuda.nvtx.range_push(PROFILE_RANGE_MARKER)
         try:
-            _ = case.candidate_fn(*pool.next_args())
+            _ = cand_fn(*pool.next_args())
             if is_gpu:
                 torch.cuda.synchronize(device)
         finally:
@@ -274,6 +304,7 @@ def run_benchmark_campaign(
         rows=rows,
         traces=traces,
         env_probe=env_probe,
+        backend_name=backend.value,
     )
 
 
@@ -307,17 +338,18 @@ def _build_parser() -> argparse.ArgumentParser:
         default=False,
     )
     parser.add_argument("--single-op-replay", default=None)
-    parser.add_argument("--compare", nargs=2, type=Path, default=None)
+    parser.add_argument("--compare", nargs="+", type=Path, default=None)
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entrypoint for local smoke validation or 15-min cloud capture."""
-    args = _build_parser().parse_args(argv)
+    parser = _build_parser()
+    args = parser.parse_args(argv)
     if args.compare is not None:
-        comparison = compare_summaries_markdown(
-            args.compare[0], args.compare[1]
-        )
+        if not 2 <= len(args.compare) <= 3:
+            parser.error("--compare requires 2 or 3 paths")
+        comparison = compare_summaries_markdown(*args.compare)
         print(comparison)
         return 0
     device = resolve_device(args.device)
