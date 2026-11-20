@@ -91,7 +91,7 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
-### Next iteration — M1 complete, E2 evidence delivered
+### Next iteration — M0–M3 closed; D0 follow-ups selected (F2 → F1 → F3)
 
 Repository maintenance on 2026-11-08 retired seven superseded documents/campaign
 scripts and repaired historical navigation; see the
@@ -267,14 +267,18 @@ failures, interruptions, indeterminate controls, or unreached sessions.
   `43,200.38 s`, `168/360` rows executed, `192` `not_reached`, clean GPU
   handback & device-free audit `91fc0ebd...`;
   [C2 & C3 terminal results](docs/internal/solar-c2-c3-results-2026-11-20.md)).
-  The official scoring contract is unchanged pending D0.
+  The official scoring contract, operator registries, and default `IRBackend`
+  remain unchanged after D0.
   [Original E2 closeout](docs/internal/solar-e2-successor-results-2026-11-19.md)
 
-See the [development batch ledger](docs/internal/solar-e2-successor-dev-batch1-2026-11-18.md)
-and the [C2 & C3 terminal results](docs/internal/solar-c2-c3-results-2026-11-20.md).
-M2 execution (E2, C2, and bounded C3) is closed; `D0` (`M3` decision
-synthesis) remains unstarted. The planning
-anchor is `8641b9dc78d00250ba1cf75d5e9434f9839e5ef4`; earlier GPU receipts
+See the [development batch ledger](docs/internal/solar-e2-successor-dev-batch1-2026-11-18.md),
+the [C2 & C3 terminal results](docs/internal/solar-c2-c3-results-2026-11-20.md),
+and the [D0 decision report](docs/internal/solar-d0-decision-2026-11-20.md).
+**M0–M3 (`D0`) are complete**: all `47` sealed receipts and `14` M0–M2 reports
+verified into `data/outputs/solar-next-iteration/20261120-d0/`
+(`d0-manifest.json` `18dbca28...`), `L3-d` remains deferred (`0/12` C3
+candidates), and three bounded follow-ups (`F2 → F1 → F3`) are queued below.
+The planning anchor is `8641b9dc78d00250ba1cf75d5e9434f9839e5ef4`; earlier GPU receipts
 do not establish acceptance of that merged revision. Minimal experiment
 integration precedes the execution-source freeze and qualification refresh.
 The initial B1 follow-up covered local source/environment freeze and CPU checks.
@@ -307,7 +311,16 @@ The start700 pause and deferred L3-d/L5 scope remain unchanged.
 | E2 repair successor and research closeout | Complete; judge did not meet E0 | 432 units, 1,296 correctness and 144 cost sessions, 72 replays. 15 LayerNorm L1 units failed repeat consistency. [Terminal report](docs/internal/solar-e2-successor-results-2026-11-19.md) |
 | LayerNorm research reference | Development GPU acceptance passed | 156/156 frozen sessions, 24/24 groups in each consistency check, 36/36 expected negative-control rejections and clean GPU handback. [GPU results](docs/internal/solar-e2-layernorm-gpu-results-2026-11-19.md) |
 | LayerNorm independent holdout | Complete; independent holdout GPU acceptance passed | `186/186` `h0` sessions (`1,866` calls), `24/24` fixed/permuted/independent-draw groups, `18/18` expected negatives, clean GPU handback & device-free audit (`cdfbd3ef...`). [Holdout results](docs/internal/solar-e2-layernorm-holdout-results-2026-11-19.md) |
-| C2 / C3 / D0 | C2 complete; C3 bounded terminal `INCOMPLETE` (`168/360` at 12h cap); `D0` next | C2 calibrated `mem-12gib` (`12,884,901,888` B; `17,095,983,104` B total / `15,300,820,992` B stable allocatable), froze 36 decisions (`20` `generated` = `180` workloads / `360` rows); `r1` smoke (`40/360`, `851acbfe...`) followed by `r2` `12h` activity-budget closeout (`43,200.38 s`, `168/360` executed: `40` passed, `111` failed, `16` unproved, `1` `budget_exhausted`, `192` `not_reached`, `0` `infrastructure_error`, clean GPU handback & device-free audit `91fc0ebd...`, recording the `row-167` nested-PGID `.formal.*` timeout drift). [Smoke](docs/internal/solar-c2-c3-smoke-2026-11-19.md) · [Terminal results](docs/internal/solar-c2-c3-results-2026-11-20.md) |
+| C2 / C3 | C2 complete; C3 bounded terminal `INCOMPLETE` (`168/360` at 12h cap) | C2 calibrated `mem-12gib` (`12,884,901,888` B; `17,095,983,104` B total / `15,300,820,992` B stable allocatable), froze 36 decisions (`20` `generated` = `180` workloads / `360` rows); `r1` smoke (`40/360`, `851acbfe...`) followed by `r2` `12h` activity-budget closeout (`43,200.38 s`, `168/360` executed: `40` passed, `111` failed, `16` unproved, `1` `budget_exhausted`, `192` `not_reached`, `0` `infrastructure_error`, clean GPU handback & device-free audit `91fc0ebd...`, recording the `row-167` nested-PGID `.formal.*` timeout drift). [Smoke](docs/internal/solar-c2-c3-smoke-2026-11-19.md) · [Terminal results](docs/internal/solar-c2-c3-results-2026-11-20.md) |
+| D0 (M3) | Complete; 3 follow-ups selected (`F2 → F1 → F3`), `L3-d` deferred | Verified `47` sealed receipts + `14` M0–M2 reports into `data/outputs/solar-next-iteration/20261120-d0/` (`d0-manifest.json` `18dbca28...`); `0/12` C3 gaps flag `L3-d`; official contracts/score unchanged. [D0 decision](docs/internal/solar-d0-decision-2026-11-20.md) · [D0 script](scripts/internal/solar/d0_synthesis.py) |
+
+#### Post-D0 selected follow-up backlog (3/3 cap, ordered `F2 → F1 → F3`)
+
+| Order / ID | Priority / State | Scope & exposure constraint |
+| --- | --- | --- |
+| 1 / `F2` | P0 / Queued | Reap nested `PGID_2` (`timeloop-mapper`) child processes before worker timeout return and map `7,200 s` mapper `TimeoutExpired` explicitly (`BUDGET_EXHAUSTED` / `mapper_timeout`) rather than `toolchain_unavailable`; CPU-only fix unlocking drift-free `--resume` (`runner.py`, `orojenesis/runner.py`, `target_coverage.py`) |
+| 2 / `F1` | P1 / Queued (after `F2`) | Propose and atomically bump contract/schema version adopting LayerNorm `centered_fp64_v1` reference based on `E-4` (`3,669` CPU calls, `156/156` dev, `186/186` `h0`); keep `gfx1200-official-score-v2` immutable and never reuse retired `E2`/`36385b8b...` `h0` commitments |
+| 3 / `F3` | P1 / Queued (after `F2`) | Close `make_fx_aten` `incomplete_tile_aware_bound` (`12` defs / `63` rows, including `local_global` / `batched_*` cross-scale regressions), `93.2%` (`40,272.21 s`) BMM mapper cost, and 3 deterministic gaps (`arange` rule, `rope_*` index read, `attention_sink` `effect_boundary`); develop on `smoke` + `development`, treat `32` reached `holdout` UUIDs as exposed, preserve `48` unreached `holdout` UUIDs |
 
 [E1/C1 CPU acceptance](docs/internal/solar-e1-c1-cpu-acceptance-2026-11-08.md)
 records 169 passing targeted tests plus quality guards. Evidence root:

@@ -76,6 +76,7 @@ release-status claims.
 - [LayerNorm centered-FP64 CPU comparison, dev GPU, and independent holdout results, 2026-11-19](internal/solar-e2-layernorm-holdout-results-2026-11-19.md)
 - [C2 capacity calibration and C3 40-row LLM_CORE smoke checkpoint, 2026-11-19](internal/solar-c2-c3-smoke-2026-11-19.md)
 - [C2 capacity calibration and bounded C3 terminal closeout, 2026-11-20](internal/solar-c2-c3-results-2026-11-20.md)
+- [D0 (M3) three-line synthesis and next-iteration selection, 2026-11-20](internal/solar-d0-decision-2026-11-20.md)
 - [B2 acceptance: representative regression and refreshed AKA qualification](internal/solar-b2-acceptance-2026-11-08.md)
 - [Historical B2 checkpoint before the approved erratum](internal/solar-b2-checkpoint-2026-11-08.md)
 - [Approved B2 representative expectation erratum](internal/solar-b2-representative-erratum-2026-11-08.md)
@@ -118,9 +119,13 @@ re-confirmed C2 (`mem-12gib`, identical `workload_view_digest = 65b39113...`)
 and ran `C3` to its 12-hour activity budget cap (`43,200.38 s`, `168/360` rows
 executed: `40` passed, `111` failed, `16` unproved, `1` `budget_exhausted`,
 `192` `not_reached`, `0` `infrastructure_error`, terminal `INCOMPLETE`), with
-clean GPU handback and independent device-free audit (`91fc0ebd...`). Official
-scoring contracts remain unchanged, M2 execution is closed, and `D0` (`M3`
-decision synthesis) is next.
+clean GPU handback and independent device-free audit (`91fc0ebd...`).
+[D0 (M3)](internal/solar-d0-decision-2026-11-20.md) is now complete: all `47`
+sealed receipts and `14` M0–M2 reports are verified under
+`data/outputs/solar-next-iteration/20261120-d0/` (`d0-manifest.json`
+`18dbca28...`), official scoring contracts and registries remain unchanged,
+`L3-d` remains deferred (`0/12` C3 candidates), and three bounded follow-ups
+(`F2 → F1 → F3`) are tracked in [HANDSOFF](../HANDSOFF.md#solar-evolution).
 
 Public contracts in this tree describe the current implementation. Retain dated
 reports when they bind unique baseline evidence or acceptance decisions still

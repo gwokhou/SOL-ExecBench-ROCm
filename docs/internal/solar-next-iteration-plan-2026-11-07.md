@@ -1,6 +1,6 @@
 # 下一轮迭代计划：版本基线、裁判辨错与 LLM_CORE 覆盖
 
-制定日期为 2026-11-07，进展更新于 2026-11-20。**M0、M1 已完成，M2 执行（E2、C2 与有界 C3）已闭合（裁判未达到 E0 整体标准；C2 `COMPLETE`；C3 在 12 小时预算上限到达合法有界终态 `INCOMPLETE`，已完成 `168/360` 行并完成无设备审计），现待 M3 / `D0` 综合决策。**
+制定日期为 2026-11-07，进展更新于 2026-11-20。**M0、M1、M2（E2、C2 与有界 C3）与 M3（`D0` 综合决策）均已闭合（裁判未达到 E0 整体标准；C2 `COMPLETE`；C3 在 12 小时预算上限到达合法有界终态 `INCOMPLETE`，已完成 `168/360` 行并完成无设备审计；`D0` 已核验 `47` 份封存收据与 `14` 份 M0–M2 报告，继续延后 `L3-d`，选定 `F2 -> F1 -> F3` 三项后续任务并登记于 `HANDSOFF.md`），详见 [D0 综合决策报告](solar-d0-decision-2026-11-20.md)。**
 E1/C1 实现和 CPU 检查见[CPU 验收记录](solar-e1-c1-cpu-acceptance-2026-11-08.md)；
 后续授权完成的执行提交、容器/mapper身份、资源预算及CPU基线见
 [B1 冻结记录](solar-b1-execution-freeze-2026-11-08.md)。
@@ -26,9 +26,9 @@ C2/C3、mapper、容量探针仍未获本轮执行授权。
 通过核验，宿主命令与冻结摘要已对账。用户已批准开启一次新留出，运行在第 501 个会话启动计时线程时停止。
 500 个正确性会话完成，1 个故障，795 个未到达，成本和离线阶段均未到达。GPU 交还与部分证据核验通过。
 进程回收修正通过真实适配器的无 GPU 开发集复验，在固定镜像中形成独立冻结。修正版使用另一次用户授权的留出，完成 1,296 个正确性会话、144 个成本会话及 72 个离线回放。终态核验通过，15 个 LayerNorm L1 逻辑单元未达到重复一致性要求。 [E2 收尾结论](solar-e2-successor-results-2026-11-19.md)
-针对该问题提出的 opt-in 研究参考 `centered_fp64_v1` 已完成 [CPU 留存调用对照](solar-e2-layernorm-reference-cpu-2026-11-19.md)、[156 会话开发集 GPU 验收](solar-e2-layernorm-gpu-results-2026-11-19.md) 与 [186 会话独立留出（`h0`）GPU 确认](solar-e2-layernorm-holdout-results-2026-11-19.md)（168/168 正对照、24/24 同字节/置换/独立抽样组、18/18 负对照全部通过，无设备审计与 GPU 交还通过）。原 E2 结论与正式评分契约保持原样，是否升级正式合同留待 `D0` 决策。
+针对该问题提出的 opt-in 研究参考 `centered_fp64_v1` 已完成 [CPU 留存调用对照](solar-e2-layernorm-reference-cpu-2026-11-19.md)、[156 会话开发集 GPU 验收](solar-e2-layernorm-gpu-results-2026-11-19.md) 与 [186 会话独立留出（`h0`）GPU 确认](solar-e2-layernorm-holdout-results-2026-11-19.md)（168/168 正对照、24/24 同字节/置换/独立抽样组、18/18 负对照全部通过，无设备审计与 GPU 交还通过）。原 E2 结论与正式评分契约保持原样，已在 `D0` 选定为后继提案 **`F1`**。
 
-此外，在基线 `b45e6f9a`（最小修复 RDNA4 WGP 与受界固件显存保留解析）及 B2 `8/8` 代表槽预检通过后，已完成 **C2** 显存标定（`mem-12gib`，`20` 算子 / `180` 工作负载 / `360` 行目标矩阵）与 **C3**：`r1` 完成前 `40/360` 行串行冒烟与审计（`851acbfe...`，[冒烟检查点](solar-c2-c3-smoke-2026-11-19.md)）；在宿主机重启中断 `row-046` 并经 `clock_recovery` 恢复后，新建 `r2` 完成全流程并于 **12 小时活动预算上限（`43,200.38 s`）到达合法有界终态 `INCOMPLETE`**（已执行 `168/360` 行：`40 passed`、`111 failed`、`16 unproved`、`1 budget_exhausted`、`192 not_reached`、`0 infrastructure_error`；`8/20` 定义完成全 9 槽；干净 GPU 交还与无设备终态审计 `91fc0ebd...` 通过，并定位了 `row-167` 嵌套进程组超时写盘竞态与 `local_global`/`batched_*` 跨尺度回归），详见 [终态 C2 与 C3 结果报告](solar-c2-c3-results-2026-11-20.md)。M2 证据采集现已收尾，待推进 `D0`（M3 决策报告）。
+此外，在基线 `b45e6f9a`（最小修复 RDNA4 WGP 与受界固件显存保留解析）及 B2 `8/8` 代表槽预检通过后，已完成 **C2** 显存标定（`mem-12gib`，`20` 算子 / `180` 工作负载 / `360` 行目标矩阵）与 **C3**：`r1` 完成前 `40/360` 行串行冒烟与审计（`851acbfe...`，[冒烟检查点](solar-c2-c3-smoke-2026-11-19.md)）；在宿主机重启中断 `row-046` 并经 `clock_recovery` 恢复后，新建 `r2` 完成全流程并于 **12 小时活动预算上限（`43,200.38 s`）到达合法有界终态 `INCOMPLETE`**（已执行 `168/360` 行：`40 passed`、`111 failed`、`16 unproved`、`1 budget_exhausted`、`192 not_reached`、`0 infrastructure_error`；`8/20` 定义完成全 9 槽；干净 GPU 交还与无设备终态审计 `91fc0ebd...` 通过，并定位了 `row-167` 嵌套进程组超时写盘竞态与 `local_global`/`batched_*` 跨尺度回归），详见 [终态 C2 与 C3 结果报告](solar-c2-c3-results-2026-11-20.md)。**M3 / `D0` 现已闭合**：核验并归档 `data/outputs/solar-next-iteration/20261120-d0/`（`d0-manifest.json` SHA-256 `18dbca28...`），因 `0/12` 缺口满足共同前端缺失而继续暂缓 `L3-d`，并在 `HANDSOFF.md` 按 `F2 -> F1 -> F3` 顺序选定 `3` 项下一轮后续任务，详见 [D0 综合决策报告](solar-d0-decision-2026-11-20.md)。
 
 原 E0 文本、算术勘误、失败记录、原始工件和分母均保留。实测缓存条件见 [预检台账](solar-e2-successor-preflight-2026-11-18.md)。
 后继阶段边界、收据和开启条件见[执行规格草案](solar-e2-successor-protocol-draft-2026-11-18.md)。
