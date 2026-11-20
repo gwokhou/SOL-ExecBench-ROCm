@@ -1,16 +1,31 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-08-13 against source revision
-`fd7970520e205318e2e63d8a96d5203e1d5972c3`, the live ignored evidence/store,
-the remote P0 conformance Release metadata, and the completed start-460 /
-start640 rejections described below.
+Last audited: 2026-11-20 (`codex/solar-b1-freeze-20261108`, `F2` CPU closeout `5153900d`)
+following the strategic stop-loss and pivot to the `v0.1` cross-vendor
+inference primitives SOL mainline (historical baseline audit: 2026-08-13 against
+source revision `fd7970520e205318e2e63d8a96d5203e1d5972c3`, the live ignored
+evidence/store, remote P0 conformance Release metadata, and completed start-460 /
+start640 rejections described below).
 
-This file records unresolved repository-level work, the decisions that
-constrain it, and the evidence that closed the lifecycle production-topology
-P0. Generated run state belongs in the diagnostic lifecycle registry; detailed
-completed investigations and one-time inventories belong in Git history.
+This file records the active repository direction, the decisions that constrain
+it, and historical evidence from prior campaigns. Generated run state belongs in
+the diagnostic lifecycle registry; detailed completed investigations and
+one-time inventories belong in Git history.
 
 ## Current state
+
+- **2026-11-20 Strategic Stop-Loss & Pivot (Active Directive)**:
+  - **Sole active mainline (`v0.1` 跨阵营推理原语 SOL 对标收口)**: **Phase 1：3 算子跨阵营 MVP（`FP8/BF16 Skinny GEMM`、`Fused MoE`、`GQA/MLA Paged Attention` 或 `RMSNorm + RoPE`）**。范围收敛至与 `flashinfer-bench` 同源的 **Collection #4（26 个核心推理原语）**，输入/输出复用现有 `FlashInfer-Trace` 契约（`definition.json` + `workload.jsonl` + `solution.json` + `Trace`）；SOL 理论上限统一采用透明可核算的解析式 Roofline（字节搬运量 + FLOPs + 硬件带宽/算力上限），彻底剥离 `Orojenesis` 重型搜索。
+  - **Hardware role switch**: 本地 `RX 9060 XT (gfx1200)` 正式降级为**免费本地开发、纯 CPU 单测与采集脚本联调机**；核心性能与计数器采集面向云端数据中心卡 **`AMD MI300X (gfx942)` vs. `NVIDIA B200/H100`**（本地定型脚本，云端 15 分钟一键采集即销毁）。
+  - **Terminated / permanently frozen tracks**:
+    - `F2`（嵌套 `PGID_2` 超时回收与 `mapper_timeout` 分类）已于纯 CPU 范围完成收口（`5153900d`），严禁以此触发任何 GPU 重跑或续跑；
+    - **严禁启动 `C3 --resume`**，严禁再跑任何 `timeloop-mapper` / `Orojenesis` 长时扫描或 `gfx1200` 大批量 GPU 战役；
+    - **取消 `F1`**：不再在本仓内部做 LayerNorm `centered_fp64_v1` 正式评测契约升版、Schema bump 或新留出集上机确认（E2 精度退化与容差案例仅作外部上游 Issue/PR 素材归档）；
+    - **取消 `F3`**：停止攻克 `make_fx_aten` 在 `LLM_CORE` 上的 `incomplete_tile_aware_bound`、4D BMM 搜索剪枝及 `arange` / `rope_*` / `attention_sink` 形式化读取证明；
+    - **永久冻结** `AMD_AKA`（含训练/卷积/Loss/反向算子）、`p1-successor-start700` 以及一切内部重型资格链/封存仪式；**严禁新增任何自定义 Artifact Schema 家族**。
+  - **Spin-off / upstream asset track**: 盘点并抽离现有硬件级防失真机制——dVFS `STABLE_PEAK` 锁频校验、L2/LLC Cache 刷新、防死代码消除（output GPU 驻留与 lazy-tensor 检查）及 E2 LayerNorm 容差退化案例——作为独立轻量模块或上游补丁输出，不再锁死在本仓重型管线内。
+
+- Historical baseline notes (frozen / superseded for active scheduling):
 
 - The official gfx1200 score is published: `0.497818327` for the
   `rx9060xt-gfx1200-reference-v2` baseline against the
@@ -71,11 +86,11 @@ completed investigations and one-time inventories belong in Git history.
 - The start700 qualification chain was re-run at `cbaa3822` (the commit changed
   the bound `source_revision`); all five gates verify (static `6fe2bb7959`,
   canary/full development and held-out). Development collection then produced
-  **69 of 440** cases before the operator paused it. **The RDNA4 diagnostic
-  production re-release is deliberately on hold**: no frozen development corpus,
-  SOLAR, inference profile, held-out collection, or acceptance verdict exists,
-  and no publication/release/tag exists. Resumption is
-  `collect --role development` from the paused root without re-qualifying.
+  **69 of 440** cases before the operator paused it. **Per the 2026-11-20
+  strategic stop-loss, `p1-successor-start700` and the RDNA4 diagnostic
+  production re-release are permanently frozen (do not resume `collect`)**: no
+  frozen development corpus, SOLAR, inference profile, held-out collection, or
+  acceptance verdict exists, and no publication/release/tag exists.
 - The production-topology lifecycle P0 closed on 2026-08-09 (conformance run
   `c96d65d534bdfe51ac23b0fda026721a614fa6f3e03388fa1ca3da533a922096`, GitHub
   Release `diagnostic-lifecycle-p0-conformance-v1`). It proves the mechanism
@@ -89,9 +104,16 @@ completed investigations and one-time inventories belong in Git history.
 
 ## Active backlog
 
+### Sole active mainline — Phase 1: 3-operator cross-vendor MVP (v0.1)
+
+- **Active scope**: **Phase 1：3 算子跨阵营 MVP（`FP8/BF16 Skinny GEMM`、`Fused MoE`、`GQA/MLA Paged Attention` 或 `RMSNorm + RoPE`）**，面向 `flashinfer-bench` 同源 Collection #4（26 个核心推理原语）。
+- **Contracts & bounds**: 复用 `FlashInfer-Trace` (`definition.json` + `workload.jsonl` + `solution.json`)，**不引入任何新 Artifact Schema**；SOL 理论上限采用透明解析式 Roofline（字节搬运量 + FLOPs + 硬件带宽/算力上限），彻底旁路 `Orojenesis`。
+- **Execution model**: 本地 `RX 9060 XT (gfx1200)` 仅作纯 CPU 单测与脚本联调；核心实测对比目标为云端 `AMD MI300X (gfx942)` vs. `NVIDIA B200/H100`（15 分钟一键采集即销毁），并将 dVFS `STABLE_PEAK` 锁频校验、Cache 刷新、防死代码消除与 E2 LayerNorm 容差案例抽离为独立轻量资产/上游补丁。
+- **Gate**: 等待确认“第 1 周 3 算子 MVP 本地脚本改造清单”与最终 3 算子组合后启动开发；本转向下不再推进下述历史 M0–M3 / Post-D0 路线。
+
 <a id="solar-evolution"></a>
 
-### Next iteration — M0–M3 closed; D0 follow-ups selected (F2 → F1 → F3)
+### Historical record — M0–M3 closed; post-D0 roadmap halted/superseded (2026-11-20)
 
 Repository maintenance on 2026-11-08 retired seven superseded documents/campaign
 scripts and repaired historical navigation; see the
@@ -277,7 +299,9 @@ and the [D0 decision report](docs/internal/solar-d0-decision-2026-11-20.md).
 **M0–M3 (`D0`) are complete**: all `47` sealed receipts and `14` M0–M2 reports
 verified into `data/outputs/solar-next-iteration/20261120-d0/`
 (`d0-manifest.json` `18dbca28...`), `L3-d` remains deferred (`0/12` C3
-candidates), and three bounded follow-ups (`F2 → F1 → F3`) are queued below.
+candidates), and three bounded follow-ups (`F2 → F1 → F3`) were queued below
+(subsequently halted/superseded by the 2026-11-20 strategic stop-loss: `F2`
+closed on CPU, `F1`/`F3` cancelled).
 The planning anchor is `8641b9dc78d00250ba1cf75d5e9434f9839e5ef4`; earlier GPU receipts
 do not establish acceptance of that merged revision. Minimal experiment
 integration precedes the execution-source freeze and qualification refresh.
@@ -314,13 +338,13 @@ The start700 pause and deferred L3-d/L5 scope remain unchanged.
 | C2 / C3 | C2 complete; C3 bounded terminal `INCOMPLETE` (`168/360` at 12h cap) | C2 calibrated `mem-12gib` (`12,884,901,888` B; `17,095,983,104` B total / `15,300,820,992` B stable allocatable), froze 36 decisions (`20` `generated` = `180` workloads / `360` rows); `r1` smoke (`40/360`, `851acbfe...`) followed by `r2` `12h` activity-budget closeout (`43,200.38 s`, `168/360` executed: `40` passed, `111` failed, `16` unproved, `1` `budget_exhausted`, `192` `not_reached`, `0` `infrastructure_error`, clean GPU handback & device-free audit `91fc0ebd...`, recording the `row-167` nested-PGID `.formal.*` timeout drift). [Smoke](docs/internal/solar-c2-c3-smoke-2026-11-19.md) · [Terminal results](docs/internal/solar-c2-c3-results-2026-11-20.md) |
 | D0 (M3) | Complete; 3 follow-ups selected (`F2 → F1 → F3`), `L3-d` deferred | Verified `47` sealed receipts + `14` M0–M2 reports into `data/outputs/solar-next-iteration/20261120-d0/` (`d0-manifest.json` `18dbca28...`); `0/12` C3 gaps flag `L3-d`; official contracts/score unchanged. [D0 decision](docs/internal/solar-d0-decision-2026-11-20.md) · [D0 script](scripts/internal/solar/d0_synthesis.py) |
 
-#### Post-D0 selected follow-up backlog (3/3 cap, ordered `F2 → F1 → F3`)
+#### Post-D0 selected follow-up backlog (superseded / halted 2026-11-20)
 
 | Order / ID | Priority / State | Scope & exposure constraint |
 | --- | --- | --- |
-| 1 / `F2` | P0 / Queued | Reap nested `PGID_2` (`timeloop-mapper`) child processes before worker timeout return and map `7,200 s` mapper `TimeoutExpired` explicitly (`BUDGET_EXHAUSTED` / `mapper_timeout`) rather than `toolchain_unavailable`; CPU-only fix unlocking drift-free `--resume` (`runner.py`, `orojenesis/runner.py`, `target_coverage.py`) |
-| 2 / `F1` | P1 / Queued (after `F2`) | Propose and atomically bump contract/schema version adopting LayerNorm `centered_fp64_v1` reference based on `E-4` (`3,669` CPU calls, `156/156` dev, `186/186` `h0`); keep `gfx1200-official-score-v2` immutable and never reuse retired `E2`/`36385b8b...` `h0` commitments |
-| 3 / `F3` | P1 / Queued (after `F2`) | Close `make_fx_aten` `incomplete_tile_aware_bound` (`12` defs / `63` rows, including `local_global` / `batched_*` cross-scale regressions), `93.2%` (`40,272.21 s`) BMM mapper cost, and 3 deterministic gaps (`arange` rule, `rope_*` index read, `attention_sink` `effect_boundary`); develop on `smoke` + `development`, treat `32` reached `holdout` UUIDs as exposed, preserve `48` unreached `holdout` UUIDs |
+| `1 / F2` | **Complete (CPU closeout, `5153900d`)** | Reaped nested `PGID_2` (`process_group=0` + session-wide `/proc`/Darwin scan and signaling), cleaned up aborted `.formal.*`/`.readiness.*` staging directories, added worker `SIGTERM` unwinding (`cleanup_on_termination`), and mapped Orojenesis `TimeoutExpired` explicitly to `OrojenesisTimeoutError` (`mapper_timeout` / `BUDGET_EXHAUSTED`) instead of `toolchain_unavailable`; pure CPU tests (`76/76` targeted; `1880 passed, 1 skipped` across `process`/`solar_bridge`/`solar`/`c3_final_audit`) passed; **no `C3 --resume` or GPU re-run authorized** |
+| `2 / F1` | **Cancelled (2026-11-20 strategic stop-loss)** | Cancelled internal LayerNorm `centered_fp64_v1` contract/schema bump and holdout GPU re-run; `E-4` / E2 precision boundary evidence (`3,669` CPU calls, `156/156` dev, `186/186` `h0`) archived solely for external upstream Issue/PR material |
+| `3 / F3` | **Cancelled (2026-11-20 strategic stop-loss)** | Cancelled `make_fx_aten` `incomplete_tile_aware_bound` (`12` defs / `63` rows), 4D BMM mapper search pruning, and `arange` / `rope_*` / `attention_sink` formal read-proof work; `Orojenesis` search retired from the active mainline |
 
 [E1/C1 CPU acceptance](docs/internal/solar-e1-c1-cpu-acceptance-2026-11-08.md)
 records 169 passing targeted tests plus quality guards. Evidence root:
