@@ -16,11 +16,14 @@ from solar.rocm.architecture import ArchitectureProfile
 
 
 class MVPOperator(StrEnum):
-    """Phase 1 3-operator ROCm vertical SOL MVP vocabulary."""
+    """Core ROCm inference primitive families for vertical SOL diagnosis."""
 
     SKINNY_GEMM = "skinny_gemm"
     FUSED_MOE = "fused_moe"
     GQA_PAGED_DECODE = "gqa_paged_decode"
+    MLA_PAGED_DECODE = "mla_paged_decode"
+    FUSED_RMSNORM_ROPE = "fused_rmsnorm_rope"
+    SWIGLU_FP8_QUANT = "swiglu_fp8_quant"
 
 
 class PrecisionMode(StrEnum):
@@ -385,6 +388,97 @@ def bound_gqa_paged_decode(
             workload_id
             or f"gqa_paged_decode_{precision.value}_b{batch}_hq{q_heads}_hk{kv_heads}_d{head_dim}_kv{kv_len}"
         ),
+        flops=flops,
+        compulsory_bytes=compulsory_bytes,
+        ceiling=ceiling,
+        empirical=empirical,
+    )
+
+
+def bound_mla_paged_decode(
+    batch: int,
+    q_heads: int,
+    d_ckv: int,
+    d_kpe: int,
+    kv_len: int,
+    page_size: int,
+    precision: PrecisionMode,
+    ceiling: HardwareCeiling,
+    *,
+    empirical: EmpiricalCeiling | None = None,
+    workload_id: str = "",
+) -> AnalyticalBound:
+    """Analytical Roofline for absorbed MLA Paged Decode (``S_q = 1``)."""
+    elem_bytes = 1 if precision is PrecisionMode.FP8 else 2
+    d_total = d_ckv + d_kpe
+    flops = float(batch * q_heads * kv_len * (4.0 * d_ckv + 2.0 * d_kpe + 5.0))
+    pages_per_seq = math.ceil(kv_len / page_size)
+    table_bytes = ((batch + 1) + batch * pages_per_seq + batch) * 4
+    q_bytes = batch * q_heads * d_total * elem_bytes
+    kv_bytes = batch * kv_len * d_total * elem_bytes
+    out_bytes = batch * q_heads * d_ckv * 2
+    compulsory_bytes = float(q_bytes + kv_bytes + out_bytes + table_bytes)
+    return _finalize_bound(
+        operator=MVPOperator.MLA_PAGED_DECODE,
+        precision=precision,
+        workload_id=(
+            workload_id
+            or f"mla_paged_decode_{precision.value}_b{batch}_hq{q_heads}_kv{kv_len}"
+        ),
+        flops=flops,
+        compulsory_bytes=compulsory_bytes,
+        ceiling=ceiling,
+        empirical=empirical,
+    )
+
+
+def bound_fused_rmsnorm_rope(
+    m: int,
+    heads: int,
+    head_dim: int,
+    precision: PrecisionMode,
+    ceiling: HardwareCeiling,
+    *,
+    empirical: EmpiricalCeiling | None = None,
+    workload_id: str = "",
+) -> AnalyticalBound:
+    """Analytical Roofline for residual add + RMSNorm + NeoX RoPE fusion."""
+    elem_bytes = 1 if precision is PrecisionMode.FP8 else 2
+    flops = float(m * heads * (8.0 * head_dim + 2.0))
+    compulsory_bytes = float(
+        3 * m * heads * head_dim * elem_bytes
+        + head_dim * elem_bytes
+        + m * head_dim * 4
+    )
+    return _finalize_bound(
+        operator=MVPOperator.FUSED_RMSNORM_ROPE,
+        precision=precision,
+        workload_id=(
+            workload_id
+            or f"fused_rmsnorm_rope_{precision.value}_m{m}_h{heads}_d{head_dim}"
+        ),
+        flops=flops,
+        compulsory_bytes=compulsory_bytes,
+        ceiling=ceiling,
+        empirical=empirical,
+    )
+
+
+def bound_swiglu_fp8_quant(
+    m: int,
+    inter: int,
+    ceiling: HardwareCeiling,
+    *,
+    empirical: EmpiricalCeiling | None = None,
+    workload_id: str = "",
+) -> AnalyticalBound:
+    """Analytical Roofline for fused SwiGLU + dynamic per-token FP8 quant."""
+    flops = float(m * (8.0 * inter + 2.0))
+    compulsory_bytes = float(4 * m * inter + m * inter + 4 * m)
+    return _finalize_bound(
+        operator=MVPOperator.SWIGLU_FP8_QUANT,
+        precision=PrecisionMode.FP8,
+        workload_id=workload_id or f"swiglu_fp8_quant_m{m}_i{inter}",
         flops=flops,
         compulsory_bytes=compulsory_bytes,
         ceiling=ceiling,

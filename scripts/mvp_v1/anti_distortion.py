@@ -405,7 +405,18 @@ def validate_materialized_outputs(output: Any, device: str) -> None:
             raise RewardHackError(
                 f"output tensor on {tensor.device}, expected {expected}"
             )
-        if not bool(torch.isfinite(tensor).all().item()):
+        check_t = (
+            tensor.float()
+            if tensor.dtype
+            in (
+                torch.float8_e4m3fnuz,
+                torch.float8_e4m3fn,
+                torch.float8_e5m2fnuz,
+                torch.float8_e5m2,
+            )
+            else tensor
+        )
+        if not bool(torch.isfinite(check_t).all().item()):
             raise RuntimeError("output tensor contains NaN or Inf")
 
 

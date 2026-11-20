@@ -178,7 +178,11 @@ def test_materialize_trace_corpus_round_trips_strict_contracts(
         "skinny_gemm_bf16",
         "skinny_gemm_fp8",
         "fused_moe_bf16",
+        "fused_moe_fp8",
         "gqa_paged_decode_bf16",
+        "mla_paged_decode_bf16",
+        "fused_rmsnorm_rope_bf16",
+        "swiglu_fp8_quant",
     }
     for def_name, wl_path in written.items():
         def_path = tmp_path / "workloads" / def_name / "definition.json"

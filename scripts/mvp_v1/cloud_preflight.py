@@ -75,7 +75,11 @@ class _UncachedPy312Finder(importlib.abc.MetaPathFinder):
 
 sys.meta_path.insert(0, _UncachedPy312Finder())
 
+from scripts.mvp_v1 import triton_ops_ext as _triton_ops_ext
+from scripts.mvp_v1 import vendor_adapters_ext as _vendor_adapters_ext
 from scripts.mvp_v1.cloud_runner import main as runner_main
+
+del _triton_ops_ext, _vendor_adapters_ext
 
 cdna3_path = repo_root / "scripts" / "internal" / "cdna3" / "run_cdna3_diagnostic_calibration.py"
 if cdna3_path.is_file():

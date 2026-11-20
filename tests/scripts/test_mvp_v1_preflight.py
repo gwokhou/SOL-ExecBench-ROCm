@@ -89,7 +89,7 @@ def test_python312_twin_verifies_mvp_and_cdna3_imports() -> None:
     assert res.passed is True
     assert res.target_id == "MI300X"
     assert res.checked_modules >= 100
-    assert res.smoke_rows == 6
+    assert res.smoke_rows == 10
 
 
 def test_ssh_fingerprints_and_connectivity_probe_verdicts(
@@ -212,12 +212,12 @@ def test_oneshot_cloud_script_end_to_end_cpu_smoke_and_verify(
 
     receipt = validate_downloaded_bundle(tar_path, expected_sha256=expected_sha)
     assert receipt.target_id == "MI300X"
-    assert receipt.row_count == 6
+    assert receipt.row_count == 10
     assert receipt.all_passed is True
     assert receipt.sha256 == expected_sha
 
     dir_receipt = validate_downloaded_bundle(out_dir)
-    assert dir_receipt.row_count == 6
+    assert dir_receipt.row_count == 10
     assert dir_receipt.all_passed is True
     assert (
         preflight_main(

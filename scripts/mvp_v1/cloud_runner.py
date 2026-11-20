@@ -15,7 +15,6 @@ import torch
 from scripts.mvp_v1.analytical_roofline import (
     EmpiricalCeiling,
     HardwareCeiling,
-    PrecisionMode,
     detect_hardware_ceiling,
 )
 from scripts.mvp_v1.anti_distortion import (
@@ -42,6 +41,7 @@ from scripts.mvp_v1.report import (
     compare_summaries_markdown,
     write_mvp_outputs,
 )
+from scripts.mvp_v1.vendor_adapters import materialize_comparable_output
 from scripts.mvp_v1.workloads import (
     RuntimeCase,
     SweepMode,
@@ -62,11 +62,6 @@ def resolve_device(requested: str) -> str:
 
 
 def _run_reference_for_spec(case: RuntimeCase) -> torch.Tensor:
-    if case.spec.precision is PrecisionMode.FP8:
-        return case.reference_fn(
-            case.prototype_args[0].float(),
-            case.prototype_args[1].float(),
-        )
     return case.reference_fn(*case.prototype_args)
 
 
@@ -161,8 +156,15 @@ def _evaluate_one_case(
     ref_out = _run_reference_for_spec(case)
     corr_holder: dict[str, tuple[Correctness, bool]] = {}
 
-    def _validate(cand_out: torch.Tensor, _args: list[object]) -> None:
-        corr, exceeds = compute_error_stats(cand_out, ref_out, spec.tolerance)
+    def _validate(cand_out: object, _args: list[object]) -> None:
+        cand_tensor = materialize_comparable_output(cand_out)
+        if cand_tensor is None:
+            raise RuntimeError(
+                f"Unsupported candidate output type {type(cand_out).__name__}"
+            )
+        corr, exceeds = compute_error_stats(
+            cand_tensor, ref_out, spec.tolerance
+        )
         corr_holder["res"] = (corr, not exceeds)
 
     timing = time_kernel_isolated(

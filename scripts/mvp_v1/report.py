@@ -273,7 +273,7 @@ def render_report_markdown(
 ) -> str:
     """Render concise human-readable dual-denominator SOL Markdown report."""
     lines = [
-        f"# v0.1 MVP 3-Operator Roofline Report — {ceiling.target_id}",
+        f"# v0.1 ROCm Core Inference Primitives Roofline Report — {ceiling.target_id}",
         "",
         f"- **Device**: `{ceiling.device_name}` (`{ceiling.architecture}`)",
         f"- **Stack Tier**: `{backend_name}`",

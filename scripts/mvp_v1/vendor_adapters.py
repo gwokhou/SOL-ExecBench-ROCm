@@ -19,10 +19,24 @@ import torch
 class PreparedRunner:
     """Resolved operator callable with setup-time pre-packed candidate args."""
 
-    fn: Callable[..., torch.Tensor] | None
+    fn: Callable[..., Any] | None
     implementation_name: str
     candidate_args: list[Any]
     unavailable_reason: str | None = None
+
+
+def materialize_comparable_output(out: Any) -> torch.Tensor | None:
+    """Convert Tensor or ``(fp8, fp32_scale)`` pair to comparable Tensor."""
+    if isinstance(out, torch.Tensor):
+        return out
+    if (
+        isinstance(out, tuple)
+        and len(out) == 2
+        and isinstance(out[0], torch.Tensor)
+        and isinstance(out[1], torch.Tensor)
+    ):
+        return (out[0].float() * out[1].float()).to(torch.bfloat16)
+    return None
 
 
 def _unavailable(prototype_args: list[Any], reason: str) -> PreparedRunner:
@@ -39,18 +53,18 @@ def _is_rocm_torch() -> bool:
 
 
 def _self_validate(
-    cand_fn: Callable[..., torch.Tensor],
+    cand_fn: Callable[..., Any],
     cand_args: list[Any],
-    ref_fn: Callable[..., torch.Tensor],
+    ref_fn: Callable[..., Any],
     ref_args: list[Any],
     max_atol: float,
 ) -> bool:
     """Dry-run vendor adapter on pre-packed args and verify finite error."""
     try:
         with torch.no_grad():
-            cand_out = cand_fn(*cand_args)
-            ref_out = ref_fn(*ref_args)
-        if not isinstance(cand_out, torch.Tensor):
+            cand_out = materialize_comparable_output(cand_fn(*cand_args))
+            ref_out = materialize_comparable_output(ref_fn(*ref_args))
+        if cand_out is None or ref_out is None:
             return False
         if cand_out.shape != ref_out.shape:
             return False
@@ -471,13 +485,24 @@ def _resolve_vllm_moe_callables() -> tuple[Any | None, Any | None] | None:
     return fused_moe_fn, fused_experts_fn
 
 
+_FP8_TORCH_DTYPES = (torch.float8_e4m3fnuz, torch.float8_e4m3fn)
+
+
 def try_make_vllm_moe_runner(
     prototype_args: list[Any],
     *,
     ref_fn: Callable[..., torch.Tensor],
     max_atol: float,
 ) -> PreparedRunner:
-    """Build a setup-packed Tier-2 vLLM Fused MoE runner."""
+    """Build a setup-packed Tier-2 vLLM Fused MoE runner (BF16 or FP8)."""
+    if prototype_args[0].dtype in _FP8_TORCH_DTYPES:
+        from scripts.mvp_v1.vendor_adapters_ext import (
+            try_make_vllm_fp8_moe_runner,
+        )
+
+        return try_make_vllm_fp8_moe_runner(
+            prototype_args, ref_fn=ref_fn, max_atol=max_atol
+        )
     if not _is_rocm_torch():
         return _unavailable(prototype_args, "rocm_torch_required")
     resolved = _resolve_vllm_moe_callables()
@@ -559,7 +584,15 @@ def try_make_aiter_moe_runner(
     ref_fn: Callable[..., torch.Tensor],
     max_atol: float,
 ) -> PreparedRunner:
-    """Build a setup-packed Tier-3 AITER Fused MoE runner."""
+    """Build a setup-packed Tier-3 AITER Fused MoE runner (BF16 or FP8)."""
+    if prototype_args[0].dtype in _FP8_TORCH_DTYPES:
+        from scripts.mvp_v1.vendor_adapters_ext import (
+            try_make_aiter_fp8_moe_runner,
+        )
+
+        return try_make_aiter_fp8_moe_runner(
+            prototype_args, ref_fn=ref_fn, max_atol=max_atol
+        )
     if not _is_rocm_torch():
         return _unavailable(prototype_args, "rocm_torch_required")
     try:
@@ -632,12 +665,44 @@ class _PackedROCmKV:
     head_dim: int
 
 
+def build_paged_tables_and_seqlens(
+    kv_indptr: torch.Tensor,
+    kv_indices: torch.Tensor,
+    kv_last_len: torch.Tensor,
+    *,
+    page_size: int,
+    device: torch.device,
+) -> tuple[torch.Tensor, torch.Tensor, int]:
+    """Build dense ``block_tables`` and ``seq_lens`` once from ragged CSR KV."""
+    starts = [int(v) for v in kv_indptr.tolist()]
+    batch = max(0, len(starts) - 1)
+    counts = [starts[i + 1] - starts[i] for i in range(batch)]
+    max_blocks = max(counts, default=1)
+    block_tables = torch.zeros(
+        (batch, max_blocks), dtype=torch.int32, device=device
+    )
+    seq_lens_list: list[int] = []
+    last_lens = [int(v) for v in kv_last_len.tolist()]
+    indices_i32 = kv_indices.to(dtype=torch.int32)
+    for b_idx in range(batch):
+        p0, p1 = starts[b_idx], starts[b_idx + 1]
+        cnt = p1 - p0
+        if cnt > 0:
+            block_tables[b_idx, :cnt] = indices_i32[p0:p1]
+        slen = (
+            max(0, (cnt - 1) * page_size + last_lens[b_idx]) if cnt > 0 else 0
+        )
+        seq_lens_list.append(slen)
+    seq_lens = torch.tensor(seq_lens_list, dtype=torch.int32, device=device)
+    return block_tables, seq_lens, max(seq_lens_list, default=page_size)
+
+
 def _pack_rocm_paged_kv_once(
     prototype_args: list[Any],
 ) -> _PackedROCmKV | None:
     q, k_cache, v_cache, kv_indptr, kv_indices, kv_last_len = prototype_args
     n_pages, ps, hk, d = k_cache.shape
-    batch, q_heads, _ = q.shape
+    _, q_heads, _ = q.shape
     x_pack = 16 // max(int(k_cache.element_size()), 1)
     if x_pack <= 0 or d % x_pack != 0 or ps % x_pack != 0:
         return None
@@ -652,30 +717,20 @@ def _pack_rocm_paged_kv_once(
         .permute(0, 3, 1, 4, 2)
         .contiguous()
     )
-    starts = [int(v) for v in kv_indptr.tolist()]
-    counts = [starts[i + 1] - starts[i] for i in range(batch)]
-    max_blocks = max(counts, default=1)
-    block_tables = torch.zeros(
-        (batch, max_blocks), dtype=torch.int32, device=q.device
+    block_tables, seq_lens, max_seq_len = build_paged_tables_and_seqlens(
+        kv_indptr,
+        kv_indices,
+        kv_last_len,
+        page_size=ps,
+        device=q.device,
     )
-    seq_lens_list: list[int] = []
-    last_lens = [int(v) for v in kv_last_len.tolist()]
-    indices_i32 = kv_indices.to(dtype=torch.int32)
-    for b_idx in range(batch):
-        p0, p1 = starts[b_idx], starts[b_idx + 1]
-        cnt = p1 - p0
-        if cnt > 0:
-            block_tables[b_idx, :cnt] = indices_i32[p0:p1]
-        slen = max(0, (cnt - 1) * ps + last_lens[b_idx]) if cnt > 0 else 0
-        seq_lens_list.append(slen)
-    seq_lens = torch.tensor(seq_lens_list, dtype=torch.int32, device=q.device)
     return _PackedROCmKV(
         k_paged=k_paged,
         v_linear=v_linear,
         v_shuffled=v_shuffled,
         block_tables=block_tables,
         seq_lens=seq_lens,
-        max_seq_len=max(seq_lens_list, default=ps),
+        max_seq_len=max_seq_len,
         page_size=ps,
         q_heads=q_heads,
         kv_heads=hk,

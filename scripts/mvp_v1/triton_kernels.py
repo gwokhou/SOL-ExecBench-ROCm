@@ -434,8 +434,13 @@ def allocate_fused_moe_workspace(
     """Pre-allocate Fused MoE intermediate activation and weighted output buffers."""
     n_pairs = tokens.shape[0] * int(top_k)
     hidden_dim = tokens.shape[1]
+    out_dtype = (
+        tokens.dtype
+        if tokens.dtype in (torch.float16, torch.bfloat16)
+        else torch.bfloat16
+    )
     inter_buf = torch.empty(
-        (n_pairs, inter_dim), dtype=tokens.dtype, device=tokens.device
+        (n_pairs, inter_dim), dtype=out_dtype, device=tokens.device
     )
     pair_out = torch.empty(
         (n_pairs, hidden_dim), dtype=torch.float32, device=tokens.device
@@ -500,4 +505,9 @@ def run_fused_moe_triton(
         inter_dim=inter_dim,
         num_experts=num_experts,
     )
-    return pair_out.view(m, int(top_k), hidden_dim).sum(dim=1).to(tokens.dtype)
+    out_dtype = (
+        tokens.dtype
+        if tokens.dtype in (torch.float16, torch.bfloat16)
+        else torch.bfloat16
+    )
+    return pair_out.view(m, int(top_k), hidden_dim).sum(dim=1).to(out_dtype)

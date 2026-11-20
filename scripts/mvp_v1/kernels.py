@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""ROCm software-stack kernels and PyTorch references for the 3-operator MVP."""
+"""ROCm software-stack kernels and PyTorch references for all 6 primitive families."""
 
 from __future__ import annotations
 
@@ -21,6 +21,13 @@ from scripts.mvp_v1.triton_kernels import (
     select_gqa_num_splits,
     supports_splitk_gqa,
 )
+from scripts.mvp_v1.triton_ops_ext import (
+    allocate_splitk_mla_workspace,
+    run_fused_rmsnorm_rope_triton,
+    run_mla_paged_decode_splitk,
+    run_swiglu_fp8_quant_triton,
+    supports_splitk_mla,
+)
 from scripts.mvp_v1.vendor_adapters import (
     PreparedRunner,
     try_make_aiter_gemm_runner,
@@ -29,6 +36,14 @@ from scripts.mvp_v1.vendor_adapters import (
     try_make_vllm_gemm_runner,
     try_make_vllm_gqa_runner,
     try_make_vllm_moe_runner,
+)
+from scripts.mvp_v1.vendor_adapters_ext import (
+    try_make_aiter_mla_runner,
+    try_make_aiter_rmsnorm_rope_runner,
+    try_make_aiter_swiglu_quant_runner,
+    try_make_vllm_mla_runner,
+    try_make_vllm_rmsnorm_rope_runner,
+    try_make_vllm_swiglu_quant_runner,
 )
 
 
@@ -262,7 +277,7 @@ def run_fused_moe_grouped(
     """Active-expert grouped SwiGLU MoE avoiding inactive expert loads."""
     probs = torch.softmax(gate_logits.float(), dim=-1)
     weights, expert_ids = torch.topk(probs, k=int(top_k), dim=-1)
-    weights = (weights / weights.sum(dim=-1, keepdim=True)).to(tokens.dtype)
+    weights = (weights / weights.sum(dim=-1, keepdim=True)).to(torch.bfloat16)
     flat_experts = expert_ids.reshape(-1)
     flat_weights = weights.reshape(-1)
     token_repeat = torch.arange(
@@ -277,16 +292,20 @@ def run_fused_moe_grouped(
         sorted_experts, return_counts=True
     )
     out = torch.zeros_like(tokens, dtype=torch.float32)
+    tokens_bf = tokens.to(torch.bfloat16)
+    gate_bf = gate_weights.to(torch.bfloat16)
+    up_bf = up_weights.to(torch.bfloat16)
+    down_bf = down_weights.to(torch.bfloat16)
     offset = 0
     for eid_t, count_t in zip(unique_e.tolist(), counts.tolist(), strict=True):
         sl = slice(offset, offset + count_t)
         t_idx = sorted_tokens[sl]
         w_e = sorted_weights[sl].unsqueeze(-1)
-        x_e = tokens[t_idx]
-        hidden = torch.nn.functional.silu(x_e @ gate_weights[eid_t]) * (
-            x_e @ up_weights[eid_t]
+        x_e = tokens_bf[t_idx]
+        hidden = torch.nn.functional.silu(x_e @ gate_bf[eid_t]) * (
+            x_e @ up_bf[eid_t]
         )
-        contrib = (hidden @ down_weights[eid_t]).float() * w_e.float()
+        contrib = (hidden @ down_bf[eid_t]).float() * w_e.float()
         out.index_add_(0, t_idx, contrib)
         offset += count_t
     return out.to(torch.bfloat16)
@@ -547,5 +566,244 @@ def make_gqa_paged_decode_runner(
         return PreparedRunner(
             fn=ref_gqa_paged_decode,
             implementation_name="pytorch_ref_fallback",
+            candidate_args=prototype_args,
+        )
+
+
+def ref_mla_paged_decode(
+    q: torch.Tensor,
+    kv_cache: torch.Tensor,
+    kv_indptr: torch.Tensor,
+    kv_indices: torch.Tensor,
+    kv_last_page_len: torch.Tensor,
+    d_ckv: int,
+) -> torch.Tensor:
+    """Reference FP32 absorbed MLA Paged Decode -> BF16."""
+    batch, q_heads, d_total = q.shape
+    page_size = kv_cache.shape[1]
+    d_ckv_i = int(d_ckv)
+    scale = 1.0 / math.sqrt(d_total)
+    out = torch.empty((batch, q_heads, d_ckv_i), dtype=q.dtype, device=q.device)
+    for b in range(batch):
+        p0 = int(kv_indptr[b].item())
+        p1 = int(kv_indptr[b + 1].item())
+        pages = kv_indices[p0:p1]
+        seq_len = (len(pages) - 1) * page_size + int(kv_last_page_len[b].item())
+        kv_seq = kv_cache[pages].reshape(-1, d_total)[:seq_len].float()
+        c_kv = kv_seq[:, :d_ckv_i]
+        scores = (q[b].float() @ kv_seq.transpose(0, 1)) * scale
+        probs = torch.softmax(scores, dim=-1)
+        out[b] = (probs @ c_kv).to(q.dtype)
+    return out
+
+
+def make_mla_paged_decode_runner(
+    *,
+    prototype_args: list[Any],
+    device: str,
+    backend: KernelBackend = KernelBackend.AUTO,
+    max_atol: float = 2e-2,
+) -> PreparedRunner:
+    """Select Tier 3 AITER, Tier 2 vLLM, Split-KV Triton, or PyTorch MLA."""
+    vendor_res = _dispatch_vendor_tiers(
+        prototype_args,
+        device=device,
+        backend=backend,
+        make_aiter=lambda: try_make_aiter_mla_runner(
+            prototype_args, ref_fn=ref_mla_paged_decode, max_atol=max_atol
+        ),
+        make_vllm=lambda: try_make_vllm_mla_runner(
+            prototype_args, ref_fn=ref_mla_paged_decode, max_atol=max_atol
+        ),
+    )
+    if vendor_res is not None:
+        return vendor_res
+    if device == "cpu" or backend is KernelBackend.PYTORCH:
+        return PreparedRunner(
+            fn=ref_mla_paged_decode,
+            implementation_name="pytorch_mla_ref",
+            candidate_args=prototype_args,
+        )
+    q, kv_cache, _indptr, kv_indices, _last_len, d_ckv = prototype_args
+    if supports_splitk_mla(q, kv_cache, int(d_ckv)):
+        num_cus = (
+            int(
+                torch.cuda.get_device_properties(q.device).multi_processor_count
+            )
+            if q.is_cuda
+            else None
+        )
+        num_splits = select_gqa_num_splits(
+            batch=q.shape[0],
+            kv_heads=1,
+            total_pages=kv_indices.numel(),
+            num_cus=num_cus,
+        )
+        workspace = allocate_splitk_mla_workspace(q, int(d_ckv), num_splits)
+
+        def _run_splitk(*args: Any) -> torch.Tensor:
+            return run_mla_paged_decode_splitk(*args, workspace=workspace)
+
+        try:
+            _run_splitk(*prototype_args)
+            return PreparedRunner(
+                fn=_run_splitk,
+                implementation_name="triton_splitk_paged_mla",
+                candidate_args=prototype_args,
+            )
+        except Exception:  # noqa: BLE001 -- degrade cleanly if triton fails
+            return PreparedRunner(
+                fn=ref_mla_paged_decode,
+                implementation_name="pytorch_mla_ref_fallback",
+                candidate_args=prototype_args,
+            )
+    return PreparedRunner(
+        fn=ref_mla_paged_decode,
+        implementation_name="pytorch_mla_ref_fallback",
+        candidate_args=prototype_args,
+    )
+
+
+def ref_fused_rmsnorm_rope(
+    x: torch.Tensor,
+    residual: torch.Tensor,
+    weight: torch.Tensor,
+    cos_sin: torch.Tensor,
+    *,
+    eps: float = 1e-6,
+) -> torch.Tensor:
+    """Reference FP32 Residual Add + RMSNorm + NeoX RoPE -> BF16."""
+    h = x.float() + residual.float()
+    rms = torch.rsqrt(h.pow(2).mean(dim=-1, keepdim=True) + eps)
+    y = h * rms * weight.float()
+    d2 = y.shape[-1] // 2
+    u, v = y[..., :d2], y[..., d2:]
+    cos_v = cos_sin[:, None, :d2].float()
+    sin_v = cos_sin[:, None, d2:].float()
+    return torch.cat([u * cos_v - v * sin_v, v * cos_v + u * sin_v], dim=-1).to(
+        x.dtype
+    )
+
+
+def make_fused_rmsnorm_rope_runner(
+    *,
+    prototype_args: list[Any],
+    device: str,
+    backend: KernelBackend = KernelBackend.AUTO,
+    max_atol: float = 2e-2,
+) -> PreparedRunner:
+    """Select Tier 3 AITER, Tier 2 vLLM, Triton single-pass, or PyTorch."""
+    vendor_res = _dispatch_vendor_tiers(
+        prototype_args,
+        device=device,
+        backend=backend,
+        make_aiter=lambda: try_make_aiter_rmsnorm_rope_runner(
+            prototype_args, ref_fn=ref_fused_rmsnorm_rope, max_atol=max_atol
+        ),
+        make_vllm=lambda: try_make_vllm_rmsnorm_rope_runner(
+            prototype_args, ref_fn=ref_fused_rmsnorm_rope, max_atol=max_atol
+        ),
+    )
+    if vendor_res is not None:
+        return vendor_res
+    if device == "cpu" or backend is KernelBackend.PYTORCH:
+        return PreparedRunner(
+            fn=ref_fused_rmsnorm_rope,
+            implementation_name="pytorch_rmsnorm_rope",
+            candidate_args=prototype_args,
+        )
+    try:
+        run_fused_rmsnorm_rope_triton(*prototype_args)
+        return PreparedRunner(
+            fn=run_fused_rmsnorm_rope_triton,
+            implementation_name="triton_fused_rmsnorm_rope",
+            candidate_args=prototype_args,
+        )
+    except Exception:  # noqa: BLE001 -- degrade cleanly if triton unavailable
+        return PreparedRunner(
+            fn=ref_fused_rmsnorm_rope,
+            implementation_name="pytorch_rmsnorm_rope_fallback",
+            candidate_args=prototype_args,
+        )
+
+
+def ref_swiglu_fp8_quant(gate_up: torch.Tensor) -> torch.Tensor:
+    """Reference BF16 SwiGLU output prior to dynamic FP8 quantization."""
+    half = gate_up.shape[-1] // 2
+    g = gate_up[:, :half].float()
+    u = gate_up[:, half:].float()
+    return (torch.nn.functional.silu(g) * u).to(torch.bfloat16)
+
+
+def run_swiglu_fp8_quant_pytorch(
+    gate_up: torch.Tensor,
+    *,
+    fp8_dtype: torch.dtype,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """PyTorch SwiGLU activation + dynamic per-token FP8 quantization."""
+    half = gate_up.shape[-1] // 2
+    g = gate_up[:, :half].float()
+    u = gate_up[:, half:].float()
+    act = torch.nn.functional.silu(g) * u
+    fp8_max = float(torch.finfo(fp8_dtype).max)
+    amax = act.abs().amax(dim=-1, keepdim=True).clamp(min=1e-12)
+    scale = (amax / fp8_max).to(torch.float32)
+    y_fp8 = (act / scale).clamp(-fp8_max, fp8_max).to(fp8_dtype)
+    return y_fp8, scale
+
+
+def make_swiglu_fp8_quant_runner(
+    *,
+    prototype_args: list[Any],
+    device: str,
+    fp8_dtype: torch.dtype,
+    backend: KernelBackend = KernelBackend.AUTO,
+    max_atol: float = 2e-1,
+) -> PreparedRunner:
+    """Select Tier 3 AITER, Tier 2 vLLM, Triton fused, or PyTorch SwiGLU+FP8."""
+    vendor_res = _dispatch_vendor_tiers(
+        prototype_args,
+        device=device,
+        backend=backend,
+        make_aiter=lambda: try_make_aiter_swiglu_quant_runner(
+            prototype_args,
+            fp8_dtype=fp8_dtype,
+            ref_fn=ref_swiglu_fp8_quant,
+            max_atol=max_atol,
+        ),
+        make_vllm=lambda: try_make_vllm_swiglu_quant_runner(
+            prototype_args,
+            fp8_dtype=fp8_dtype,
+            ref_fn=ref_swiglu_fp8_quant,
+            max_atol=max_atol,
+        ),
+    )
+    if vendor_res is not None:
+        return vendor_res
+
+    def _run_pt(gu_in: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        return run_swiglu_fp8_quant_pytorch(gu_in, fp8_dtype=fp8_dtype)
+
+    if device == "cpu" or backend is KernelBackend.PYTORCH:
+        return PreparedRunner(
+            fn=_run_pt,
+            implementation_name="pytorch_swiglu_fp8_quant",
+            candidate_args=prototype_args,
+        )
+
+    def _run_triton(gu_in: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        return run_swiglu_fp8_quant_triton(gu_in, fp8_dtype=fp8_dtype)
+
+    try:
+        _run_triton(*prototype_args)
+        return PreparedRunner(
+            fn=_run_triton,
+            implementation_name="triton_swiglu_fp8_quant",
+            candidate_args=prototype_args,
+        )
+    except Exception:  # noqa: BLE001 -- degrade cleanly if triton unavailable
+        return PreparedRunner(
+            fn=_run_pt,
+            implementation_name="pytorch_swiglu_fp8_quant_fallback",
             candidate_args=prototype_args,
         )

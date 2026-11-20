@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""3-operator MVP workloads in FlashInfer-Trace format + runtime builders."""
+"""6-family ROCm inference primitive workloads in FlashInfer-Trace format."""
 
 from __future__ import annotations
 
@@ -21,17 +21,26 @@ from scripts.mvp_v1.analytical_roofline import (
     MVPOperator,
     PrecisionMode,
     bound_fused_moe,
+    bound_fused_rmsnorm_rope,
     bound_gqa_paged_decode,
+    bound_mla_paged_decode,
     bound_skinny_gemm,
+    bound_swiglu_fp8_quant,
 )
 from scripts.mvp_v1.kernels import (
     KernelBackend,
     make_fused_moe_runner,
+    make_fused_rmsnorm_rope_runner,
     make_gqa_paged_decode_runner,
+    make_mla_paged_decode_runner,
     make_skinny_gemm_runner,
+    make_swiglu_fp8_quant_runner,
     ref_fused_moe,
+    ref_fused_rmsnorm_rope,
     ref_gqa_paged_decode,
+    ref_mla_paged_decode,
     ref_skinny_gemm,
+    ref_swiglu_fp8_quant,
 )
 from sol_execbench.core.data.definition import (
     AxisConst,
@@ -87,7 +96,7 @@ class RuntimeCase:
     prototype_args: list[Any]
     candidate_args: list[Any]
     reference_fn: Callable[..., torch.Tensor]
-    candidate_fn: Callable[..., torch.Tensor] | None
+    candidate_fn: Callable[..., Any] | None
     implementation_name: str
     unavailable_reason: str | None = None
     bound: AnalyticalBound
@@ -144,8 +153,55 @@ _GQA_PAGED_REF = (
 )
 
 
+_MLA_PAGED_REF = (
+    "import math\nimport torch\n\n"
+    "def gen_inputs(axes, device):\n"
+    "    b = int(axes['B'])\n"
+    "    total_pages = int(axes['NTOTALPAGES'])\n"
+    "    per_seq = total_pages // b\n"
+    "    return {\n"
+    "        'kv_indptr': torch.arange(0, (b + 1) * per_seq, per_seq, dtype=torch.int32, device=device),\n"
+    "        'kv_indices': torch.randperm(int(axes['NPAGES']), dtype=torch.int32, device=device)[:total_pages].contiguous(),\n"
+    "        'kv_last_page_len': torch.full((b,), int(axes['PS']), dtype=torch.int32, device=device),\n"
+    "    }\n\n"
+    "def run(q, kv_cache, kv_indptr, kv_indices, kv_last_page_len, d_ckv):\n"
+    "    b, hq, d_tot = q.shape\n"
+    "    ps = kv_cache.shape[1]\n"
+    "    dc = int(d_ckv)\n"
+    "    scale = 1.0 / math.sqrt(d_tot)\n"
+    "    out = torch.empty((b, hq, dc), dtype=q.dtype, device=q.device)\n"
+    "    for i in range(b):\n"
+    "        pages = kv_indices[kv_indptr[i]:kv_indptr[i + 1]]\n"
+    "        slen = (len(pages) - 1) * ps + int(kv_last_page_len[i].item())\n"
+    "        kv = kv_cache[pages].reshape(-1, d_tot)[:slen].float()\n"
+    "        probs = torch.softmax((q[i].float() @ kv.transpose(0, 1)) * scale, dim=-1)\n"
+    "        out[i] = (probs @ kv[:, :dc]).to(q.dtype)\n"
+    "    return out\n"
+)
+
+_RMSNORM_ROPE_REF = (
+    "import torch\n\n"
+    "def run(x, residual, weight, cos_sin):\n"
+    "    h = x.float() + residual.float()\n"
+    "    rms = torch.rsqrt(h.pow(2).mean(dim=-1, keepdim=True) + 1e-6)\n"
+    "    y = h * rms * weight.float()\n"
+    "    d2 = y.shape[-1] // 2\n"
+    "    u, v = y[..., :d2], y[..., d2:]\n"
+    "    c, s = cos_sin[:, None, :d2].float(), cos_sin[:, None, d2:].float()\n"
+    "    return torch.cat([u * c - v * s, v * c + u * s], dim=-1).to(x.dtype)\n"
+)
+
+_SWIGLU_QUANT_REF = (
+    "import torch\n\n"
+    "def run(gate_up):\n"
+    "    half = gate_up.shape[-1] // 2\n"
+    "    g, u = gate_up[:, :half].float(), gate_up[:, half:].float()\n"
+    "    return (torch.nn.functional.silu(g) * u).to(torch.bfloat16)\n"
+)
+
+
 def build_trace_definitions() -> dict[str, Definition]:
-    """Build standard FlashInfer-Trace Definition objects for all 3 ops."""
+    """Build standard FlashInfer-Trace Definition objects for all 8 ops."""
     gemm_axes = {"M": AxisVar(), "K": AxisVar(), "N": AxisVar()}
     gemm_out = {"output": TensorSpec(shape=["M", "N"], dtype=DType.BFLOAT16)}
     return {
@@ -175,33 +231,36 @@ def build_trace_definitions() -> dict[str, Definition]:
             reference=_SKINNY_GEMM_REF,
             description="MVP Phase 1 Skinny GEMM (8-bit FP8; E4M3FNUZ on CDNA3).",
         ),
-        "fused_moe_bf16": _build_moe_definition(),
+        "fused_moe_bf16": _build_moe_definition(fp8=False),
+        "fused_moe_fp8": _build_moe_definition(fp8=True),
         "gqa_paged_decode_bf16": _build_gqa_definition(),
+        "mla_paged_decode_bf16": _build_mla_definition(),
+        "fused_rmsnorm_rope_bf16": _build_rmsnorm_rope_definition(),
+        "swiglu_fp8_quant": _build_swiglu_quant_definition(),
     }
 
 
-def _build_moe_definition() -> Definition:
+def _build_moe_definition(*, fp8: bool) -> Definition:
+    dt = DType.FLOAT8_E4M3FN if fp8 else DType.BFLOAT16
     return Definition(
-        name="fused_moe_bf16",
+        name="fused_moe_fp8" if fp8 else "fused_moe_bf16",
         op_type="moe",
         axes={"M": AxisVar(), "H": AxisVar(), "I": AxisVar(), "E": AxisVar()},
         inputs={
-            "tokens": TensorSpec(shape=["M", "H"], dtype=DType.BFLOAT16),
-            "gate_weights": TensorSpec(
-                shape=["E", "H", "I"], dtype=DType.BFLOAT16
-            ),
-            "up_weights": TensorSpec(
-                shape=["E", "H", "I"], dtype=DType.BFLOAT16
-            ),
-            "down_weights": TensorSpec(
-                shape=["E", "I", "H"], dtype=DType.BFLOAT16
-            ),
+            "tokens": TensorSpec(shape=["M", "H"], dtype=dt),
+            "gate_weights": TensorSpec(shape=["E", "H", "I"], dtype=dt),
+            "up_weights": TensorSpec(shape=["E", "H", "I"], dtype=dt),
+            "down_weights": TensorSpec(shape=["E", "I", "H"], dtype=dt),
             "gate_logits": TensorSpec(shape=["M", "E"], dtype=DType.BFLOAT16),
             "top_k": TensorSpec(shape=None, dtype=DType.INT64),
         },
         outputs={"output": TensorSpec(shape=["M", "H"], dtype=DType.BFLOAT16)},
         reference=_FUSED_MOE_REF,
-        description="MVP Phase 1 Fused SwiGLU MoE.",
+        description=(
+            "Fused SwiGLU MoE (8-bit FP8; E4M3FNUZ on CDNA3)."
+            if fp8
+            else "MVP Phase 1 Fused SwiGLU MoE."
+        ),
     )
 
 
@@ -238,6 +297,125 @@ def _build_gqa_definition() -> Definition:
         reference=_GQA_PAGED_REF,
         description="MVP Phase 1 NHD GQA Paged Decode Attention.",
     )
+
+
+def _build_mla_definition() -> Definition:
+    return Definition(
+        name="mla_paged_decode_bf16",
+        op_type="attention",
+        axes={
+            "B": AxisVar(),
+            "BP1": AxisExpr(expression="B + 1"),
+            "NPAGES": AxisVar(),
+            "PS": AxisConst(value=_PAGE_SIZE),
+            "HQ": AxisVar(),
+            "DCKV": AxisVar(),
+            "DKPE": AxisVar(),
+            "DTOTAL": AxisExpr(expression="DCKV + DKPE"),
+            "NTOTALPAGES": AxisVar(),
+        },
+        custom_inputs_entrypoint="gen_inputs",
+        inputs={
+            "q": TensorSpec(shape=["B", "HQ", "DTOTAL"], dtype=DType.BFLOAT16),
+            "kv_cache": TensorSpec(
+                shape=["NPAGES", "PS", "DTOTAL"], dtype=DType.BFLOAT16
+            ),
+            "kv_indptr": TensorSpec(shape=["BP1"], dtype=DType.INT32),
+            "kv_indices": TensorSpec(shape=["NTOTALPAGES"], dtype=DType.INT32),
+            "kv_last_page_len": TensorSpec(shape=["B"], dtype=DType.INT32),
+            "d_ckv": TensorSpec(shape=None, dtype=DType.INT64),
+        },
+        outputs={
+            "output": TensorSpec(
+                shape=["B", "HQ", "DCKV"], dtype=DType.BFLOAT16
+            )
+        },
+        reference=_MLA_PAGED_REF,
+        description="Absorbed DeepSeek MLA Paged Decode Attention.",
+    )
+
+
+def _build_rmsnorm_rope_definition() -> Definition:
+    return Definition(
+        name="fused_rmsnorm_rope_bf16",
+        op_type="norm_rope",
+        axes={"M": AxisVar(), "H": AxisVar(), "D": AxisVar()},
+        inputs={
+            "x": TensorSpec(shape=["M", "H", "D"], dtype=DType.BFLOAT16),
+            "residual": TensorSpec(shape=["M", "H", "D"], dtype=DType.BFLOAT16),
+            "weight": TensorSpec(shape=["D"], dtype=DType.BFLOAT16),
+            "cos_sin": TensorSpec(shape=["M", "D"], dtype=DType.FLOAT32),
+        },
+        outputs={
+            "output": TensorSpec(shape=["M", "H", "D"], dtype=DType.BFLOAT16)
+        },
+        reference=_RMSNORM_ROPE_REF,
+        description="Fused Residual Add + RMSNorm + NeoX RoPE.",
+    )
+
+
+def _build_swiglu_quant_definition() -> Definition:
+    return Definition(
+        name="swiglu_fp8_quant",
+        op_type="activation_quant",
+        axes={
+            "M": AxisVar(),
+            "I": AxisVar(),
+            "I2": AxisExpr(expression="2 * I"),
+        },
+        inputs={
+            "gate_up": TensorSpec(shape=["M", "I2"], dtype=DType.BFLOAT16),
+        },
+        outputs={
+            "output": TensorSpec(shape=["M", "I"], dtype=DType.BFLOAT16),
+        },
+        reference=_SWIGLU_QUANT_REF,
+        description="Fused SwiGLU + Dynamic Per-Token FP8 Quantization.",
+    )
+
+
+def _stage2_smoke_specs() -> list[WorkloadSpec]:
+    return [
+        WorkloadSpec(
+            workload_id="fused_moe_fp8_m8_e8_k2",
+            operator=MVPOperator.FUSED_MOE,
+            precision=PrecisionMode.FP8,
+            definition_name="fused_moe_fp8",
+            axes={"M": 8, "H": 128, "I": 64, "E": 8, "top_k": 2},
+            tolerance=ToleranceSpec(max_atol=5e-1, max_rtol=1e-1),
+        ),
+        WorkloadSpec(
+            workload_id="mla_paged_decode_bf16_b2_kv64",
+            operator=MVPOperator.MLA_PAGED_DECODE,
+            precision=PrecisionMode.BF16,
+            definition_name="mla_paged_decode_bf16",
+            axes={
+                "B": 2,
+                "HQ": 16,
+                "DCKV": 64,
+                "DKPE": 16,
+                "kv_len": 64,
+                "page_size": _PAGE_SIZE,
+            },
+            tolerance=ToleranceSpec(max_atol=2e-2, max_rtol=2e-2),
+        ),
+        WorkloadSpec(
+            workload_id="fused_rmsnorm_rope_bf16_m16_h8_d64",
+            operator=MVPOperator.FUSED_RMSNORM_ROPE,
+            precision=PrecisionMode.BF16,
+            definition_name="fused_rmsnorm_rope_bf16",
+            axes={"M": 16, "H": 8, "D": 64},
+            tolerance=ToleranceSpec(max_atol=2e-2, max_rtol=2e-2),
+        ),
+        WorkloadSpec(
+            workload_id="swiglu_fp8_quant_m16_i128",
+            operator=MVPOperator.SWIGLU_FP8_QUANT,
+            precision=PrecisionMode.FP8,
+            definition_name="swiglu_fp8_quant",
+            axes={"M": 16, "I": 128},
+            tolerance=ToleranceSpec(max_atol=2.5e-1, max_rtol=8e-2),
+        ),
+    ]
 
 
 def _smoke_specs() -> list[WorkloadSpec]:
@@ -287,7 +465,64 @@ def _smoke_specs() -> list[WorkloadSpec]:
             },
             tolerance=ToleranceSpec(max_atol=2e-2, max_rtol=2e-2),
         ),
+        *_stage2_smoke_specs(),
     ]
+
+
+def _stage2_full_specs() -> list[WorkloadSpec]:
+    specs: list[WorkloadSpec] = []
+    for m in (1, 8, 32, 128):
+        specs.append(
+            WorkloadSpec(
+                workload_id=f"fused_moe_fp8_m{m}_e64_k6",
+                operator=MVPOperator.FUSED_MOE,
+                precision=PrecisionMode.FP8,
+                definition_name="fused_moe_fp8",
+                axes={"M": m, "H": 2048, "I": 1024, "E": 64, "top_k": 6},
+                tolerance=ToleranceSpec(max_atol=5e-1, max_rtol=1e-1),
+            )
+        )
+    for b, kv_len in ((1, 4096), (8, 4096), (8, 32768), (16, 32768)):
+        specs.append(
+            WorkloadSpec(
+                workload_id=f"mla_paged_decode_bf16_b{b}_kv{kv_len}",
+                operator=MVPOperator.MLA_PAGED_DECODE,
+                precision=PrecisionMode.BF16,
+                definition_name="mla_paged_decode_bf16",
+                axes={
+                    "B": b,
+                    "HQ": 16,
+                    "DCKV": 512,
+                    "DKPE": 64,
+                    "kv_len": kv_len,
+                    "page_size": _PAGE_SIZE,
+                },
+                tolerance=ToleranceSpec(max_atol=2e-2, max_rtol=2e-2),
+            )
+        )
+    for m in (1, 16, 128, 1024):
+        specs.append(
+            WorkloadSpec(
+                workload_id=f"fused_rmsnorm_rope_bf16_m{m}_h32_d128",
+                operator=MVPOperator.FUSED_RMSNORM_ROPE,
+                precision=PrecisionMode.BF16,
+                definition_name="fused_rmsnorm_rope_bf16",
+                axes={"M": m, "H": 32, "D": 128},
+                tolerance=ToleranceSpec(max_atol=2e-2, max_rtol=2e-2),
+            )
+        )
+    for m in (1, 16, 128, 1024):
+        specs.append(
+            WorkloadSpec(
+                workload_id=f"swiglu_fp8_quant_m{m}_i4096",
+                operator=MVPOperator.SWIGLU_FP8_QUANT,
+                precision=PrecisionMode.FP8,
+                definition_name="swiglu_fp8_quant",
+                axes={"M": m, "I": 4096},
+                tolerance=ToleranceSpec(max_atol=2.5e-1, max_rtol=8e-2),
+            )
+        )
+    return specs
 
 
 def _full_specs() -> list[WorkloadSpec]:
@@ -336,6 +571,7 @@ def _full_specs() -> list[WorkloadSpec]:
                 tolerance=ToleranceSpec(max_atol=2e-2, max_rtol=2e-2),
             )
         )
+    specs.extend(_stage2_full_specs())
     return specs
 
 
@@ -366,6 +602,37 @@ def to_trace_workload(spec: WorkloadSpec) -> Workload:
             "down_weights": RandomInput(),
             "gate_logits": RandomInput(),
             "top_k": ScalarInput(value=spec.axes["top_k"]),
+        }
+    elif spec.operator is MVPOperator.FUSED_RMSNORM_ROPE:
+        axes = {k: spec.axes[k] for k in ("M", "H", "D")}
+        inputs = {
+            "x": RandomInput(),
+            "residual": RandomInput(),
+            "weight": RandomInput(),
+            "cos_sin": RandomInput(),
+        }
+    elif spec.operator is MVPOperator.SWIGLU_FP8_QUANT:
+        axes = {k: spec.axes[k] for k in ("M", "I")}
+        inputs = {"gate_up": RandomInput()}
+    elif spec.operator is MVPOperator.MLA_PAGED_DECODE:
+        b = spec.axes["B"]
+        pages_per_seq = math.ceil(spec.axes["kv_len"] / spec.axes["page_size"])
+        total_pages = b * pages_per_seq
+        axes = {
+            "B": b,
+            "NPAGES": total_pages + 4,
+            "HQ": spec.axes["HQ"],
+            "DCKV": spec.axes["DCKV"],
+            "DKPE": spec.axes["DKPE"],
+            "NTOTALPAGES": total_pages,
+        }
+        inputs = {
+            "q": RandomInput(),
+            "kv_cache": RandomInput(),
+            "kv_indptr": CustomInput(),
+            "kv_indices": CustomInput(),
+            "kv_last_page_len": CustomInput(),
+            "d_ckv": ScalarInput(value=spec.axes["DCKV"]),
         }
     else:
         b = spec.axes["B"]
@@ -440,30 +707,15 @@ def build_runtime_case(
     trace_wl = to_trace_workload(spec)
     gen = torch.Generator(device=device if device != "cpu" else "cpu")
     gen.manual_seed(seed)
-
-    if spec.operator is MVPOperator.SKINNY_GEMM:
-        return _build_gemm_case(
-            spec,
-            device=device,
-            ceiling=ceiling,
-            empirical=empirical,
-            backend=backend,
-            gen=gen,
-            trace_def=trace_def,
-            trace_wl=trace_wl,
-        )
-    if spec.operator is MVPOperator.FUSED_MOE:
-        return _build_moe_case(
-            spec,
-            device=device,
-            ceiling=ceiling,
-            empirical=empirical,
-            backend=backend,
-            gen=gen,
-            trace_def=trace_def,
-            trace_wl=trace_wl,
-        )
-    return _build_gqa_case(
+    builders = {
+        MVPOperator.SKINNY_GEMM: _build_gemm_case,
+        MVPOperator.FUSED_MOE: _build_moe_case,
+        MVPOperator.GQA_PAGED_DECODE: _build_gqa_case,
+        MVPOperator.MLA_PAGED_DECODE: _build_mla_case,
+        MVPOperator.FUSED_RMSNORM_ROPE: _build_rmsnorm_rope_case,
+        MVPOperator.SWIGLU_FP8_QUANT: _build_swiglu_quant_case,
+    }
+    return builders[spec.operator](
         spec,
         device=device,
         ceiling=ceiling,
@@ -544,17 +796,13 @@ def _build_gemm_case(
     )
 
 
-def _build_moe_case(
+def _sample_moe_inputs(
     spec: WorkloadSpec,
     *,
     device: str,
     ceiling: HardwareCeiling,
-    empirical: EmpiricalCeiling | None,
-    backend: KernelBackend,
     gen: torch.Generator,
-    trace_def: Definition,
-    trace_wl: Workload,
-) -> RuntimeCase:
+) -> tuple[list[Any], int]:
     m = spec.axes["M"]
     h, inter, e, top_k = (
         spec.axes["H"],
@@ -589,11 +837,36 @@ def _build_moe_case(
     logits = torch.randn(
         (m, e), dtype=torch.bfloat16, device=device, generator=gen
     )
+    if spec.precision is PrecisionMode.FP8:
+        fp8_dt = ceiling.fp8_torch_dtype()
+        tokens = tokens.to(fp8_dt)
+        gate_w = gate_w.to(fp8_dt)
+        up_w = up_w.to(fp8_dt)
+        down_w = down_w.to(fp8_dt)
     topk_ids = torch.topk(
         torch.softmax(logits.float(), dim=-1), k=top_k, dim=-1
     ).indices
     active_experts = int(torch.unique(topk_ids).numel())
-    proto_args: list[Any] = [tokens, gate_w, up_w, down_w, logits, top_k]
+    return [tokens, gate_w, up_w, down_w, logits, top_k], active_experts
+
+
+def _build_moe_case(
+    spec: WorkloadSpec,
+    *,
+    device: str,
+    ceiling: HardwareCeiling,
+    empirical: EmpiricalCeiling | None,
+    backend: KernelBackend,
+    gen: torch.Generator,
+    trace_def: Definition,
+    trace_wl: Workload,
+) -> RuntimeCase:
+    proto_args, active_experts = _sample_moe_inputs(
+        spec,
+        device=device,
+        ceiling=ceiling,
+        gen=gen,
+    )
     prepared = make_fused_moe_runner(
         prototype_args=proto_args,
         device=device,
@@ -601,11 +874,11 @@ def _build_moe_case(
         max_atol=spec.tolerance.max_atol,
     )
     bound = bound_fused_moe(
-        m,
-        h,
-        inter,
-        e,
-        top_k,
+        spec.axes["M"],
+        spec.axes["H"],
+        spec.axes["I"],
+        spec.axes["E"],
+        spec.axes["top_k"],
         spec.precision,
         ceiling,
         active_experts=active_experts,
@@ -626,6 +899,28 @@ def _build_moe_case(
     )
 
 
+def _build_paged_csr_metadata(
+    b: int,
+    kv_len: int,
+    ps: int,
+    *,
+    device: str,
+    gen: torch.Generator,
+) -> tuple[int, torch.Tensor, torch.Tensor, torch.Tensor]:
+    per_seq = math.ceil(kv_len / ps)
+    total_pages = b * per_seq
+    n_pool = total_pages + 4
+    kv_indptr = torch.arange(
+        0, (b + 1) * per_seq, per_seq, dtype=torch.int32, device=device
+    )
+    kv_indices = torch.randperm(
+        n_pool, dtype=torch.int32, device=device, generator=gen
+    )[:total_pages].contiguous()
+    tail = kv_len - (per_seq - 1) * ps
+    kv_last_len = torch.full((b,), tail, dtype=torch.int32, device=device)
+    return n_pool, kv_indptr, kv_indices, kv_last_len
+
+
 def _make_gqa_paged_tensors(
     spec: WorkloadSpec,
     *,
@@ -639,9 +934,9 @@ def _make_gqa_paged_tensors(
         spec.axes["D"],
     )
     kv_len, ps = spec.axes["kv_len"], spec.axes["page_size"]
-    per_seq = math.ceil(kv_len / ps)
-    total_pages = b * per_seq
-    n_pool = total_pages + 4
+    n_pool, kv_indptr, kv_indices, kv_last_len = _build_paged_csr_metadata(
+        b, kv_len, ps, device=device, gen=gen
+    )
     q = (
         torch.randn(
             (b, hq, d), dtype=torch.bfloat16, device=device, generator=gen
@@ -666,14 +961,6 @@ def _make_gqa_paged_tensors(
         )
         * 0.5
     )
-    kv_indptr = torch.arange(
-        0, (b + 1) * per_seq, per_seq, dtype=torch.int32, device=device
-    )
-    kv_indices = torch.randperm(
-        n_pool, dtype=torch.int32, device=device, generator=gen
-    )[:total_pages].contiguous()
-    tail = kv_len - (per_seq - 1) * ps
-    kv_last_len = torch.full((b,), tail, dtype=torch.int32, device=device)
     return [q, k_cache, v_cache, kv_indptr, kv_indices, kv_last_len]
 
 
@@ -719,6 +1006,185 @@ def _build_gqa_case(
         prototype_args=args,
         candidate_args=prepared.candidate_args,
         reference_fn=ref_gqa_paged_decode,
+        candidate_fn=prepared.fn,
+        implementation_name=prepared.implementation_name,
+        unavailable_reason=prepared.unavailable_reason,
+        bound=bound,
+        trace_definition=trace_def,
+        trace_workload=trace_wl,
+    )
+
+
+def _build_mla_case(
+    spec: WorkloadSpec,
+    *,
+    device: str,
+    ceiling: HardwareCeiling,
+    empirical: EmpiricalCeiling | None,
+    backend: KernelBackend,
+    gen: torch.Generator,
+    trace_def: Definition,
+    trace_wl: Workload,
+) -> RuntimeCase:
+    b, hq, d_ckv, d_kpe = (
+        spec.axes["B"],
+        spec.axes["HQ"],
+        spec.axes["DCKV"],
+        spec.axes["DKPE"],
+    )
+    kv_len, ps = spec.axes["kv_len"], spec.axes["page_size"]
+    d_total = d_ckv + d_kpe
+    n_pool, kv_indptr, kv_indices, kv_last_len = _build_paged_csr_metadata(
+        b, kv_len, ps, device=device, gen=gen
+    )
+    q = (
+        torch.randn(
+            (b, hq, d_total), dtype=torch.bfloat16, device=device, generator=gen
+        )
+        * 0.5
+    )
+    kv_cache = (
+        torch.randn(
+            (n_pool, ps, d_total),
+            dtype=torch.bfloat16,
+            device=device,
+            generator=gen,
+        )
+        * 0.5
+    )
+    proto_args: list[Any] = [
+        q,
+        kv_cache,
+        kv_indptr,
+        kv_indices,
+        kv_last_len,
+        d_ckv,
+    ]
+    prepared = make_mla_paged_decode_runner(
+        prototype_args=proto_args,
+        device=device,
+        backend=backend,
+        max_atol=spec.tolerance.max_atol,
+    )
+    bound = bound_mla_paged_decode(
+        b,
+        hq,
+        d_ckv,
+        d_kpe,
+        kv_len,
+        ps,
+        spec.precision,
+        ceiling,
+        empirical=empirical,
+        workload_id=spec.workload_id,
+    )
+    return RuntimeCase(
+        spec=spec,
+        prototype_args=proto_args,
+        candidate_args=prepared.candidate_args,
+        reference_fn=ref_mla_paged_decode,
+        candidate_fn=prepared.fn,
+        implementation_name=prepared.implementation_name,
+        unavailable_reason=prepared.unavailable_reason,
+        bound=bound,
+        trace_definition=trace_def,
+        trace_workload=trace_wl,
+    )
+
+
+def _build_rmsnorm_rope_case(
+    spec: WorkloadSpec,
+    *,
+    device: str,
+    ceiling: HardwareCeiling,
+    empirical: EmpiricalCeiling | None,
+    backend: KernelBackend,
+    gen: torch.Generator,
+    trace_def: Definition,
+    trace_wl: Workload,
+) -> RuntimeCase:
+    m, h, d = spec.axes["M"], spec.axes["H"], spec.axes["D"]
+    x = torch.randn(
+        (m, h, d), dtype=torch.bfloat16, device=device, generator=gen
+    )
+    residual = torch.randn(
+        (m, h, d), dtype=torch.bfloat16, device=device, generator=gen
+    )
+    weight = torch.randn(
+        (d,), dtype=torch.bfloat16, device=device, generator=gen
+    )
+    angles = torch.randn(
+        (m, d // 2), dtype=torch.float32, device=device, generator=gen
+    )
+    cos_sin = torch.cat([torch.cos(angles), torch.sin(angles)], dim=-1)
+    proto_args: list[Any] = [x, residual, weight, cos_sin]
+    prepared = make_fused_rmsnorm_rope_runner(
+        prototype_args=proto_args,
+        device=device,
+        backend=backend,
+        max_atol=spec.tolerance.max_atol,
+    )
+    bound = bound_fused_rmsnorm_rope(
+        m,
+        h,
+        d,
+        spec.precision,
+        ceiling,
+        empirical=empirical,
+        workload_id=spec.workload_id,
+    )
+    return RuntimeCase(
+        spec=spec,
+        prototype_args=proto_args,
+        candidate_args=prepared.candidate_args,
+        reference_fn=ref_fused_rmsnorm_rope,
+        candidate_fn=prepared.fn,
+        implementation_name=prepared.implementation_name,
+        unavailable_reason=prepared.unavailable_reason,
+        bound=bound,
+        trace_definition=trace_def,
+        trace_workload=trace_wl,
+    )
+
+
+def _build_swiglu_quant_case(
+    spec: WorkloadSpec,
+    *,
+    device: str,
+    ceiling: HardwareCeiling,
+    empirical: EmpiricalCeiling | None,
+    backend: KernelBackend,
+    gen: torch.Generator,
+    trace_def: Definition,
+    trace_wl: Workload,
+) -> RuntimeCase:
+    m, inter = spec.axes["M"], spec.axes["I"]
+    gate_up = (
+        torch.randn(
+            (m, 2 * inter), dtype=torch.bfloat16, device=device, generator=gen
+        )
+        * 0.5
+    )
+    proto_args: list[Any] = [gate_up]
+    prepared = make_swiglu_fp8_quant_runner(
+        prototype_args=proto_args,
+        device=device,
+        fp8_dtype=ceiling.fp8_torch_dtype(),
+        backend=backend,
+        max_atol=spec.tolerance.max_atol,
+    )
+    bound = bound_swiglu_fp8_quant(
+        m,
+        inter,
+        ceiling,
+        empirical=empirical,
+        workload_id=spec.workload_id,
+    )
+    return RuntimeCase(
+        spec=spec,
+        prototype_args=proto_args,
+        candidate_args=prepared.candidate_args,
+        reference_fn=ref_swiglu_fp8_quant,
         candidate_fn=prepared.fn,
         implementation_name=prepared.implementation_name,
         unavailable_reason=prepared.unavailable_reason,
