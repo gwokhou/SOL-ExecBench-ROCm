@@ -14,11 +14,14 @@ _MEMORY_COUNTER_MULTIPLIERS = {
     "GL2C_EA_RDREQ_64B_SUM": 64.0,
     "GL2C_EA_RDREQ_128B_SUM": 128.0,
     "GL2C_EA_WRREQ_64B_SUM": 64.0,
+    "TCC_EA0_RDREQ_32B_SUM": 32.0,
+    "TCC_EA0_WRREQ_64B_SUM": 64.0,
     "TCC_EA_RDREQ_32B_SUM": 32.0,
     "TCC_EA_WRREQ_64B_SUM": 64.0,
 }
 _CACHE_REQUEST_COUNTERS = (
     ("GL2C_HIT_SUM", "GL2C_MISS_SUM"),
+    ("TCC_HIT_SUM", "TCC_MISS_SUM"),
     ("TCC_HIT", "TCC_MISS"),
     ("L2CACHEHIT", "L2CACHEMISS"),
 )
@@ -47,7 +50,7 @@ def counter_memory_bytes(counters: Mapping[str, float]) -> float:
 
 def counter_native_multiplier(name: str) -> float | None:
     """Return the declared conversion from native counter value to bytes."""
-    return _MEMORY_COUNTER_MULTIPLIERS.get(name)
+    return _MEMORY_COUNTER_MULTIPLIERS.get(name.upper())
 
 
 __all__ = ["counter_memory_bytes", "counter_native_multiplier"]

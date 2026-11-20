@@ -41,6 +41,7 @@ def test_gfx942_budget_values():
     assert budget.compute_unit_grouping == "cu"
     assert budget.simd_per_cu == 4
     assert budget.wave_slots_per_simd == 10
+    assert "fp8" in budget.supported_dtypes
     assert budget.source
 
 

@@ -11,7 +11,7 @@
 name: AMD_Instinct_MI300X
 vendor: AMD
 gfx_target: gfx942
-profile_revision: mi300x-amd-resource-v1
+profile_revision: mi300x-amd-resource-v2
 compute_units: 304
 memory_capacity_bytes: 206158430208
 memory_bandwidth_bytes_per_second: 5300000000000
@@ -50,14 +50,15 @@ peak_ops_per_second:
   fp32: 163400000000000
   fp16: 1307400000000000
   bf16: 1307400000000000
+  fp8: 2614900000000000
   int8: 2614900000000000
 resource_model_version: amd_resource_v3
-# MFMA rates use the published CDNA3 matrix throughput (FP16/BF16/INT8 dense
-# matrix peaks). CDNA3 has no native FP8 in this ROCm 7.2 stack (FNUZ encoding),
-# and no INT4 matrix mode, so both are intentionally absent here; the AKA
-# gfx942 execution target likewise omits FP8. VALU fp32 uses the published
-# vector peak; fp16 uses the packed V_PK_FMA_F16 ceiling; bf16 promotes to fp32
-# (no packed bf16 VALU FMA on CDNA3), so its VALU rate keeps the fp32 ceiling.
+# MFMA rates use the published CDNA3 matrix throughput (FP16/BF16/FP8/INT8 dense
+# matrix peaks). CDNA3 native FP8 uses FNUZ encoding (E4M3FNUZ / E5M2FNUZ) at
+# the published 2,614.9 TFLOPS ceiling, and CDNA3 has no INT4 matrix mode so
+# int4 stays intentionally absent here. VALU fp32 uses the published vector peak;
+# fp16 uses the packed V_PK_FMA_F16 ceiling; bf16 promotes to fp32 (no packed
+# bf16 VALU FMA on CDNA3), so its VALU rate keeps the fp32 ceiling.
 # sfu/reduction/atomic/scan_sort/conversion keep the packed-FP16 ceiling as a
 # conservative bound pending per-resource publication. These are spec-derived
 # nominal peaks; a real resource-peak calibration receipt replaces them for
@@ -67,6 +68,7 @@ resource_limits:
     "fp32->fp32": 163400000000000
     "fp16->fp32": 1307400000000000
     "bf16->fp32": 1307400000000000
+    "fp8->fp32": 2614900000000000
     "int8->int32": 2614900000000000
   valu:
     "fp32": 163400000000000
@@ -116,6 +118,13 @@ precision_support:
     software: pytorch_production
     calibration: required
     evidence: https://rocm.docs.amd.com/projects/rocWMMA/en/docs-7.2.1/API_Reference_Guide.html
+  fp8:
+    hardware: native_mfma
+    software: pytorch_production
+    calibration: required
+    evidence: https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/instruction-set-architectures/amd-instinct-mi300-cdna3-instruction-set-architecture.pdf
+    formats: [float8_e4m3fnuz, float8_e5m2fnuz]
+    limitation: "CDNA3 native FP8 uses FNUZ encoding (E4M3FNUZ and E5M2FNUZ), not OCP E4M3FN/E5M2."
   int8:
     hardware: native_mfma
     software: pytorch_production
@@ -124,4 +133,7 @@ precision_support:
 audit_evidence:
   status: unavailable
   reason_code: spec_derived_inexact_pending_hardware_qualification
+precision_aliases:
+  float8_e4m3fnuz: fp8
+  float8_e5m2fnuz: fp8
 source: https://www.amd.com/en/products/accelerators/instinct/mi300.html

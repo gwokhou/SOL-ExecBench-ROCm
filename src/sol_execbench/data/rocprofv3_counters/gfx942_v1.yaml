@@ -14,6 +14,7 @@ groups:
       - metric: waves
         alternatives:
           - {name: SQ_WAVES_sum, native_unit: waves, multiplier: 1}
+          - {name: SQ_WAVES, native_unit: waves, multiplier: 1}
         normalized_unit: waves
         scope: dispatch
         aggregation: sum
@@ -21,6 +22,8 @@ groups:
       - metric: bytes_read
         alternatives:
           - {name: FETCH_SIZE, native_unit: kibibytes, multiplier: 1024}
+          - {name: TCC_EA0_RDREQ_32B_sum, native_unit: transactions_32b, multiplier: 32}
+          - {name: TCC_EA_RDREQ_32B_sum, native_unit: transactions_32b, multiplier: 32}
         normalized_unit: bytes
         scope: dispatch
         aggregation: sum
@@ -28,6 +31,8 @@ groups:
       - metric: bytes_written
         alternatives:
           - {name: WRITE_SIZE, native_unit: kibibytes, multiplier: 1024}
+          - {name: TCC_EA0_WRREQ_64B_sum, native_unit: transactions_64b, multiplier: 64}
+          - {name: TCC_EA_WRREQ_64B_sum, native_unit: transactions_64b, multiplier: 64}
         normalized_unit: bytes
         scope: dispatch
         aggregation: sum
@@ -36,6 +41,7 @@ groups:
     counters:
       - metric: cache_misses
         alternatives:
+          - {name: TCC_MISS_sum, native_unit: requests, multiplier: 1}
           - {name: TCC_MISS, native_unit: requests, multiplier: 1}
           - {name: L2CacheMiss, native_unit: requests, multiplier: 1}
         required: false
@@ -45,6 +51,7 @@ groups:
         sanity: non_negative
       - metric: cache_hits
         alternatives:
+          - {name: TCC_HIT_sum, native_unit: requests, multiplier: 1}
           - {name: TCC_HIT, native_unit: requests, multiplier: 1}
         required: false
         normalized_unit: requests
@@ -53,10 +60,31 @@ groups:
         sanity: non_negative
       - metric: lds_bank_conflict_percent
         alternatives:
+          - {name: SQ_LDS_BANK_CONFLICT_sum, native_unit: percent, multiplier: 1}
           - {name: SQ_LDS_BANK_CONFLICT, native_unit: percent, multiplier: 1}
           - {name: LDSBankConflict, native_unit: percent, multiplier: 1}
         required: false
         normalized_unit: percent
         scope: dispatch
         aggregation: maximum
+        sanity: non_negative
+  - name: compute_activity
+    counters:
+      - metric: mfma_instructions
+        alternatives:
+          - {name: SQ_INSTS_MFMA_sum, native_unit: instructions, multiplier: 1}
+          - {name: SQ_INSTS_MFMA, native_unit: instructions, multiplier: 1}
+        required: false
+        normalized_unit: instructions
+        scope: dispatch
+        aggregation: sum
+        sanity: non_negative
+      - metric: gpu_active_cycles
+        alternatives:
+          - {name: GRBM_GUI_ACTIVE_sum, native_unit: cycles, multiplier: 1}
+          - {name: GRBM_GUI_ACTIVE, native_unit: cycles, multiplier: 1}
+        required: false
+        normalized_unit: cycles
+        scope: dispatch
+        aggregation: sum
         sanity: non_negative
