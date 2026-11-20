@@ -378,6 +378,10 @@ def _cpu_gpu_lock_fixture_configuration(request, tmp_path_factory, monkeypatch):
     if _has_real_gpu_marker(request.node):
         return
     from sol_execbench.core.bench import clock_ownership
+    from sol_execbench.core.bench.rocm_profiler.pmc_clock import (
+        ENV_PMC_CLOCK_MODE,
+        ENV_PMC_CLOCK_TARGET,
+    )
 
     tmp_path = tmp_path_factory.mktemp("gpu-control")
     monkeypatch.setenv("GPU_LOCK_DIR", str(tmp_path / "gpu-locks"))
@@ -385,6 +389,8 @@ def _cpu_gpu_lock_fixture_configuration(request, tmp_path_factory, monkeypatch):
     monkeypatch.setenv(
         "SOL_EXECBENCH_CLOCK_STATE_DIR", str(tmp_path / "gpu-private")
     )
+    monkeypatch.delenv(ENV_PMC_CLOCK_TARGET, raising=False)
+    monkeypatch.delenv(ENV_PMC_CLOCK_MODE, raising=False)
     monkeypatch.setattr(
         clock_ownership,
         "LEGACY_CLOCK_STATE_DIRECTORY",
