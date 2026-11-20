@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -315,10 +316,58 @@ def write_mvp_outputs(
     }
 
 
+_REPORT_TITLE_TARGET_RE = re.compile(r"^#\s+.*?(?:—|-)\s+([A-Za-z0-9_.-]+)\s*$")
+
+
+def _parse_pct_cell(cell: str) -> float | None:
+    if "/" not in cell:
+        return None
+    pct_part = cell.split("/", maxsplit=1)[1].strip()
+    if not pct_part or pct_part.startswith("-"):
+        return None
+    return float(pct_part.rstrip("%").strip())
+
+
+def _load_comparison_source(path: Path) -> dict[str, Any]:
+    text = path.read_text(encoding="utf-8")
+    if path.suffix.lower() != ".md":
+        return json.loads(text)
+    target_id = path.stem
+    rows: list[dict[str, Any]] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not rows and (m := _REPORT_TITLE_TARGET_RE.match(line)):
+            target_id = m.group(1)
+            continue
+        if not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        if (
+            len(cells) < 6
+            or cells[0] in {"Workload", "---"}
+            or "---" in cells[0]
+        ):
+            continue
+        wid = cells[0].strip("`")
+        if not wid:
+            continue
+        rows.append(
+            {
+                "workload_id": wid,
+                "median_ms": float(cells[3]),
+                "sol_pct_spec": _parse_pct_cell(cells[4]) or 0.0,
+                "sol_pct_empirical": _parse_pct_cell(cells[5]),
+            }
+        )
+    if not rows:
+        raise ValueError(f"No workload rows parsed from Markdown report {path}")
+    return {"target": {"target_id": target_id}, "rows": rows}
+
+
 def compare_summaries_markdown(left_path: Path, right_path: Path) -> str:
     """Render side-by-side Spec & Empirical SOL comparison across two targets."""
-    left = json.loads(left_path.read_text(encoding="utf-8"))
-    right = json.loads(right_path.read_text(encoding="utf-8"))
+    left = _load_comparison_source(left_path)
+    right = _load_comparison_source(right_path)
     l_id = left["target"]["target_id"]
     r_id = right["target"]["target_id"]
     r_map = {row["workload_id"]: row for row in right["rows"]}

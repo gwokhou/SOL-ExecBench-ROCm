@@ -3,6 +3,10 @@
 
 """Lightweight Phase 1 3-operator cross-vendor analytical Roofline MVP."""
 
+from scripts.mvp_v1.py312_compat import install_py312_pep758_import_hook
+
+install_py312_pep758_import_hook()
+
 from scripts.mvp_v1.analytical_roofline import (
     AnalyticalBound,
     EmpiricalCeiling,
@@ -26,5 +30,6 @@ __all__ = [
     "bound_fused_moe",
     "bound_gqa_paged_decode",
     "bound_skinny_gemm",
+    "install_py312_pep758_import_hook",
     "load_hardware_ceiling",
 ]

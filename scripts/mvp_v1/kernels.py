@@ -42,6 +42,77 @@ def ref_skinny_gemm(x: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
     return (x.float() @ weight.float()).to(torch.bfloat16)
 
 
+def _probe_fp8_candidate(
+    cand_fn: Callable[..., torch.Tensor],
+    prototype_args: list[Any],
+    expected_shape: tuple[int, int],
+) -> bool:
+    try:
+        with torch.no_grad():
+            out = cand_fn(*prototype_args)
+        return (
+            isinstance(out, torch.Tensor)
+            and tuple(out.shape) == expected_shape
+            and bool(torch.isfinite(out).all().item())
+        )
+    except Exception:  # noqa: BLE001 -- hipBLASLt/cuBLASLt shape probe
+        return False
+
+
+def _select_gpu_fp8_gemm_runner(
+    prototype_args: list[Any],
+    *,
+    scale_a: torch.Tensor,
+    scale_b: torch.Tensor,
+) -> tuple[Callable[..., torch.Tensor], str]:
+    x0, w_t0 = prototype_args
+    m, k = int(x0.shape[0]), int(x0.shape[1])
+    expected_shape = (m, int(w_t0.shape[1]))
+
+    def _run_fp8(x: torch.Tensor, weight_t: torch.Tensor) -> torch.Tensor:
+        return torch._scaled_mm(
+            x,
+            weight_t,
+            scale_a=scale_a,
+            scale_b=scale_b,
+            out_dtype=torch.bfloat16,
+        )
+
+    if _probe_fp8_candidate(_run_fp8, prototype_args, expected_shape):
+        return _run_fp8, "torch._scaled_mm"
+
+    if m % 16 != 0:
+        m_pad = math.ceil(m / 16) * 16
+        pad_x = torch.zeros((m_pad, k), dtype=x0.dtype, device=x0.device)
+
+        def _run_fp8_pad16(
+            x: torch.Tensor, weight_t: torch.Tensor
+        ) -> torch.Tensor:
+            rows = x.shape[0]
+            pad_x[:rows].copy_(x)
+            return torch._scaled_mm(
+                pad_x,
+                weight_t,
+                scale_a=scale_a,
+                scale_b=scale_b,
+                out_dtype=torch.bfloat16,
+            )[:rows]
+
+        if _probe_fp8_candidate(_run_fp8_pad16, prototype_args, expected_shape):
+            return _run_fp8_pad16, "torch._scaled_mm_pad16"
+
+    combined_scale = (scale_a.float() * scale_b.float()).to(torch.bfloat16)
+
+    def _run_dequant_fallback(
+        x: torch.Tensor, weight_t: torch.Tensor
+    ) -> torch.Tensor:
+        return (
+            x.to(torch.bfloat16) @ weight_t.to(torch.bfloat16)
+        ) * combined_scale
+
+    return _run_dequant_fallback, "bf16_dequant_matmul_fallback"
+
+
 def make_skinny_gemm_runner(
     *,
     prototype_args: list[Any],
@@ -71,17 +142,11 @@ def make_skinny_gemm_runner(
         )
         if aiter_match is not None:
             return aiter_match
-
-    def _run_fp8(x: torch.Tensor, weight_t: torch.Tensor) -> torch.Tensor:
-        return torch._scaled_mm(
-            x,
-            weight_t,
-            scale_a=scale_a,
-            scale_b=scale_b,
-            out_dtype=torch.bfloat16,
-        )
-
-    return _run_fp8, "torch._scaled_mm"
+    return _select_gpu_fp8_gemm_runner(
+        prototype_args,
+        scale_a=scale_a,
+        scale_b=scale_b,
+    )
 
 
 def ref_fused_moe(

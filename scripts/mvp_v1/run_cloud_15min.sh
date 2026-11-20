@@ -18,8 +18,8 @@ else
     PY="$(command -v python)"
 fi
 
-if ! "${PY}" -c "import pydantic, yaml" >/dev/null 2>&1; then
-    "${PY}" -m pip install -q pydantic pyyaml
+if ! "${PY}" -c "import pydantic, yaml; assert int(pydantic.__version__.split('.')[0]) >= 2" >/dev/null 2>&1; then
+    "${PY}" -m pip install -q "pydantic>=2.6" pyyaml
 fi
 
 MVP_MODE="${MVP_MODE:-full}"
@@ -50,9 +50,11 @@ if torch.cuda.is_available():
 
 TAR_PATH="${OUT_DIR}.tar.gz"
 tar -C "$(dirname "${OUT_DIR}")" -czf "${TAR_PATH}" "$(basename "${OUT_DIR}")"
+TAR_SHA256="$(sha256sum "${TAR_PATH}" | awk '{print $1}')"
 
 echo ""
 echo "=== Cloud Capture Complete ==="
 echo "Report:  ${OUT_DIR}/report.md"
 echo "Bundle:  ${TAR_PATH}"
+echo "SHA256:  ${TAR_SHA256}"
 echo "Compare: python -m scripts.mvp_v1.cloud_runner --compare <amd/summary.json> <nvidia/summary.json>"
