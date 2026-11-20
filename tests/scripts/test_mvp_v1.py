@@ -23,12 +23,16 @@ from scripts.mvp_v1 import (
 from scripts.mvp_v1.anti_distortion import (
     LLCRotatingFlusher,
     RotatingBufferPool,
+    _extract_amd_metrics,
     acquire_dvfs_telemetry_window,
     recommended_llc_flush_bytes,
     validate_materialized_outputs,
 )
 from scripts.mvp_v1.cloud_runner import main as runner_main
 from scripts.mvp_v1.counter_capture import (
+    PROFILE_RANGE_MARKER,
+    _execute_rocm_groups,
+    _filter_pass_csv_to_marker,
     collect_hardware_counters,
     parse_ncu_csv_metrics,
     parse_rocprof_mvp_passes,
@@ -330,3 +334,110 @@ def test_end_to_end_cpu_smoke_runner_and_cross_vendor_compare(
         == 0
     )
     assert "MI300X vs B200" in capsys.readouterr().out
+
+
+def test_amd_smi_gpu_data_metric_extraction() -> None:
+    payload = {
+        "gpu_data": [
+            {
+                "power": {"socket_power": {"value": 22}},
+                "clock": {
+                    "gfx_0": {"clk": {"value": 2500}},
+                    "mem_0": {"clk": {"value": 1200}},
+                },
+                "temperature": {"edge": {"value": 45}},
+            }
+        ]
+    }
+    assert _extract_amd_metrics(json.dumps(payload)) == (
+        2500.0,
+        1200.0,
+        22.0,
+        45.0,
+    )
+
+
+def test_rocprof_marker_window_and_zero_byte_counter_handling(
+    tmp_path: Path,
+) -> None:
+    pass_dir = tmp_path / "pass_1"
+    pass_dir.mkdir(parents=True)
+    (pass_dir / "10_marker_api_trace.csv").write_text(
+        "Domain,Function,Start_Timestamp,End_Timestamp\n"
+        f"MARKER_CORE_RANGE_API,{PROFILE_RANGE_MARKER},1000,2000\n",
+        encoding="utf-8",
+    )
+    raw_csv = pass_dir / "10_counter_collection.csv"
+    raw_csv.write_text(
+        "Dispatch_Id,Kernel_Name,Grid_Size,Workgroup_Size,Counter_Name,Counter_Value,Start_Timestamp\n"
+        '1,warmup_k,"[1,1,1]","[64,1,1]",SQ_WAVES_sum,99,500\n'
+        '2,flush_k,"[1,1,1]","[64,1,1]",SQ_WAVES_sum,88,900\n'
+        '3,target_k,"[4,1,1]","[64,1,1]",SQ_WAVES_sum,32,1500\n'
+        '3,target_k,"[4,1,1]","[64,1,1]",FETCH_SIZE,0,1500\n'
+        '4,trailing_k,"[1,1,1]","[64,1,1]",SQ_WAVES_sum,77,2500\n',
+        encoding="utf-8",
+    )
+    filtered = _filter_pass_csv_to_marker(raw_csv, pass_dir)
+    rows = list(csv.DictReader(filtered.open(encoding="utf-8")))
+    assert [(r["Dispatch_Id"], r["Kernel_Name"]) for r in rows] == [
+        ("3", "target_k"),
+        ("3", "target_k"),
+    ]
+
+    summary = parse_rocprof_mvp_passes([filtered], workload_uuid="w_zero")
+    assert summary.status == "collected"
+    assert summary.memory_bytes is None
+    assert summary.waves == pytest.approx(32.0)
+    assert "returned 0" in (summary.note or "")
+
+
+def test_execute_rocm_groups_splits_on_hardware_capability_limit(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    seen_groups: list[list[str]] = []
+
+    def _fake_pass(
+        _rocprof: Path,
+        group: list[str],
+        _cmd: list[str],
+        *,
+        pass_dir: Path,
+        env: dict[str, str],
+    ) -> subprocess.CompletedProcess[str]:
+        del env
+        seen_groups.append(list(group))
+        if len(group) > 1:
+            return subprocess.CompletedProcess(
+                ["rocprofv3"],
+                -6,
+                "",
+                "Request exceeds the capabilities of the hardware to collect",
+            )
+        pass_dir.mkdir(parents=True, exist_ok=True)
+        out = pass_dir / "1_counter_collection.csv"
+        out.write_text(
+            "Dispatch_Id,Kernel_Name,Grid_Size,Workgroup_Size,Counter_Name,Counter_Value\n"
+            f'1,k,"[1,1,1]","[64,1,1]",{group[0]},16\n',
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(["rocprofv3"], 0, "", "")
+
+    monkeypatch.setattr(
+        "scripts.mvp_v1.counter_capture._run_one_rocm_pass",
+        _fake_pass,
+    )
+    csvs, err = _execute_rocm_groups(
+        Path("/opt/rocm/bin/rocprofv3"),
+        [["SQ_WAVES_sum", "FETCH_SIZE"]],
+        ["python"],
+        tmp=tmp_path,
+        env={},
+    )
+    assert err is None
+    assert seen_groups == [
+        ["SQ_WAVES_sum", "FETCH_SIZE"],
+        ["SQ_WAVES_sum"],
+        ["FETCH_SIZE"],
+    ]
+    assert len(csvs) == 2

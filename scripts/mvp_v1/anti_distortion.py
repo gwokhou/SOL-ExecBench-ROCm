@@ -8,10 +8,12 @@ from __future__ import annotations
 import json
 import math
 import statistics
+import sys
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import torch
@@ -175,28 +177,45 @@ def _parse_float(value: object) -> float | None:
     return None
 
 
+def resolve_bundled_or_rocm_tool(tool: str) -> str:
+    """Prefer active virtualenv ``_rocm_sdk_core/bin`` tool before host ROCm."""
+    for match in sorted(
+        Path(sys.prefix).glob(
+            f"lib/python*/site-packages/_rocm_sdk_core/bin/{tool}"
+        )
+    ):
+        if match.is_file():
+            return str(match)
+    return resolve_rocm_tool_command(tool)
+
+
+def _amd_smi_candidates() -> list[str]:
+    candidates = [
+        resolve_rocm_tool_command("amd-smi"),
+        resolve_bundled_or_rocm_tool("amd-smi"),
+    ]
+    return list(dict.fromkeys(candidates))
+
+
 def _sample_amd_telemetry(device: str) -> TelemetrySample:
     idx = str(torch.device(device).index or 0) if device != "cpu" else "0"
     perf_levels = observe_clock_levels()
     perf_level = perf_levels[0] if perf_levels else None
     concurrent = len(detect_concurrent_gpu_processes())
     sclk = mclk = power = temp = None
-    res = run_in_process_group_bounded(
-        [
-            resolve_rocm_tool_command("amd-smi"),
-            "metric",
-            "--gpu",
-            idx,
-            "-c",
-            "-p",
-            "-t",
-            "--json",
-        ],
-        timeout=10,
-        max_capture_bytes=16384,
-    )
-    if res.returncode == 0 and res.stdout.strip():
-        sclk, mclk, power, temp = _extract_amd_metrics(res.stdout)
+    for tool in _amd_smi_candidates():
+        try:
+            res = run_in_process_group_bounded(
+                [tool, "metric", "--gpu", idx, "-c", "-p", "-t", "--json"],
+                timeout=10,
+                max_capture_bytes=16384,
+            )
+        except OSError:
+            continue
+        if res.returncode == 0 and res.stdout.strip():
+            sclk, mclk, power, temp = _extract_amd_metrics(res.stdout)
+            if any(v is not None for v in (sclk, mclk, power, temp)):
+                break
     return TelemetrySample(
         vendor=VendorBackend.AMD_ROCM,
         perf_level=perf_level,
@@ -215,7 +234,11 @@ def _extract_amd_metrics(
         payload = json.loads(raw_json)
     except json.JSONDecodeError:
         return None, None, None, None
-    entry = payload[0] if isinstance(payload, list) and payload else payload
+    if isinstance(payload, dict) and isinstance(payload.get("gpu_data"), list):
+        gpu_data = payload["gpu_data"]
+        entry = gpu_data[0] if gpu_data else {}
+    else:
+        entry = payload[0] if isinstance(payload, list) and payload else payload
     if not isinstance(entry, dict):
         return None, None, None, None
     clock = entry.get("clock") or {}
@@ -449,7 +472,7 @@ def _measure_hbm_triad_bw(
 ) -> float:
     span_bytes = (
         1024 * 1024
-        if (device == "cpu" or smoke)
+        if device == "cpu"
         else recommended_llc_flush_bytes(
             llc_bytes,
             device=device,
@@ -461,25 +484,30 @@ def _measure_hbm_triad_bw(
     c = torch.full((numel,), 2.0, dtype=torch.float32, device=device)
 
     stats = time_kernel_isolated(
-        lambda x, y: x + 2.0 * y,
+        lambda x, y: torch.add(x, y, alpha=2.0),
         [b, c],
         device=device,
         llc_bytes=llc_bytes,
         warmup=2 if smoke else 3,
-        rep=5 if smoke else 10,
+        rep=4 if smoke else 10,
     )
     return (3.0 * numel * 4.0) / (stats.median_ms * 1e-3)
 
 
 def _measure_rmsnorm_bw(device: str, llc_bytes: int, *, smoke: bool) -> float:
-    m, n = (512, 1024) if (device == "cpu" or smoke) else (16384, 8192)
+    if device == "cpu":
+        m, n = (512, 1024)
+    elif smoke:
+        m, n = (8192, 4096)
+    else:
+        m, n = (16384, 8192)
     x = torch.randn((m, n), dtype=torch.bfloat16, device=device)
     w = torch.ones((n,), dtype=torch.bfloat16, device=device)
 
     def _run_norm(inp: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
-        xf = inp.float()
-        rms = torch.rsqrt(xf.square().mean(dim=-1, keepdim=True) + 1e-6)
-        return (xf * rms * weight.float()).to(torch.bfloat16)
+        return torch.nn.functional.rms_norm(
+            inp, (inp.shape[-1],), weight, eps=1e-6
+        )
 
     stats = time_kernel_isolated(
         _run_norm,
@@ -487,7 +515,7 @@ def _measure_rmsnorm_bw(device: str, llc_bytes: int, *, smoke: bool) -> float:
         device=device,
         llc_bytes=llc_bytes,
         warmup=2 if smoke else 3,
-        rep=5 if smoke else 10,
+        rep=4 if smoke else 10,
     )
     bytes_moved = (2 * m * n + n) * 2.0
     return bytes_moved / (stats.median_ms * 1e-3)
@@ -500,7 +528,12 @@ def _measure_gemm_tflops(
     smoke: bool,
     fp8: bool,
 ) -> float | None:
-    size = 256 if (device == "cpu" or smoke) else 4096
+    if device == "cpu":
+        size = 256
+    elif smoke:
+        size = 2048
+    else:
+        size = 4096
     try:
         if fp8:
             if device == "cpu":

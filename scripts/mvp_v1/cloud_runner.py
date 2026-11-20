@@ -19,11 +19,15 @@ from scripts.mvp_v1.analytical_roofline import (
     detect_hardware_ceiling,
 )
 from scripts.mvp_v1.anti_distortion import (
+    LLCRotatingFlusher,
+    RotatingBufferPool,
     acquire_dvfs_telemetry_window,
     measure_empirical_ceiling,
+    recommended_llc_flush_bytes,
     time_kernel_isolated,
 )
 from scripts.mvp_v1.counter_capture import (
+    PROFILE_RANGE_MARKER,
     CounterCaptureSummary,
     collect_hardware_counters,
 )
@@ -173,7 +177,7 @@ def run_single_op_replay(
     ceiling: HardwareCeiling,
     backend: KernelBackend,
 ) -> int:
-    """Execute 1 warmup + 2 timed launches for clean profiler counter capture."""
+    """Execute 1 warmup + LLC flush + 1 ROCTX/NVTX-bracketed cold launch."""
     specs = {s.workload_id: s for s in build_workload_specs(mode)}
     if workload_id not in specs:
         raise ValueError(f"Unknown workload_id for {mode.value}: {workload_id}")
@@ -183,12 +187,23 @@ def run_single_op_replay(
         ceiling=ceiling,
         backend=backend,
     )
+    flush_bytes = recommended_llc_flush_bytes(ceiling.llc_bytes, device=device)
+    flusher = LLCRotatingFlusher(device, flush_bytes)
+    pool = RotatingBufferPool(case.prototype_args, min_ring_bytes=1)
+    is_gpu = device != "cpu" and torch.cuda.is_available()
     with torch.no_grad():
-        _ = case.candidate_fn(*case.prototype_args)
-        for _ in range(2):
-            _ = case.candidate_fn(*case.prototype_args)
-    if device != "cpu" and torch.cuda.is_available():
-        torch.cuda.synchronize(device)
+        _ = case.candidate_fn(*pool.next_args())
+        flusher.flush()
+        if is_gpu:
+            torch.cuda.synchronize(device)
+            torch.cuda.nvtx.range_push(PROFILE_RANGE_MARKER)
+        try:
+            _ = case.candidate_fn(*pool.next_args())
+            if is_gpu:
+                torch.cuda.synchronize(device)
+        finally:
+            if is_gpu:
+                torch.cuda.nvtx.range_pop()
     return 0
 
 
