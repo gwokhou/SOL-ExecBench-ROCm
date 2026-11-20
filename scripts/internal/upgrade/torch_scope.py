@@ -25,8 +25,8 @@ from sol_execbench.core.bench.rocm_profiler.hip_torch_scope import (
 )
 from sol_execbench.core.bench.rocm_profiler.models import Rocprofv3ProfileResult
 from sol_execbench.core.bench.rocm_profiler.pmc_clock import (
-    TARGET_ROCR_UUID,
     pmc_clock_window,
+    required_visible_rocr_uuid,
 )
 from sol_execbench.core.bench.rocm_profiler.schema_versions import (
     ProfilerArtifactSchema,
@@ -87,7 +87,7 @@ def collect_case(tool: Path, directory: Path, case: str) -> dict:
     intent = {
         "run_id": nonce,
         "workload_id": case,
-        "device_uuid": TARGET_ROCR_UUID,
+        "device_uuid": required_visible_rocr_uuid(),
         "definition_sha256": sha256_file(definition),
         "executor_sha256": sha256_file(executor),
         "collector_sha256": sha256_file(tool),

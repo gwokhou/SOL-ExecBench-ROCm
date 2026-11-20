@@ -19,6 +19,11 @@ from sol_execbench.core.bench.clock_ownership import (
 )
 from sol_execbench.core.bench.rocm_profiler import pmc_clock
 
+TEST_UNIQUE_ID = "0000000000000001"
+TEST_ROCR_UUID = f"GPU-{TEST_UNIQUE_ID}"
+TEST_BDF = "0000:05:00.0"
+TEST_SMI_UUID = "00000000-0000-1000-8000-000000000001"
+
 
 class ControlState(TypedDict):
     level: str
@@ -28,9 +33,14 @@ class ControlState(TypedDict):
 
 
 @pytest.fixture
-def control(monkeypatch, tmp_path):
+def control(monkeypatch, tmp_path, tmp_path_factory):
+    pci_root = tmp_path_factory.mktemp("pci-sysfs")
+    pci_dir = pci_root / TEST_BDF
+    pci_dir.mkdir(parents=True)
+    (pci_dir / "unique_id").write_text(f"{TEST_UNIQUE_ID}\n", encoding="utf-8")
+    monkeypatch.setattr(pmc_clock, "PCI_DEVICES_ROOT", pci_root)
     monkeypatch.setenv("GPU_LOCK_DIR", str(tmp_path / "locks"))
-    monkeypatch.setenv("GPU_LOCK_UUID", pmc_clock.TARGET_SMI_UUID)
+    monkeypatch.setenv("GPU_LOCK_UUID", TEST_SMI_UUID)
     monkeypatch.setenv(
         "SOL_EXECBENCH_CLOCK_STATE_DIR", str(tmp_path / "private")
     )
@@ -41,9 +51,7 @@ def control(monkeypatch, tmp_path):
         "fail_peak": False,
         "fail_restore": False,
     }
-    monkeypatch.setenv(
-        pmc_clock.ENV_ROCR_VISIBLE_DEVICES, pmc_clock.TARGET_ROCR_UUID
-    )
+    monkeypatch.setenv(pmc_clock.ENV_ROCR_VISIBLE_DEVICES, TEST_ROCR_UUID)
     monkeypatch.setattr(pmc_clock, "clock_executable", lambda: "amd-smi")
 
     def run(command, **_kwargs):
@@ -53,8 +61,8 @@ def control(monkeypatch, tmp_path):
             payload = [
                 {
                     "gpu": 0,
-                    "bdf": pmc_clock.TARGET_BDF,
-                    "uuid": pmc_clock.TARGET_SMI_UUID,
+                    "bdf": TEST_BDF,
+                    "uuid": TEST_SMI_UUID,
                 }
             ]
         elif "set" in command:
@@ -127,7 +135,7 @@ def test_owned_window_restores_auto_on_every_exit(tmp_path, control, failure):
     assert observed.collection_completed == (failure == "none")
     for command in control["calls"]:
         if "metric" in command:
-            assert command[command.index("--gpu") + 1] == pmc_clock.TARGET_BDF
+            assert command[command.index("--gpu") + 1] == TEST_BDF
 
 
 def test_partial_setup_failure_still_restores(tmp_path, control):
@@ -203,10 +211,7 @@ def test_all_devices_is_explicit(tmp_path, control):
         pass
     mutations = [cmd for cmd in control["calls"] if "set" in cmd]
     assert len(mutations) == 2
-    assert all(
-        cmd[cmd.index("-g") + 1] == pmc_clock.TARGET_SMI_UUID
-        for cmd in mutations
-    )
+    assert all(cmd[cmd.index("-g") + 1] == TEST_SMI_UUID for cmd in mutations)
 
 
 def test_environment_options_are_normalized(monkeypatch):
@@ -323,13 +328,13 @@ def test_host_guard_owns_pmc_borrow_and_final_auto(
     restores = []
 
     def restore(gpu_uuid):
-        assert gpu_uuid == pmc_clock.TARGET_SMI_UUID
+        assert gpu_uuid == TEST_SMI_UUID
         restores.append("host")
         control["level"] = "AUTO"
         return True
 
     def activate(gpu_uuid):
-        assert gpu_uuid == pmc_clock.TARGET_SMI_UUID
+        assert gpu_uuid == TEST_SMI_UUID
         control["level"] = "STABLE_PEAK"
 
     monkeypatch.setattr(host_clock_guard, "set_peak_clocks", activate)
@@ -343,9 +348,7 @@ def test_host_guard_owns_pmc_borrow_and_final_auto(
         host_clock_guard,
         "observe_clock_devices",
         lambda: (
-            clock_ownership.ClockDevice(
-                bdf=pmc_clock.TARGET_BDF, uuid=pmc_clock.TARGET_SMI_UUID
-            ),
+            clock_ownership.ClockDevice(bdf=TEST_BDF, uuid=TEST_SMI_UUID),
         ),
     )
 
@@ -436,9 +439,7 @@ def test_cli_replay_restores_policy_and_canonical_timing(
     assert timing.read_bytes() == b"canonical samples"
 
 
-@pytest.mark.parametrize(
-    "target", [pmc_clock.TARGET_BDF, pmc_clock.TARGET_SMI_UUID, "0", "all"]
-)
+@pytest.mark.parametrize("target", [TEST_BDF, TEST_SMI_UUID, "0", "all"])
 def test_mutations_use_verified_uuid_and_authorized_arguments(
     tmp_path, control, target
 ):
@@ -455,7 +456,7 @@ def test_mutations_use_verified_uuid_and_authorized_arguments(
             "-l",
             level,
             "-g",
-            pmc_clock.TARGET_SMI_UUID,
+            TEST_SMI_UUID,
         ]
         for level in ("STABLE_PEAK", "AUTO")
     ]
@@ -470,3 +471,76 @@ def test_mutation_requires_verified_identity(tmp_path, control):
     ):
         controller.set_level(pmc_clock.ClockLevel.PEAK)
     assert not control["calls"]
+
+
+def test_dynamic_resolution_supports_arbitrary_single_gpu(
+    tmp_path, monkeypatch
+):
+    bdf = "0000:c1:00.0"
+    unique_id = "feedfacecafebeef"
+    smi_uuid = "22222222-3333-4444-5555-666666666666"
+    pci_dir = tmp_path / "pci" / bdf
+    pci_dir.mkdir(parents=True)
+    (pci_dir / "unique_id").write_text(f"{unique_id}\n", encoding="utf-8")
+    monkeypatch.setattr(pmc_clock, "PCI_DEVICES_ROOT", tmp_path / "pci")
+    monkeypatch.setattr(pmc_clock, "clock_executable", lambda: "amd-smi")
+    monkeypatch.setenv("GPU_LOCK_DIR", str(tmp_path / "locks"))
+    monkeypatch.setenv("GPU_LOCK_UUID", smi_uuid)
+    monkeypatch.setenv(
+        "SOL_EXECBENCH_CLOCK_STATE_DIR", str(tmp_path / "private")
+    )
+    monkeypatch.setenv(pmc_clock.ENV_ROCR_VISIBLE_DEVICES, f"GPU-{unique_id}")
+    monkeypatch.delenv(pmc_clock.ENV_PMC_CLOCK_TARGET, raising=False)
+    monkeypatch.delenv("SOL_EXECBENCH_CLOCK_OWNER", raising=False)
+
+    calls: list[list[str]] = []
+    level = "AUTO"
+
+    def run(command, **_kwargs):
+        nonlocal level
+        calls.append(command)
+        if "list" in command:
+            payload = [{"gpu": 1, "bdf": bdf, "uuid": smi_uuid}]
+        elif "set" in command:
+            level = command[command.index("-l") + 1]
+            payload = {}
+        else:
+            payload = {
+                "gpu_data": [
+                    {
+                        "gpu": 1,
+                        "perf_level": f"AMDSMI_DEV_PERF_LEVEL_{level}",
+                    }
+                ]
+            }
+        return subprocess.CompletedProcess(command, 0, json.dumps(payload), "")
+
+    monkeypatch.setattr(pmc_clock, "run_in_process_group_bounded", run)
+
+    options = pmc_clock.configured_pmc_clock_options()
+    assert options == pmc_clock.PMCClockOptions(target=bdf)
+    assert pmc_clock.required_visible_rocr_uuid() == f"GPU-{unique_id}"
+
+    with pmc_clock.pmc_clock_window(tmp_path / "profile"):
+        assert level == "STABLE_PEAK"
+
+    assert any("--gpu" in cmd and bdf in cmd for cmd in calls)
+    assert [cmd for cmd in calls if "set" in cmd] == [
+        ["sudo", "-n", "amd-smi", "set", "-l", mode, "-g", smi_uuid]
+        for mode in ("STABLE_PEAK", "AUTO")
+    ]
+
+
+def test_preflight_rejects_uuid_disagreeing_with_gpu_lock_uuid(
+    tmp_path, control, monkeypatch
+):
+    monkeypatch.setenv("GPU_LOCK_UUID", "33333333-4444-5555-6666-777777777777")
+    with (
+        pytest.raises(RuntimeError, match="pmc_clock_identity_mismatch"),
+        pmc_clock.pmc_clock_window(tmp_path / "profile"),
+    ):
+        pytest.fail("mismatched GPU_LOCK_UUID must be refused")
+    assert not any("set" in cmd for cmd in control["calls"])
+    monkeypatch.delenv(pmc_clock.ENV_ROCR_VISIBLE_DEVICES)
+    with pytest.raises(RuntimeError, match="pmc_clock_device_uuid_required"):
+        pmc_clock.required_visible_rocr_uuid()

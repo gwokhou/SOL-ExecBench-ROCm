@@ -108,16 +108,27 @@ def _docker_init(image: str) -> dict[str, str]:
     )
 
 
+def _resolve_host_amd_unique_id() -> str:
+    pci_root = Path("/sys/bus/pci/devices")
+    bdf = os.environ.get("SOL_EXECBENCH_GPU_BDF", "").strip()
+    if bdf:
+        return (pci_root / bdf / "unique_id").read_text().strip()
+    matches = sorted(pci_root.glob("*/unique_id"))
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"expected exactly 1 AMD PCI unique_id under {pci_root}, "
+            f"found {len(matches)}; set SOL_EXECBENCH_GPU_BDF explicitly"
+        )
+    return matches[0].read_text().strip()
+
+
 def _observe_host() -> dict[str, str]:
-    bdf = os.environ.get("SOL_EXECBENCH_GPU_BDF", "<pci-bdf>")
     return {
         "kernel_release": os.uname().release,
         "docker": _probe(
             ["docker", "info", "--format={{.ServerVersion}}/{{.InitCommit.ID}}"]
         ),
-        "native_roc_device": (Path("/sys/bus/pci/devices") / bdf / "unique_id")
-        .read_text()
-        .strip(),
+        "native_roc_device": _resolve_host_amd_unique_id(),
     }
 
 

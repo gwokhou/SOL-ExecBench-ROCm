@@ -10,9 +10,10 @@ needed: only the two exact amd-smi set commands use sudo -n.
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager, suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from typing import Literal
@@ -33,6 +34,13 @@ from sol_execbench.core.bench.clock_ownership import (
     verify_clock_owner,
 )
 from sol_execbench.core.bench.gpu_lock import gpu_lock_directory
+from sol_execbench.core.bench.gpu_lock_paths import (
+    GPU_LOCK_UUID_ENV,
+    normalize_gpu_uuid,
+)
+from sol_execbench.core.bench.rocm_profiler.hip_scope_models import (
+    ROCR_UUID_PATTERN,
+)
 from sol_execbench.core.bench.rocm_profiler.schema_versions import (
     ProfilerArtifactSchema,
 )
@@ -52,9 +60,7 @@ from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 from sol_execbench.core.process.termination import cleanup_on_termination
 from sol_execbench.core.timestamps import utc_timestamp
 
-TARGET_ROCR_UUID = "GPU-0000000000000001"
-TARGET_BDF = "0000:05:00.0"
-TARGET_SMI_UUID = "00000000-0000-1000-8000-000000000001"
+PCI_DEVICES_ROOT = Path("/sys/bus/pci/devices")
 CONTROL_TIMEOUT_SECONDS = 20
 CONTROL_OUTPUT_BYTES = 8192
 ARCHIVE_SUFFIX = ".pmc-clock"
@@ -70,11 +76,44 @@ class PMCClockMode(StrEnum):
     BEST_EFFORT = "best-effort"
 
 
+def required_visible_rocr_uuid() -> str:
+    """Return the single physical ROCR_VISIBLE_DEVICES UUID or fail."""
+    visible = os.environ.get(ENV_ROCR_VISIBLE_DEVICES, "").strip()
+    if re.fullmatch(ROCR_UUID_PATTERN, visible) is None:
+        raise RuntimeError(
+            "pmc_clock_device_uuid_required: "
+            "set single-GPU ROCR_VISIBLE_DEVICES"
+        )
+    return visible
+
+
+def _resolve_visible_rocr_bdf(visible: str) -> str | None:
+    """Resolve one ROCr GPU-<unique_id> selector to its unique PCI BDF."""
+    if re.fullmatch(ROCR_UUID_PATTERN, visible) is None:
+        return None
+    want = visible.removeprefix("GPU-").lower()
+    matches: list[str] = []
+    for uid_path in sorted(PCI_DEVICES_ROOT.glob("*/unique_id")):
+        with suppress(OSError):
+            if uid_path.read_text(encoding="utf-8").strip().lower() == want:
+                matches.append(uid_path.parent.name.lower())
+    return matches[0] if len(matches) == 1 else None
+
+
+def _default_pmc_clock_target() -> str:
+    """Resolve an omitted target from env or the single visible ROCr GPU."""
+    explicit = os.environ.get(ENV_PMC_CLOCK_TARGET)
+    if explicit is not None:
+        return explicit
+    visible = os.environ.get(ENV_ROCR_VISIBLE_DEVICES, "").strip()
+    return _resolve_visible_rocr_bdf(visible) or ""
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class PMCClockOptions:
     """Explicit GPU selector (BDF/UUID/index or all) and setup failure policy."""
 
-    target: str = TARGET_BDF
+    target: str = field(default_factory=_default_pmc_clock_target)
     mode: PMCClockMode = PMCClockMode.REQUIRED
 
     def __post_init__(self) -> None:
@@ -87,12 +126,13 @@ class PMCClockOptions:
 
 
 def configured_pmc_clock_options() -> PMCClockOptions | None:
-    """Auto-enable only the qualified target; explicit options work elsewhere."""
+    """Auto-enable when ROCR_VISIBLE_DEVICES maps to one local PCI GPU."""
     target = os.environ.get(ENV_PMC_CLOCK_TARGET)
     if target is None:
-        if os.environ.get(ENV_ROCR_VISIBLE_DEVICES) != TARGET_ROCR_UUID:
+        visible = os.environ.get(ENV_ROCR_VISIBLE_DEVICES, "").strip()
+        target = _resolve_visible_rocr_bdf(visible)
+        if target is None:
             return None
-        target = TARGET_BDF
     return PMCClockOptions(
         target=target,
         mode=PMCClockMode(
@@ -217,15 +257,19 @@ class PMCClockControl:
             self.options.target != ALL_GPU_TARGET and len(selected) != 1
         ):
             raise RuntimeError("pmc_clock_identity_mismatch: refusing mutation")
-        if (
-            self.options.target == TARGET_BDF
-            and selected[0].uuid != TARGET_SMI_UUID
-        ):
-            raise RuntimeError(
-                "pmc_clock_identity_mismatch: target UUID changed"
-            )
         if any(not item.bdf or not item.uuid for item in selected):
             raise ClockOwnershipError("pmc_clock_identity_incomplete")
+        lock_uuid = os.environ.get(GPU_LOCK_UUID_ENV, "").strip()
+        if (
+            self.options.target != ALL_GPU_TARGET
+            and lock_uuid
+            and (selected[0].uuid or "").lower()
+            != normalize_gpu_uuid(lock_uuid)
+        ):
+            raise RuntimeError(
+                "pmc_clock_identity_mismatch: "
+                "target UUID disagrees with GPU_LOCK_UUID"
+            )
         self.devices = tuple(
             ClockDevice(bdf=str(item.bdf), uuid=str(item.uuid))
             for item in selected

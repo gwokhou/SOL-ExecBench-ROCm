@@ -19,8 +19,8 @@ from sol_execbench.core.bench.rocm_profiler.hip_scope_models import (
     HIPTraceScopeQualification,
 )
 from sol_execbench.core.bench.rocm_profiler.pmc_clock import (
-    TARGET_ROCR_UUID,
     pmc_clock_window,
+    required_visible_rocr_uuid,
 )
 from sol_execbench.core.bench.rocm_profiler.schema_versions import (
     ProfilerArtifactSchema,
@@ -59,7 +59,7 @@ def collect_case(probe: Path, directory: Path, case: str) -> dict:
         "executor_source_sha256": sha256_bytes(
             "".join(sources.values()).encode()
         ),
-        "device_uuid": TARGET_ROCR_UUID,
+        "device_uuid": required_visible_rocr_uuid(),
         "application_command": list(command),
     }
     atomic_write_json_value(

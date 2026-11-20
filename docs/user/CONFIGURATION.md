@@ -81,18 +81,19 @@ it reports `scope_qualified` separately from `all_passed`. See the
 
 | Environment option | Default | Meaning |
 | --- | --- | --- |
-| `SOL_EXECBENCH_PMC_CLOCK_TARGET` | `0000:05:00.0` when `ROCR_VISIBLE_DEVICES=GPU-0000000000000001`; otherwise no automatic window | AMD-SMI BDF, UUID, index, or explicit `all` |
+| `SOL_EXECBENCH_PMC_CLOCK_TARGET` | Resolved automatically via `/sys/bus/pci/devices/*/unique_id` when `ROCR_VISIBLE_DEVICES=GPU-<unique_id>` identifies a single physical AMD GPU; otherwise no automatic window | AMD-SMI BDF, UUID, index, or explicit `all` |
 | `SOL_EXECBENCH_PMC_CLOCK_MODE` | `required` | `required` refuses replay if setup fails; `best-effort` permits unlocked diagnostic replay after verified rollback |
 
 Prefer a BDF or UUID over a mutable enumeration index. `all` deliberately changes
-every AMD GPU, and is never selected implicitly. The qualified local BDF is
-also checked against its known AMD-SMI UUID before any write.
+every AMD GPU, and is never selected implicitly. When `GPU_LOCK_UUID` is set,
+the resolved target is cross-checked against its AMD-SMI UUID before any write.
 
-For the qualified gfx1200 target, set these in the **process running evaluate**:
+For single-GPU `rocprofv3-counters` or `rocprofv3-scope` runs, set
+`ROCR_VISIBLE_DEVICES` to the target GPU's physical `GPU-<unique_id>` (or set
+`SOL_EXECBENCH_PMC_CLOCK_TARGET` explicitly):
 
 ```bash
 export ROCR_VISIBLE_DEVICES=GPU-0000000000000001
-export SOL_EXECBENCH_PMC_CLOCK_TARGET=0000:05:00.0
 export SOL_EXECBENCH_PMC_CLOCK_MODE=required
 ```
 
