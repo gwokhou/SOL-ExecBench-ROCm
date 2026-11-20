@@ -52,6 +52,7 @@ class HardwareCeiling:
     l2_bytes: int
     llc_bytes: int
     fp8_dtype_name: str
+    expected_compute_units: int | None = None
 
     def peak_flops(self, precision: PrecisionMode) -> float:
         """Return peak FLOP/s for the requested compute precision."""
@@ -103,7 +104,33 @@ class AnalyticalBound:
     bottleneck_empirical: str | None = None
 
 
-_NVIDIA_DATASHEET_CEILINGS: dict[str, HardwareCeiling] = {
+_STATIC_CEILINGS: dict[str, HardwareCeiling] = {
+    "MI308X": HardwareCeiling(
+        target_id="MI308X",
+        device_name="AMD Instinct MI308X",
+        vendor=VendorBackend.AMD_ROCM,
+        architecture="gfx942",
+        hbm_bandwidth_bytes_per_s=5_300_000_000_000.0,
+        peak_bf16_flops_per_s=148_000_000_000_000.0,
+        peak_fp8_flops_per_s=296_000_000_000_000.0,
+        l2_bytes=16_777_216,
+        llc_bytes=268_435_456,
+        fp8_dtype_name="float8_e4m3fnuz",
+        expected_compute_units=80,
+    ),
+    "H20": HardwareCeiling(
+        target_id="H20",
+        device_name="NVIDIA H20",
+        vendor=VendorBackend.NVIDIA_CUDA,
+        architecture="sm_90",
+        hbm_bandwidth_bytes_per_s=4_000_000_000_000.0,
+        peak_bf16_flops_per_s=148_000_000_000_000.0,
+        peak_fp8_flops_per_s=296_000_000_000_000.0,
+        l2_bytes=62_914_560,
+        llc_bytes=62_914_560,
+        fp8_dtype_name="float8_e4m3fn",
+        expected_compute_units=78,
+    ),
     "H100_SXM": HardwareCeiling(
         target_id="H100_SXM",
         device_name="NVIDIA H100 SXM5 80GB",
@@ -115,6 +142,7 @@ _NVIDIA_DATASHEET_CEILINGS: dict[str, HardwareCeiling] = {
         l2_bytes=52_428_800,
         llc_bytes=52_428_800,
         fp8_dtype_name="float8_e4m3fn",
+        expected_compute_units=132,
     ),
     "B200": HardwareCeiling(
         target_id="B200",
@@ -127,6 +155,7 @@ _NVIDIA_DATASHEET_CEILINGS: dict[str, HardwareCeiling] = {
         l2_bytes=134_217_728,
         llc_bytes=134_217_728,
         fp8_dtype_name="float8_e4m3fn",
+        expected_compute_units=148,
     ),
 }
 
@@ -134,9 +163,13 @@ _TARGET_ALIASES = {
     "MI300X": "MI300X",
     "AMD_INSTINCT_MI300X": "MI300X",
     "GFX942": "MI300X",
+    "MI308X": "MI308X",
+    "AMD_INSTINCT_MI308X": "MI308X",
     "RX_9060_XT": "RX_9060_XT",
     "RX9060XT": "RX_9060_XT",
     "GFX1200": "RX_9060_XT",
+    "H20": "H20",
+    "NVIDIA_H20": "H20",
     "H100": "H100_SXM",
     "H100_SXM": "H100_SXM",
     "SM_90": "H100_SXM",
@@ -153,6 +186,12 @@ def _rocm_profile_to_ceiling(profile_name: str) -> HardwareCeiling:
         if "float8_e4m3fnuz" in profile.precision_aliases
         else "float8_e4m3fn"
     )
+    raw_cus = int(profile.compute_units) or None
+    expected_cus = (
+        raw_cus // 2
+        if raw_cus is not None and profile.gfx_target.startswith("gfx12")
+        else raw_cus
+    )
     return HardwareCeiling(
         target_id=profile_name,
         device_name=profile.name.replace("_", " "),
@@ -164,20 +203,46 @@ def _rocm_profile_to_ceiling(profile_name: str) -> HardwareCeiling:
         l2_bytes=profile.l2_bytes,
         llc_bytes=profile.last_level_cache_bytes or profile.l2_bytes,
         fp8_dtype_name=fp8_dtype_name,
+        expected_compute_units=expected_cus,
     )
 
 
 def load_hardware_ceiling(target_id: str) -> HardwareCeiling:
-    """Resolve a target key (MI300X, RX_9060_XT, H100_SXM, B200) to ceilings."""
+    """Resolve target key (MI300X, MI308X, RX_9060_XT, H20, H100_SXM, B200)."""
     normalized = target_id.strip().upper().replace("-", "_").replace(" ", "_")
     canonical = _TARGET_ALIASES.get(normalized, normalized)
     if canonical in {"MI300X", "RX_9060_XT"}:
         return _rocm_profile_to_ceiling(canonical)
-    if canonical in _NVIDIA_DATASHEET_CEILINGS:
-        return _NVIDIA_DATASHEET_CEILINGS[canonical]
-    supported = sorted({"MI300X", "RX_9060_XT", *_NVIDIA_DATASHEET_CEILINGS})
+    if canonical in _STATIC_CEILINGS:
+        return _STATIC_CEILINGS[canonical]
+    supported = sorted({"MI300X", "RX_9060_XT", *_STATIC_CEILINGS})
     raise ValueError(
         f"Unsupported MVP target {target_id!r}; expected one of {supported}"
+    )
+
+
+def _match_live_gpu_ceiling(props: object) -> HardwareCeiling:
+    gfx = str(getattr(props, "gcnArchName", "")).split(":", maxsplit=1)[0]
+    name = str(getattr(props, "name", "")).upper()
+    cus = int(getattr(props, "multi_processor_count", 0) or 0)
+    if "MI308" in name:
+        return load_hardware_ceiling("MI308X")
+    if "MI300" in name:
+        return load_hardware_ceiling("MI300X")
+    if "B200" in name:
+        return load_hardware_ceiling("B200")
+    if "H20" in name and "H200" not in name:
+        return load_hardware_ceiling("H20")
+    if "H100" in name:
+        return load_hardware_ceiling("H100_SXM")
+    if "9060" in name or "1200" in gfx:
+        return load_hardware_ceiling("RX_9060_XT")
+    if "942" in gfx:
+        target = "MI308X" if 0 < cus <= 128 else "MI300X"
+        return load_hardware_ceiling(target)
+    raise ValueError(
+        f"Unrecognized GPU {getattr(props, 'name', '')!r} ({gfx}); "
+        "pass --target-override"
     )
 
 
@@ -200,6 +265,7 @@ def detect_hardware_ceiling(
                 l2_bytes=ceiling.l2_bytes,
                 llc_bytes=ceiling.llc_bytes,
                 fp8_dtype_name=ceiling.fp8_dtype_name,
+                expected_compute_units=ceiling.expected_compute_units,
             )
         return ceiling
     if device == "cpu" or not torch.cuda.is_available():
@@ -216,21 +282,7 @@ def detect_hardware_ceiling(
             fp8_dtype_name="float8_e4m3fn",
         )
     idx = torch.device(device).index or 0
-    props = torch.cuda.get_device_properties(idx)
-    gfx = str(getattr(props, "gcnArchName", "")).split(":", maxsplit=1)[0]
-    name = str(props.name).upper()
-    for token in (gfx, name):
-        if "942" in token or "MI300X" in token:
-            return load_hardware_ceiling("MI300X")
-        if "1200" in token or "9060" in token:
-            return load_hardware_ceiling("RX_9060_XT")
-        if "B200" in token:
-            return load_hardware_ceiling("B200")
-        if "H100" in token:
-            return load_hardware_ceiling("H100_SXM")
-    raise ValueError(
-        f"Unrecognized GPU {props.name!r} ({gfx}); pass --target-override"
-    )
+    return _match_live_gpu_ceiling(torch.cuda.get_device_properties(idx))
 
 
 def _finalize_bound(

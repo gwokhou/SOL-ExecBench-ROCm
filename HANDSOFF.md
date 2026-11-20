@@ -1,6 +1,6 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-11-20 (`codex/solar-b1-freeze-20261108`, `F2` CPU closeout `5153900d`)
+Last audited: 2026-11-20 (`main`, Phase 1 3-operator `v0.1` MVP + `F2` CPU closeout `5153900d`)
 following the strategic stop-loss and pivot to the `v0.1` cross-vendor
 inference primitives SOL mainline (historical baseline audit: 2026-08-13 against
 source revision `fd7970520e205318e2e63d8a96d5203e1d5972c3`, the live ignored
@@ -14,9 +14,9 @@ one-time inventories belong in Git history.
 
 ## Current state
 
-- **2026-11-20 Strategic Stop-Loss & Pivot (Active Directive)**:
-  - **Sole active mainline (`v0.1` 跨阵营推理原语 SOL 对标收口)**: **Phase 1：3 算子跨阵营 MVP（`FP8/BF16 Skinny GEMM`、`Fused MoE`、`GQA/MLA Paged Attention` 或 `RMSNorm + RoPE`）**。范围收敛至与 `flashinfer-bench` 同源的 **Collection #4（26 个核心推理原语）**，输入/输出复用现有 `FlashInfer-Trace` 契约（`definition.json` + `workload.jsonl` + `solution.json` + `Trace`）；SOL 理论上限统一采用透明可核算的解析式 Roofline（字节搬运量 + FLOPs + 硬件带宽/算力上限），彻底剥离 `Orojenesis` 重型搜索。
-  - **Hardware role switch**: 本地 `RX 9060 XT (gfx1200)` 正式降级为**免费本地开发、纯 CPU 单测与采集脚本联调机**；核心性能与计数器采集面向云端数据中心卡 **`AMD MI300X (gfx942)` vs. `NVIDIA B200/H100`**（本地定型脚本，云端 15 分钟一键采集即销毁）。
+- **2026-11-20 Strategic Stop-Loss & Pivot (Active Directive — Phase 1 Local Closeout Ready on `main`)**:
+  - **Sole active mainline (`v0.1` 跨阵营推理原语 SOL 对标收口)**: **Phase 1：3 算子跨阵营 MVP（`FP8/BF16 Skinny GEMM`、`Triton Fused SwiGLU MoE`、`Grouped Split-KV GQA Paged Decode`）** 已在 `scripts/mvp_v1/` 合入 `main` 并就绪云端采集（支持 `MI300X` / `MI308X` / `RX_9060_XT` / `H20` / `H100_SXM` / `B200` 与虚拟化云环境一键脚本 `scripts/mvp_v1/run_cloud_15min.sh`）。范围收敛至与 `flashinfer-bench` 同源的 **Collection #4（26 个核心推理原语）**，输入/输出复用现有 `FlashInfer-Trace` 契约（`definition.json` + `workload.jsonl` + `solution.json` + `Trace`）；SOL 理论上限统一采用透明可核算的解析式 Roofline（字节搬运量 + FLOPs + 硬件带宽/算力上限），彻底剥离 `Orojenesis` 重型搜索。
+  - **Hardware role switch**: 本地 `RX 9060 XT (gfx1200)` 正式降级为**免费本地开发、纯 CPU 单测与采集脚本联调机**；核心性能与计数器采集面向云端数据中心卡 **`AMD MI300X / MI308X (gfx942)` vs. `NVIDIA H20 / H100 / B200`**（本地定型脚本，云端 15 分钟一键采集即销毁）。
   - **Terminated / permanently frozen tracks**:
     - `F2`（嵌套 `PGID_2` 超时回收与 `mapper_timeout` 分类）已于纯 CPU 范围完成收口（`5153900d`），严禁以此触发任何 GPU 重跑或续跑；
     - **严禁启动 `C3 --resume`**，严禁再跑任何 `timeloop-mapper` / `Orojenesis` 长时扫描或 `gfx1200` 大批量 GPU 战役；

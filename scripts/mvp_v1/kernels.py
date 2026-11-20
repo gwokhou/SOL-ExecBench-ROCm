@@ -318,10 +318,16 @@ def _try_splitk_gqa(
     q, k_cache, _v, _indptr, kv_indices, _last_len = prototype_args
     if not supports_splitk_gqa(q, k_cache):
         return None
+    num_cus = (
+        int(torch.cuda.get_device_properties(q.device).multi_processor_count)
+        if q.is_cuda
+        else None
+    )
     num_splits = select_gqa_num_splits(
         batch=q.shape[0],
         kv_heads=k_cache.shape[2],
         total_pages=kv_indices.numel(),
+        num_cus=num_cus,
     )
     workspace = allocate_splitk_gqa_workspace(q, num_splits)
 

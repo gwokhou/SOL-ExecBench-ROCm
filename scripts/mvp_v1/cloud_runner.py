@@ -23,6 +23,7 @@ from scripts.mvp_v1.anti_distortion import (
     RotatingBufferPool,
     acquire_dvfs_telemetry_window,
     measure_empirical_ceiling,
+    probe_runtime_environment,
     recommended_llc_flush_bytes,
     time_kernel_isolated,
 )
@@ -108,6 +109,7 @@ def _evaluate_one_case(
     backend: KernelBackend,
     collect_counters: bool,
     clocks_locked: bool,
+    skip_counter_reason: str | None = None,
 ) -> tuple[WorkloadMeasurementRow, Trace]:
     case = build_runtime_case(
         spec,
@@ -136,20 +138,25 @@ def _evaluate_one_case(
         validate_first=_validate,
     )
     correctness, passed = corr_holder["res"]
-    counters = (
-        _capture_counters_for_spec(
+    if skip_counter_reason is not None:
+        counters = CounterCaptureSummary(
+            status="skipped_circuit_breaker",
+            backend=ceiling.vendor,
+            note=skip_counter_reason,
+        )
+    elif collect_counters:
+        counters = _capture_counters_for_spec(
             spec,
             mode=mode,
             device=device,
             ceiling=ceiling,
             backend=backend,
         )
-        if collect_counters
-        else CounterCaptureSummary(
+    else:
+        counters = CounterCaptureSummary(
             status="not_requested",
             backend=ceiling.vendor,
         )
-    )
     row = build_measurement_row(
         case,
         timing,
@@ -219,9 +226,12 @@ def run_benchmark_campaign(
 ) -> dict[str, Path]:
     """Run startup microbench + 3-operator sweep and emit report artifacts."""
     ceiling = detect_hardware_ceiling(device, target_override=target_override)
+    env_probe = probe_runtime_environment(device, ceiling)
     materialize_trace_corpus(output_dir, mode)
     rows: list[WorkloadMeasurementRow] = []
     traces: list[Trace] = []
+    profiler_blocked_note: str | None = None
+    seen_collected = False
     with acquire_dvfs_telemetry_window(
         device, ceiling.vendor, lock_clocks=lock_clocks
     ) as dvfs_holder:
@@ -239,7 +249,21 @@ def run_benchmark_campaign(
                 backend=backend,
                 collect_counters=collect_counters,
                 clocks_locked=locked,
+                skip_counter_reason=profiler_blocked_note,
             )
+            if row.counter_status == "collected":
+                seen_collected = True
+            elif (
+                collect_counters
+                and profiler_blocked_note is None
+                and (
+                    row.counter_status == "unavailable"
+                    or (not seen_collected and row.counter_status == "failed")
+                )
+            ):
+                profiler_blocked_note = (
+                    f"circuit-breaker after workload ({row.counter_status})"
+                )
             rows.append(row)
             traces.append(trace)
     return write_mvp_outputs(
@@ -249,6 +273,7 @@ def run_benchmark_campaign(
         dvfs=dvfs_holder["receipt"],
         rows=rows,
         traces=traces,
+        env_probe=env_probe,
     )
 
 

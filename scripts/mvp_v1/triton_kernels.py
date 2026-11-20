@@ -16,11 +16,17 @@ def select_gqa_num_splits(
     batch: int,
     kv_heads: int,
     total_pages: int,
+    num_cus: int | None = None,
 ) -> int:
     """Choose a power-of-2 Split-KV factor saturating datacenter CUs/SMs."""
     avg_pages = max(1, total_pages // max(1, batch))
     max_by_len = max(1, avg_pages // 2)
-    target = max(1, min(64, 256 // max(1, batch * kv_heads)))
+    target_ctas = (
+        256
+        if (num_cus is None or num_cus <= 0)
+        else min(256, max(64, num_cus * 2))
+    )
+    target = max(1, min(64, target_ctas // max(1, batch * kv_heads)))
     raw = min(max_by_len, target)
     return 1 << (raw.bit_length() - 1)
 
@@ -193,8 +199,16 @@ def run_gqa_paged_decode_splitk(
     batch, q_heads, head_dim = q_c.shape
     kv_heads = k_c.shape[2]
     group_size = q_heads // kv_heads
+    num_cus = (
+        int(torch.cuda.get_device_properties(q_c.device).multi_processor_count)
+        if q_c.is_cuda
+        else None
+    )
     num_splits = select_gqa_num_splits(
-        batch=batch, kv_heads=kv_heads, total_pages=kv_indices.numel()
+        batch=batch,
+        kv_heads=kv_heads,
+        total_pages=kv_indices.numel(),
+        num_cus=num_cus,
     )
     expected_shape = (batch, q_heads, num_splits, head_dim)
     if (

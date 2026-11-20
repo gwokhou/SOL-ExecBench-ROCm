@@ -22,6 +22,7 @@ from scripts.mvp_v1 import (
     bound_skinny_gemm,
     load_hardware_ceiling,
 )
+from scripts.mvp_v1.analytical_roofline import detect_hardware_ceiling
 from scripts.mvp_v1.anti_distortion import (
     LLCRotatingFlusher,
     RotatingBufferPool,
@@ -30,15 +31,20 @@ from scripts.mvp_v1.anti_distortion import (
     recommended_llc_flush_bytes,
     validate_materialized_outputs,
 )
-from scripts.mvp_v1.cloud_runner import main as runner_main
+from scripts.mvp_v1.cloud_runner import (
+    main as runner_main,
+    run_benchmark_campaign,
+)
 from scripts.mvp_v1.counter_capture import (
     PROFILE_RANGE_MARKER,
+    CounterCaptureSummary,
     _execute_rocm_groups,
     _filter_pass_csv_to_marker,
     collect_hardware_counters,
     parse_ncu_csv_metrics,
     parse_rocprof_mvp_passes,
 )
+from scripts.mvp_v1.kernels import KernelBackend
 from scripts.mvp_v1.report import compare_summaries_markdown
 from scripts.mvp_v1.triton_kernels import (
     _build_moe_tile_schedule,
@@ -521,3 +527,98 @@ def test_flashinfer_gqa_adapter_self_validation_and_plan_once(
         args, device="cuda:0", ref_fn=lambda q_in, *_rest: q_in, max_atol=1e-2
     )
     assert rejected is None
+
+
+def test_mi308x_and_h20_ceilings_cu_aware_detection_and_splits(
+    monkeypatch,
+) -> None:
+    import types
+
+    mi308x = load_hardware_ceiling("MI308X")
+    assert mi308x.expected_compute_units == 80
+    assert mi308x.fp8_torch_dtype() is torch.float8_e4m3fnuz
+    assert mi308x.hbm_bandwidth_bytes_per_s == pytest.approx(5.3e12)
+    assert mi308x.peak_bf16_flops_per_s == pytest.approx(148.0e12)
+    assert mi308x.peak_fp8_flops_per_s == pytest.approx(296.0e12)
+
+    h20 = load_hardware_ceiling("H20")
+    assert h20.expected_compute_units == 78
+    assert h20.fp8_torch_dtype() is torch.float8_e4m3fn
+    assert h20.hbm_bandwidth_bytes_per_s == pytest.approx(4.0e12)
+    assert h20.peak_bf16_flops_per_s == pytest.approx(148.0e12)
+    assert h20.peak_fp8_flops_per_s == pytest.approx(296.0e12)
+
+    assert (
+        select_gqa_num_splits(batch=1, kv_heads=4, total_pages=256, num_cus=80)
+        == 32
+    )
+    assert (
+        select_gqa_num_splits(batch=1, kv_heads=4, total_pages=256, num_cus=304)
+        == 64
+    )
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    props_map = [
+        ("AMD Instinct MI308X", "gfx942", 80, "MI308X"),
+        ("AMD Instinct", "gfx942:sramecc+:xnack-", 80, "MI308X"),
+        ("AMD Instinct", "gfx942", 304, "MI300X"),
+        ("NVIDIA H20", "", 78, "H20"),
+        ("NVIDIA H100 80GB HBM3", "", 132, "H100_SXM"),
+    ]
+    for name, gfx, cus, expected_id in props_map:
+        monkeypatch.setattr(
+            torch.cuda,
+            "get_device_properties",
+            lambda _idx, n=name, g=gfx, c=cus: types.SimpleNamespace(
+                name=n, gcnArchName=g, multi_processor_count=c
+            ),
+        )
+        assert detect_hardware_ceiling("cuda:0").target_id == expected_id
+
+    monkeypatch.setattr(
+        torch.cuda,
+        "get_device_properties",
+        lambda _idx: types.SimpleNamespace(
+            name="NVIDIA H200", gcnArchName="", multi_processor_count=132
+        ),
+    )
+    with pytest.raises(ValueError, match="Unrecognized GPU"):
+        detect_hardware_ceiling("cuda:0")
+
+
+def test_campaign_counter_circuit_breaker_and_topology_report(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    calls = {"count": 0}
+
+    def _fake_collect(*_args, **_kwargs) -> CounterCaptureSummary:
+        calls["count"] += 1
+        return CounterCaptureSummary(
+            status="unavailable",
+            backend=VendorBackend.CPU,
+            note="pmc blocked in VM",
+        )
+
+    monkeypatch.setattr(
+        "scripts.mvp_v1.cloud_runner.collect_hardware_counters",
+        _fake_collect,
+    )
+    paths = run_benchmark_campaign(
+        mode=SweepMode.SMOKE,
+        device="cpu",
+        target_override="MI308X",
+        backend=KernelBackend.AUTO,
+        output_dir=tmp_path / "vm_cb",
+        collect_counters=True,
+        lock_clocks=False,
+    )
+    assert calls["count"] == 1
+    summary = json.loads(paths["summary_json"].read_text(encoding="utf-8"))
+    statuses = [row["counter_status"] for row in summary["rows"]]
+    assert statuses[0] == "unavailable"
+    assert all(s == "skipped_circuit_breaker" for s in statuses[1:])
+    assert summary["environment_probe"]["expected_compute_units"] == 80
+    report_md = paths["report_md"].read_text(encoding="utf-8")
+    assert "Runtime Topology" in report_md
+    assert "MI308X" in report_md

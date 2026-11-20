@@ -15,6 +15,7 @@ from scripts.mvp_v1.analytical_roofline import EmpiricalCeiling, HardwareCeiling
 from scripts.mvp_v1.anti_distortion import (
     DVFSWindowReceipt,
     IsolatedTimingStats,
+    RuntimeEnvironmentProbe,
 )
 from scripts.mvp_v1.counter_capture import CounterCaptureSummary
 from scripts.mvp_v1.workloads import RuntimeCase
@@ -201,6 +202,7 @@ def render_report_markdown(
     empirical: EmpiricalCeiling,
     dvfs: DVFSWindowReceipt,
     rows: list[WorkloadMeasurementRow],
+    env_probe: RuntimeEnvironmentProbe | None = None,
 ) -> str:
     """Render concise human-readable dual-denominator SOL Markdown report."""
     lines = [
@@ -220,10 +222,26 @@ def render_report_markdown(
             f"FP8 GEMM `{_format_opt(empirical.fp8_flops_per_s / 1e12 if empirical.fp8_flops_per_s else None, '.2f')} TFLOPS`"
         ),
         f"- **dVFS Window**: requested=`{dvfs.lock_requested}`, acquired=`{dvfs.lock_acquired}`, note=`{dvfs.lock_note}`",
-        "",
-        "| Workload | Impl | Pass | Median (ms) | Spec SOL (ms / %) | Emp SOL (ms / %) | AI (F/B) | Bound | Amp |",
-        "| --- | --- | --- | ---: | ---: | ---: | ---: | --- | ---: |",
     ]
+    if env_probe is not None:
+        warn = (
+            f" | WARNING: {env_probe.partition_warning}"
+            if env_probe.partition_warning
+            else ""
+        )
+        lines.append(
+            f"- **Runtime Topology**: observed=`{env_probe.observed_device_name}` "
+            f"| CUs=`{env_probe.visible_compute_units}` (expected `{env_probe.expected_compute_units}`) "
+            f"| VRAM=`{env_probe.total_vram_gib} GiB` "
+            f"| mode=`{env_probe.virtualization_mode}`{warn}"
+        )
+    lines.extend(
+        [
+            "",
+            "| Workload | Impl | Pass | Median (ms) | Spec SOL (ms / %) | Emp SOL (ms / %) | AI (F/B) | Bound | Amp |",
+            "| --- | --- | --- | ---: | ---: | ---: | ---: | --- | ---: |",
+        ]
+    )
     for r in rows:
         spec_cell = f"{r.t_sol_ms_spec:.4f} / {r.sol_pct_spec:.1f}%"
         emp_cell = (
@@ -250,12 +268,16 @@ def write_mvp_outputs(
     dvfs: DVFSWindowReceipt,
     rows: list[WorkloadMeasurementRow],
     traces: list[Trace],
+    env_probe: RuntimeEnvironmentProbe | None = None,
 ) -> dict[str, Path]:
     """Atomically write summary.json, summary.csv, traces.jsonl, and report.md."""
     output_dir.mkdir(parents=True, exist_ok=True)
     summary_payload: dict[str, Any] = {
         "created_at": utc_timestamp(),
         "target": asdict(ceiling),
+        "environment_probe": asdict(env_probe)
+        if env_probe is not None
+        else None,
         "empirical_ceiling": asdict(empirical),
         "dvfs": asdict(dvfs),
         "rows": [asdict(r) for r in rows],
@@ -277,7 +299,11 @@ def write_mvp_outputs(
     )
     md_path.write_text(
         render_report_markdown(
-            ceiling=ceiling, empirical=empirical, dvfs=dvfs, rows=rows
+            ceiling=ceiling,
+            empirical=empirical,
+            dvfs=dvfs,
+            rows=rows,
+            env_probe=env_probe,
         ),
         encoding="utf-8",
     )

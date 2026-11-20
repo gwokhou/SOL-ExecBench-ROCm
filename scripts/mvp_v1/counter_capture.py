@@ -13,7 +13,7 @@ import subprocess
 import sys
 import tempfile
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from importlib.resources import as_file, files
 from pathlib import Path
 
@@ -311,10 +311,12 @@ def _execute_rocm_groups(
     *,
     tmp: Path,
     env: dict[str, str],
+    skipped_out: list[str] | None = None,
 ) -> tuple[list[Path], str | None]:
     pending: list[Sequence[str]] = list(groups)
     csvs: list[Path] = []
     pass_idx = 0
+    last_rc = 0
     while pending:
         group = pending.pop(0)
         pass_idx += 1
@@ -323,15 +325,18 @@ def _execute_rocm_groups(
             rocprof, group, replay_command, pass_dir=pass_dir, env=env
         )
         if res.returncode != 0:
-            if len(group) > 1 and "exceeds the capabilities" in (
-                res.stderr + res.stdout
-            ):
+            last_rc = res.returncode
+            if len(group) > 1:
                 pending = [[c] for c in group] + pending
                 continue
-            return [], f"rocprofv3 pass_{pass_idx} exited {res.returncode}"
+            if skipped_out is not None:
+                skipped_out.append(group[0])
+            continue
         found = sorted(pass_dir.rglob("*counter_collection*.csv"))
         for raw_csv in found:
             csvs.append(_filter_pass_csv_to_marker(raw_csv, pass_dir))
+    if not csvs:
+        return [], f"all rocprofv3 passes failed (last rc={last_rc})"
     return csvs, None
 
 
@@ -363,15 +368,21 @@ def _collect_rocm_counters(
     with as_file(manifest_res) as manifest_path:
         manifest = load_counter_manifest(manifest_path)
     groups, missing = select_counter_groups(manifest, available)
-    if missing or not groups:
+    if not groups:
         return CounterCaptureSummary(
             status="unavailable",
             backend=VendorBackend.AMD_ROCM,
-            note=f"missing required counters: {missing}",
+            note=f"missing all counters: {missing}",
         )
+    skipped: list[str] = []
     with tempfile.TemporaryDirectory(prefix="mvp-rocprof-") as tmp_dir:
         csvs, err_note = _execute_rocm_groups(
-            rocprof, groups, replay_command, tmp=Path(tmp_dir), env=env
+            rocprof,
+            groups,
+            replay_command,
+            tmp=Path(tmp_dir),
+            env=env,
+            skipped_out=skipped,
         )
         if err_note is not None:
             return CounterCaptureSummary(
@@ -379,7 +390,14 @@ def _collect_rocm_counters(
                 backend=VendorBackend.AMD_ROCM,
                 note=err_note,
             )
-        return parse_rocprof_mvp_passes(csvs, workload_uuid=workload_id)
+        summary = parse_rocprof_mvp_passes(csvs, workload_uuid=workload_id)
+    partial = [*missing, *skipped]
+    if partial and summary.status == "collected":
+        prefix = f"{summary.note}; " if summary.note else ""
+        return replace(
+            summary, note=f"{prefix}partial counters (skipped {partial})"
+        )
+    return summary
 
 
 def _collect_nvidia_counters(

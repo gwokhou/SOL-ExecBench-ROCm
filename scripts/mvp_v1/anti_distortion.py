@@ -44,6 +44,81 @@ _CPU_SMOKE_FLUSH_BYTES = 64 * 1024
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class RuntimeEnvironmentProbe:
+    """Observed GPU partition topology and container/VM virtualization mode."""
+
+    observed_device_name: str
+    visible_compute_units: int | None = None
+    expected_compute_units: int | None = None
+    total_vram_gib: float | None = None
+    virtualization_mode: str = "unknown"
+    partition_warning: str | None = None
+
+
+def _detect_virtualization_mode() -> str:
+    if list(Path("/sys/class/drm").glob("renderD*/device/physfn")):
+        return "sriov_vf"
+    if Path("/.dockerenv").exists() or Path("/run/.containerenv").exists():
+        return "container"
+    dmi_markers = ("kvm", "qemu", "virtual", "openstack", "vmware", "xen")
+    for probe_path in (
+        Path("/sys/class/dmi/id/product_name"),
+        Path("/sys/class/dmi/id/sys_vendor"),
+    ):
+        if probe_path.is_file():
+            text = probe_path.read_text(
+                encoding="utf-8", errors="ignore"
+            ).lower()
+            if any(marker in text for marker in dmi_markers):
+                return "vm_guest"
+    cpuinfo = Path("/proc/cpuinfo")
+    if cpuinfo.is_file():
+        for line in cpuinfo.read_text(
+            encoding="utf-8", errors="ignore"
+        ).splitlines():
+            if (
+                line.lower().startswith("flags")
+                and "hypervisor" in line.split()
+            ):
+                return "vm_guest"
+    return "bare_metal"
+
+
+def probe_runtime_environment(
+    device: str,
+    ceiling: HardwareCeiling,
+) -> RuntimeEnvironmentProbe:
+    """Capture visible CUs/SMs, VRAM, and virtualization posture."""
+    if device == "cpu" or not torch.cuda.is_available():
+        return RuntimeEnvironmentProbe(
+            observed_device_name="cpu",
+            expected_compute_units=ceiling.expected_compute_units,
+            virtualization_mode="cpu",
+        )
+    idx = torch.device(device).index or 0
+    props = torch.cuda.get_device_properties(idx)
+    visible_cus = int(getattr(props, "multi_processor_count", 0) or 0) or None
+    total_vram_gib = round(int(props.total_memory) / (1024**3), 2)
+    expected = ceiling.expected_compute_units
+    warning = (
+        f"visible_cus={visible_cus} < expected={expected} "
+        "(possible CPX/vGPU slice)"
+        if visible_cus is not None
+        and expected is not None
+        and visible_cus < expected
+        else None
+    )
+    return RuntimeEnvironmentProbe(
+        observed_device_name=str(props.name),
+        visible_compute_units=visible_cus,
+        expected_compute_units=expected,
+        total_vram_gib=total_vram_gib,
+        virtualization_mode=_detect_virtualization_mode(),
+        partition_warning=warning,
+    )
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class TelemetrySample:
     """Point-in-time GPU clock, power, temperature, and isolation snapshot."""
 
