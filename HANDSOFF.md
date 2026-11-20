@@ -255,12 +255,25 @@ failures, interruptions, indeterminate controls, or unreached sessions.
   enforcing `kw_only=True` on helper dataclasses leaves sealed run capsules
   untouched). Keep the earlier E2 denominators, raw verdicts, stops and
   indeterminate rows in their historical records, including the 15 inconsistent
-  LayerNorm units and 90 indeterminate controls. C2/C3 remain unstarted. The
-  official scoring contract is unchanged pending D0.
+  LayerNorm units and 90 indeterminate controls. C2 is complete
+  (`mem-12gib`, 20 problems, 180 workloads, 360 planned rows), the initial
+  `r1` C3 smoke checkpoint (`40/360` rows) is recorded under
+  `data/outputs/solar-c2-c3-20261119/`
+  ([C2 & C3 smoke results](docs/internal/solar-c2-c3-smoke-2026-11-19.md)),
+  and after a host restart on `r1` `row-046` (recovered via
+  `sol_execbench.core.bench.clock_recovery`), fresh `r2`
+  (`data/outputs/solar-c2-c3-20261119-r2/`) reached bounded terminal
+  `C3` closeout (`INCOMPLETE` at the 12h activity budget limit,
+  `43,200.38 s`, `168/360` rows executed, `192` `not_reached`, clean GPU
+  handback & device-free audit `91fc0ebd...`;
+  [C2 & C3 terminal results](docs/internal/solar-c2-c3-results-2026-11-20.md)).
+  The official scoring contract is unchanged pending D0.
   [Original E2 closeout](docs/internal/solar-e2-successor-results-2026-11-19.md)
 
-See the [development batch ledger](docs/internal/solar-e2-successor-dev-batch1-2026-11-18.md).
-C2/C3/D0 remain unstarted. The planning
+See the [development batch ledger](docs/internal/solar-e2-successor-dev-batch1-2026-11-18.md)
+and the [C2 & C3 terminal results](docs/internal/solar-c2-c3-results-2026-11-20.md).
+M2 execution (E2, C2, and bounded C3) is closed; `D0` (`M3` decision
+synthesis) remains unstarted. The planning
 anchor is `8641b9dc78d00250ba1cf75d5e9434f9839e5ef4`; earlier GPU receipts
 do not establish acceptance of that merged revision. Minimal experiment
 integration precedes the execution-source freeze and qualification refresh.
@@ -294,7 +307,7 @@ The start700 pause and deferred L3-d/L5 scope remain unchanged.
 | E2 repair successor and research closeout | Complete; judge did not meet E0 | 432 units, 1,296 correctness and 144 cost sessions, 72 replays. 15 LayerNorm L1 units failed repeat consistency. [Terminal report](docs/internal/solar-e2-successor-results-2026-11-19.md) |
 | LayerNorm research reference | Development GPU acceptance passed | 156/156 frozen sessions, 24/24 groups in each consistency check, 36/36 expected negative-control rejections and clean GPU handback. [GPU results](docs/internal/solar-e2-layernorm-gpu-results-2026-11-19.md) |
 | LayerNorm independent holdout | Complete; independent holdout GPU acceptance passed | `186/186` `h0` sessions (`1,866` calls), `24/24` fixed/permuted/independent-draw groups, `18/18` expected negatives, clean GPU handback & device-free audit (`cdfbd3ef...`). [Holdout results](docs/internal/solar-e2-layernorm-holdout-results-2026-11-19.md) |
-| C2 / C3 / D0 | Not started | No capacity probe or LLM_CORE target view; outside this E2 instruction |
+| C2 / C3 / D0 | C2 complete; C3 bounded terminal `INCOMPLETE` (`168/360` at 12h cap); `D0` next | C2 calibrated `mem-12gib` (`12,884,901,888` B; `17,095,983,104` B total / `15,300,820,992` B stable allocatable), froze 36 decisions (`20` `generated` = `180` workloads / `360` rows); `r1` smoke (`40/360`, `851acbfe...`) followed by `r2` `12h` activity-budget closeout (`43,200.38 s`, `168/360` executed: `40` passed, `111` failed, `16` unproved, `1` `budget_exhausted`, `192` `not_reached`, `0` `infrastructure_error`, clean GPU handback & device-free audit `91fc0ebd...`, recording the `row-167` nested-PGID `.formal.*` timeout drift). [Smoke](docs/internal/solar-c2-c3-smoke-2026-11-19.md) · [Terminal results](docs/internal/solar-c2-c3-results-2026-11-20.md) |
 
 [E1/C1 CPU acceptance](docs/internal/solar-e1-c1-cpu-acceptance-2026-11-08.md)
 records 169 passing targeted tests plus quality guards. Evidence root:

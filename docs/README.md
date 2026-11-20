@@ -74,6 +74,8 @@ release-status claims.
 - [E2 successor full-denominator budget and development measurement slots](internal/solar-e2-successor-budget-2026-11-18.md)
 - [E2 successor judge discrimination and cost results, 2026-11-19](internal/solar-e2-successor-results-2026-11-19.md)
 - [LayerNorm centered-FP64 CPU comparison, dev GPU, and independent holdout results, 2026-11-19](internal/solar-e2-layernorm-holdout-results-2026-11-19.md)
+- [C2 capacity calibration and C3 40-row LLM_CORE smoke checkpoint, 2026-11-19](internal/solar-c2-c3-smoke-2026-11-19.md)
+- [C2 capacity calibration and bounded C3 terminal closeout, 2026-11-20](internal/solar-c2-c3-results-2026-11-20.md)
 - [B2 acceptance: representative regression and refreshed AKA qualification](internal/solar-b2-acceptance-2026-11-08.md)
 - [Historical B2 checkpoint before the approved erratum](internal/solar-b2-checkpoint-2026-11-08.md)
 - [Approved B2 representative expectation erratum](internal/solar-b2-representative-erratum-2026-11-08.md)
@@ -105,7 +107,20 @@ replays; the judge did not meet the overall E0 criteria because 15 LayerNorm
 L1 units failed repeat consistency. The opt-in `centered_fp64_v1` LayerNorm
 research reference subsequently passed CPU replay (3,669 calls), 156
 development GPU sessions, and 186 independent `h0` holdout GPU sessions.
-Official scoring contracts remain unchanged, and C2/C3 remain unstarted.
+[C2 and C3 smoke](internal/solar-c2-c3-smoke-2026-11-19.md) subsequently
+completed the RX 9060 XT capacity probe (`mem-12gib`, 20 problems, 180
+workloads, 360 planned rows) and a 40-row serial C3 smoke checkpoint (`16`
+passed, `24` failed, `320` `not_reached` pending `--resume`) with device-free
+audit passed (`851acbfe...`). After a host restart interrupted `r1` at `row-046`,
+clean clock recovery and a fresh `r2` campaign
+([C2 and bounded C3 terminal closeout](internal/solar-c2-c3-results-2026-11-20.md))
+re-confirmed C2 (`mem-12gib`, identical `workload_view_digest = 65b39113...`)
+and ran `C3` to its 12-hour activity budget cap (`43,200.38 s`, `168/360` rows
+executed: `40` passed, `111` failed, `16` unproved, `1` `budget_exhausted`,
+`192` `not_reached`, `0` `infrastructure_error`, terminal `INCOMPLETE`), with
+clean GPU handback and independent device-free audit (`91fc0ebd...`). Official
+scoring contracts remain unchanged, M2 execution is closed, and `D0` (`M3`
+decision synthesis) is next.
 
 Public contracts in this tree describe the current implementation. Retain dated
 reports when they bind unique baseline evidence or acceptance decisions still
