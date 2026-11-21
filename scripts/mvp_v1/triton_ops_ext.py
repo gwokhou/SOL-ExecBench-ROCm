@@ -62,7 +62,7 @@ def _load_mla_splitk_stage1() -> Any:
         m_i = tl.full([q_heads], -float("inf"), dtype=tl.float32)
         l_i = tl.zeros([q_heads], dtype=tl.float32)
         acc = tl.zeros([q_heads, d_ckv], dtype=tl.float32)
-        sm_scale = 1.0 / tl.sqrt(float(d_total))
+        sm_scale = 1.0 / tl.sqrt(d_total * 1.0)
         for p_iter in range(s_start, s_end):
             phys_page = tl.load(indices_ptr + p_iter)
             valid = tl.where(p_iter + 1 == end_page, last_len, 16)
@@ -229,7 +229,7 @@ def _load_rmsnorm_rope_kernel() -> Any:
         r1 = tl.load(res_ptr + tok_off + d2 + offs).to(tl.float32)
         h0 = x0 + r0
         h1 = x1 + r1
-        mean_sq = tl.sum(h0 * h0 + h1 * h1, axis=0) / float(d_full)
+        mean_sq = tl.sum(h0 * h0 + h1 * h1, axis=0) / d_full
         rms = tl.rsqrt(mean_sq + eps)
         w0 = tl.load(w_ptr + offs).to(tl.float32)
         w1 = tl.load(w_ptr + d2 + offs).to(tl.float32)

@@ -340,6 +340,16 @@ def try_make_vllm_gemm_runner(
     )
 
 
+def _ensure_aiter_hipblas(aiter_mod: Any) -> None:
+    """Initialize AITER hipBLASLt extension lazily before hipb_mm probes."""
+    init_fn = getattr(aiter_mod, "hipb_create_extension", None)
+    if callable(init_fn):
+        with contextlib.suppress(
+            RuntimeError, TypeError, ValueError, AttributeError
+        ):
+            init_fn()
+
+
 def _try_aiter_bf16_gemm(
     prototype_args: list[Any],
     aiter_mod: Any,
@@ -504,6 +514,7 @@ def try_make_aiter_gemm_runner(
         aiter_mod = importlib.import_module("aiter")
     except Exception:  # noqa: BLE001 -- aiter optional on ROCm hosts
         return _unavailable(prototype_args, "aiter_not_installed")
+    _ensure_aiter_hipblas(aiter_mod)
     if fp8:
         return _try_aiter_fp8_gemm(
             prototype_args,
@@ -544,10 +555,66 @@ def _resolve_vllm_moe_callables() -> tuple[Any | None, Any | None] | None:
         if sub_mod is not None:
             fused_moe_fn = getattr(sub_mod, "fused_moe", None)
             fused_experts_fn = getattr(sub_mod, "fused_experts", None)
+    if fused_experts_fn is None:
+        with contextlib.suppress(ImportError, RuntimeError, AttributeError):
+            sub_mod = importlib.import_module(
+                "vllm.model_executor.layers.fused_moe.fused_moe"
+            )
+            fused_experts_fn = getattr(sub_mod, "fused_experts", None)
     return fused_moe_fn, fused_experts_fn
 
 
 _FP8_TORCH_DTYPES = (torch.float8_e4m3fnuz, torch.float8_e4m3fn)
+
+
+def _probe_vllm_bf16_experts(
+    fused_experts_fn: Callable[..., torch.Tensor],
+    cand_args: list[Any],
+    prototype_args: list[Any],
+    *,
+    ref_fn: Callable[..., torch.Tensor],
+    max_atol: float,
+) -> PreparedRunner | None:
+    for use_inplace in (False, True):
+
+        def _make_experts_runner(
+            *, pass_inplace: bool
+        ) -> Callable[..., torch.Tensor]:
+            def _run_experts(
+                t: torch.Tensor,
+                w1: torch.Tensor,
+                w2: torch.Tensor,
+                lg: torch.Tensor,
+                k: int,
+            ) -> torch.Tensor:
+                probs = torch.softmax(lg.float(), dim=-1)
+                weights, ids = torch.topk(probs, k=int(k), dim=-1)
+                w_norm = (weights / weights.sum(dim=-1, keepdim=True)).to(
+                    t.dtype
+                )
+                if pass_inplace:
+                    return fused_experts_fn(
+                        t,
+                        w1,
+                        w2,
+                        w_norm,
+                        ids.to(torch.int32),
+                        inplace=False,
+                    )
+                return fused_experts_fn(t, w1, w2, w_norm, ids.to(torch.int32))
+
+            return _run_experts
+
+        experts_runner = _make_experts_runner(pass_inplace=use_inplace)
+        if _self_validate(
+            experts_runner, cand_args, ref_fn, prototype_args, max_atol
+        ):
+            return PreparedRunner(
+                fn=experts_runner,
+                implementation_name="vllm_fused_moe",
+                candidate_args=cand_args,
+            )
+    return None
 
 
 def try_make_vllm_moe_runner(
@@ -592,29 +659,15 @@ def try_make_vllm_moe_runner(
                 )
 
     if callable(fused_experts_fn):
-
-        def _run_experts(
-            t: torch.Tensor,
-            w1: torch.Tensor,
-            w2: torch.Tensor,
-            lg: torch.Tensor,
-            k: int,
-        ) -> torch.Tensor:
-            probs = torch.softmax(lg.float(), dim=-1)
-            weights, ids = torch.topk(probs, k=int(k), dim=-1)
-            w_norm = (weights / weights.sum(dim=-1, keepdim=True)).to(t.dtype)
-            return fused_experts_fn(
-                t, w1, w2, w_norm, ids.to(torch.int32), inplace=False
-            )
-
-        if _self_validate(
-            _run_experts, cand_args, ref_fn, prototype_args, max_atol
-        ):
-            return PreparedRunner(
-                fn=_run_experts,
-                implementation_name="vllm_fused_moe",
-                candidate_args=cand_args,
-            )
+        matched = _probe_vllm_bf16_experts(
+            fused_experts_fn,
+            cand_args,
+            prototype_args,
+            ref_fn=ref_fn,
+            max_atol=max_atol,
+        )
+        if matched is not None:
+            return matched
     return _unavailable(prototype_args, "vllm_moe_unsupported")
 
 
@@ -665,6 +718,11 @@ def try_make_aiter_moe_runner(
     tokens, gate_w, up_w, down_w, logits, top_k = prototype_args
     weight_pairs = _build_aiter_moe_weight_pairs(gate_w, up_w, down_w)
     candidates: list[tuple[str, Callable[..., Any]]] = []
+    with contextlib.suppress(ImportError, RuntimeError, AttributeError):
+        fm_mod = importlib.import_module("aiter.fused_moe")
+        fm_fn = getattr(fm_mod, "fused_moe", None)
+        if callable(fm_fn):
+            candidates.append(("aiter_fused_moe", fm_fn))
     for attr, impl_name in (
         ("fused_moe", "aiter_fused_moe"),
         ("ck_moe", "aiter_ck_moe"),
@@ -808,6 +866,8 @@ def _make_vllm_pa_v2_runner(
     k_scale: torch.Tensor,
     v_scale: torch.Tensor,
     partition_size: int = 256,
+    *,
+    with_query_start_loc: bool = False,
 ) -> Callable[..., torch.Tensor]:
     num_parts = max(1, math.ceil(packed.max_seq_len / partition_size))
     scratch_shape = (q.shape[0], packed.q_heads, num_parts)
@@ -827,6 +887,29 @@ def _make_vllm_pa_v2_runner(
         sl_in: torch.Tensor,
     ) -> torch.Tensor:
         out = torch.empty_like(q_in)
+        if with_query_start_loc:
+            pa_fn(
+                out,
+                exp_sums,
+                max_logits,
+                tmp_out,
+                q_in,
+                k_in,
+                v_in,
+                packed.kv_heads,
+                scale,
+                bt_in,
+                sl_in,
+                None,
+                packed.page_size,
+                packed.max_seq_len,
+                None,
+                "auto",
+                k_scale,
+                v_scale,
+                None,
+            )
+            return out
         pa_fn(
             out,
             exp_sums,
@@ -852,27 +935,13 @@ def _make_vllm_pa_v2_runner(
     return _run_rocm_v2
 
 
-def _probe_vllm_pa_op(
+def _make_vllm_pa_v1_runner(
     pa_fn: Callable[..., Any],
     packed: _PackedROCmKV,
-    cand_args: list[Any],
-    prototype_args: list[Any],
-    *,
-    impl_name: str,
-    ref_fn: Callable[..., torch.Tensor],
-    max_atol: float,
-) -> PreparedRunner | None:
-    q = cand_args[0]
-    scale = 1.0 / math.sqrt(packed.head_dim)
-    k_scale = torch.ones(1, dtype=torch.float32, device=q.device)
-    v_scale = torch.ones(1, dtype=torch.float32, device=q.device)
-    run_v2_256 = _make_vllm_pa_v2_runner(
-        pa_fn, packed, q, scale, k_scale, v_scale, partition_size=256
-    )
-    run_v2_512 = _make_vllm_pa_v2_runner(
-        pa_fn, packed, q, scale, k_scale, v_scale, partition_size=512
-    )
-
+    scale: float,
+    k_scale: torch.Tensor,
+    v_scale: torch.Tensor,
+) -> Callable[..., torch.Tensor]:
     def _run_v1(
         q_in: torch.Tensor,
         k_in: torch.Tensor,
@@ -904,7 +973,58 @@ def _probe_vllm_pa_op(
         )
         return out
 
-    for runner in (run_v2_256, run_v2_512, _run_v1):
+    return _run_v1
+
+
+def _probe_vllm_pa_op(
+    pa_fn: Callable[..., Any],
+    packed: _PackedROCmKV,
+    cand_args: list[Any],
+    prototype_args: list[Any],
+    *,
+    impl_name: str,
+    ref_fn: Callable[..., torch.Tensor],
+    max_atol: float,
+) -> PreparedRunner | None:
+    q = cand_args[0]
+    scale = 1.0 / math.sqrt(packed.head_dim)
+    k_scale = torch.ones(1, dtype=torch.float32, device=q.device)
+    v_scale = torch.ones(1, dtype=torch.float32, device=q.device)
+    candidates = (
+        _make_vllm_pa_v2_runner(
+            pa_fn,
+            packed,
+            q,
+            scale,
+            k_scale,
+            v_scale,
+            partition_size=256,
+            with_query_start_loc=True,
+        ),
+        _make_vllm_pa_v2_runner(
+            pa_fn,
+            packed,
+            q,
+            scale,
+            k_scale,
+            v_scale,
+            partition_size=256,
+            with_query_start_loc=False,
+        ),
+        _make_vllm_pa_v2_runner(
+            pa_fn,
+            packed,
+            q,
+            scale,
+            k_scale,
+            v_scale,
+            partition_size=512,
+            with_query_start_loc=False,
+        ),
+        _make_vllm_pa_v1_runner(pa_fn, packed, scale, k_scale, v_scale),
+    )
+
+    for runner in candidates:
         if _self_validate(runner, cand_args, ref_fn, prototype_args, max_atol):
             return PreparedRunner(
                 fn=runner,
@@ -980,7 +1100,7 @@ def try_make_aiter_gqa_runner(
     q = prototype_args[0]
     max_blocks = int(packed.block_tables.shape[1])
     pa_asm_fn = getattr(aiter_mod, "pa_fwd_asm", None)
-    if callable(pa_asm_fn):
+    if callable(pa_asm_fn) and packed.head_dim == 128:
         for v_cand in (packed.v_shuffled, packed.v_linear):
             cand_args: list[Any] = [
                 q,

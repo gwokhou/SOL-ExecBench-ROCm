@@ -637,8 +637,8 @@ def test_rocm_vendor_adapters_prepack_once_and_validate(monkeypatch) -> None:
     _assert_zero_copy_from_pool(moe_vllm, 1, seen_ptrs)
     _assert_zero_copy_from_pool(moe_aiter, 1, seen_ptrs)
 
-    q = torch.ones((1, 4, 16), dtype=torch.bfloat16)
-    k = torch.ones((2, 16, 2, 16), dtype=torch.bfloat16)
+    q = torch.ones((1, 4, 128), dtype=torch.bfloat16)
+    k = torch.ones((2, 16, 2, 128), dtype=torch.bfloat16)
     gqa_args: list[Any] = [
         q,
         k,
@@ -655,9 +655,22 @@ def test_rocm_vendor_adapters_prepack_once_and_validate(monkeypatch) -> None:
     )
     assert gqa_vllm.implementation_name == "vllm_paged_attention_rocm"
     assert gqa_aiter.implementation_name == "aiter_pa_fwd_asm"
-    assert gqa_aiter.candidate_args[1].shape == (2, 2, 2, 16, 8)
+    assert gqa_aiter.candidate_args[1].shape == (2, 2, 16, 16, 8)
     _assert_zero_copy_from_pool(gqa_vllm, 1, seen_ptrs)
     _assert_zero_copy_from_pool(gqa_aiter, 1, seen_ptrs)
+
+    # AITER ASM paged attention C++ kernel aborts unless head_dim == 128.
+    q_d64 = torch.ones((1, 4, 64), dtype=torch.bfloat16)
+    k_d64 = torch.ones((2, 16, 2, 64), dtype=torch.bfloat16)
+    gqa_d64_aiter = try_make_aiter_gqa_runner(
+        [q_d64, k_d64, k_d64, *gqa_args[3:]],
+        ref_fn=lambda q_in, *_r: q_in,
+        max_atol=1e-2,
+    )
+    assert gqa_d64_aiter.fn is None
+    assert (
+        gqa_d64_aiter.implementation_name == "unavailable:aiter_gqa_unsupported"
+    )
 
     corrupt["flag"] = True
     rejected = try_make_aiter_gqa_runner(

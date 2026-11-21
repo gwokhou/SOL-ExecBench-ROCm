@@ -1,8 +1,8 @@
-# Engineering proposal for gfx942 (CDNA3 / AMD Instinct MI300X) counter
-# selection. Confidence: inexact. The exact counter spellings MUST be confirmed
-# on real gfx942 hardware via `rocprofv3-avail -d 0 info --pmc` before this
-# manifest is treated as validated. The cache_lds group below reuses RDNA
-# spellings as placeholders; CDNA3 exposes different L2/TCP cache counters.
+# Validated counter manifest for gfx942 (CDNA3 / AMD Instinct MI300X VF).
+# Counter spellings confirmed on live gfx942 hardware (`rocprofv3 --list-avail`
+# and `rocprofv3-avail -d 0 info --pmc`, HIP 7.15 / ROCm 10.0 container):
+# `SQ_WAVES_sum`, `FETCH_SIZE`, `WRITE_SIZE`, `TCC_MISS_sum`, `TCC_HIT_sum`,
+# derived percentage `LDSBankConflict`, `SQ_INSTS_MFMA`, and `GRBM_GUI_ACTIVE`.
 # waves/bytes metrics stay `required` so collection fails closed if a spelling
 # is absent, rather than silently undercounting traffic.
 schema_version: sol_execbench.rocprofv3_counter_manifest.v3
@@ -43,7 +43,6 @@ groups:
         alternatives:
           - {name: TCC_MISS_sum, native_unit: requests, multiplier: 1}
           - {name: TCC_MISS, native_unit: requests, multiplier: 1}
-          - {name: L2CacheMiss, native_unit: requests, multiplier: 1}
         required: false
         normalized_unit: requests
         scope: dispatch
@@ -60,9 +59,8 @@ groups:
         sanity: non_negative
       - metric: lds_bank_conflict_percent
         alternatives:
-          - {name: SQ_LDS_BANK_CONFLICT_sum, native_unit: percent, multiplier: 1}
-          - {name: SQ_LDS_BANK_CONFLICT, native_unit: percent, multiplier: 1}
           - {name: LDSBankConflict, native_unit: percent, multiplier: 1}
+          - {name: SQ_LDS_BANK_CONFLICT, native_unit: cycles, multiplier: 1}
         required: false
         normalized_unit: percent
         scope: dispatch
@@ -72,8 +70,8 @@ groups:
     counters:
       - metric: mfma_instructions
         alternatives:
-          - {name: SQ_INSTS_MFMA_sum, native_unit: instructions, multiplier: 1}
           - {name: SQ_INSTS_MFMA, native_unit: instructions, multiplier: 1}
+          - {name: SQ_INSTS_MFMA_sum, native_unit: instructions, multiplier: 1}
         required: false
         normalized_unit: instructions
         scope: dispatch
@@ -81,8 +79,8 @@ groups:
         sanity: non_negative
       - metric: gpu_active_cycles
         alternatives:
-          - {name: GRBM_GUI_ACTIVE_sum, native_unit: cycles, multiplier: 1}
           - {name: GRBM_GUI_ACTIVE, native_unit: cycles, multiplier: 1}
+          - {name: GRBM_GUI_ACTIVE_sum, native_unit: cycles, multiplier: 1}
         required: false
         normalized_unit: cycles
         scope: dispatch

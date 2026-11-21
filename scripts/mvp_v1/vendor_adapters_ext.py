@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import importlib
 import math
 from collections.abc import Callable
@@ -230,6 +231,14 @@ def try_make_aiter_fp8_moe_runner(
     tokens, gate_w, up_w, down_w, logits, top_k = prototype_args
     weight_pairs = _build_aiter_moe_weight_pairs(gate_w, up_w, down_w)
     candidates: list[Callable[..., Any]] = []
+    quant_type: Any = None
+    with contextlib.suppress(ImportError, RuntimeError, AttributeError):
+        fm_mod = importlib.import_module("aiter.fused_moe")
+        fm_fn = getattr(fm_mod, "fused_moe", None)
+        if callable(fm_fn):
+            candidates.append(fm_fn)
+        qt_enum = getattr(fm_mod, "QuantType", None)
+        quant_type = getattr(qt_enum, "per_Tensor", None) if qt_enum else None
     for attr in ("fused_moe", "fmoe_fp8_blockscale_g1u1", "ck_moe"):
         target = getattr(aiter_mod, attr, None)
         if target is not None and not callable(target):
@@ -255,8 +264,17 @@ def try_make_aiter_fp8_moe_runner(
                 int(top_k),
             ]
             for moe_fn in candidates:
+                bound_fn = (
+                    (
+                        lambda *args, _fn=moe_fn, _qt=quant_type, **kw: _fn(
+                            *args, quant_type=_qt, **kw
+                        )
+                    )
+                    if quant_type is not None
+                    else moe_fn
+                )
                 matched = _probe_aiter_fp8_moe_fn(
-                    moe_fn,
+                    bound_fn,
                     cand_args,
                     prototype_args,
                     scales,
@@ -808,8 +826,13 @@ def try_make_aiter_swiglu_quant_runner(
         aiter_mod = importlib.import_module("aiter")
     except Exception:  # noqa: BLE001 -- aiter optional on ROCm hosts
         return _unavailable(prototype_args, "aiter_not_installed")
+    fused_fn = getattr(aiter_mod, "silu_and_mul_scaled_quant", None)
+    if fused_fn is None:
+        with contextlib.suppress(ImportError, RuntimeError, AttributeError):
+            act_mod = importlib.import_module("aiter.ops.activation")
+            fused_fn = getattr(act_mod, "silu_and_mul_quant", None)
     matched = _probe_swiglu_quant_pair(
-        getattr(aiter_mod, "silu_and_mul_scaled_quant", None),
+        fused_fn,
         getattr(aiter_mod, "silu_and_mul", None),
         getattr(aiter_mod, "dynamic_per_token_scaled_quant", None),
         prototype_args,
