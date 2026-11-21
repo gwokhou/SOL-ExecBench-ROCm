@@ -8,8 +8,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
-import yaml
-
 from solar.analysis.graph_models import (
     AnalysisAccumulator,
     FormalAnalysis,
@@ -17,7 +15,7 @@ from solar.analysis.graph_models import (
     LowerBound,
 )
 from solar.analysis.views import build_analysis_views
-from solar.artifacts.yaml import NoAliasDumper
+from solar.artifacts.yaml import write_yaml_atomic
 from solar.contracts import FORMAL_BOUND_KIND, ROOFLINE_BOUND_KIND
 from solar.ir.access import AccessQuality
 from solar.rocm.architecture import ArchitectureProfile
@@ -231,15 +229,7 @@ def build_analysis_result(
 def write_analysis(output_dir: Path, analysis: NodeDict) -> Path:
     """Write analysis at the pipeline's staged canonical destination."""
     output_path = output_dir / "analysis.yaml"
-    with open(output_path, "w") as file:
-        yaml.dump(
-            analysis,
-            file,
-            Dumper=NoAliasDumper,
-            sort_keys=False,
-            default_flow_style=False,
-        )
-    return output_path
+    return write_yaml_atomic(output_path, analysis, no_aliases=True)
 
 
 __all__ = ["PreparedAnalysisView", "build_analysis_result", "write_analysis"]

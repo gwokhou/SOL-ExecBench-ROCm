@@ -28,7 +28,6 @@ BATCH1_VOCABULARY = frozenset(
         "leaky_relu",
         "bitwise_and",
         "xlogy",
-        "masked_fill",
         "expand",
         "repeat",
     }
@@ -59,7 +58,7 @@ def _inputs(*shapes: tuple[int, ...]) -> tuple[torch.Tensor, ...]:
         ("xlogy", lambda a, b: torch.xlogy(a, b), ((4, 6), (4, 6))),
         (
             "masked_fill",
-            lambda a, mask: a.masked_fill(mask, 1.0),
+            lambda a, mask: (a + 1.0).masked_fill(mask, 1.0),
             ((4, 6), (4, 6)),
         ),
         (

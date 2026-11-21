@@ -292,6 +292,8 @@ def forward_prop(
             model.train()
         elif mode == "eval":
             model.eval()
+        elif mode == "keep":
+            pass
         else:
             raise RuntimeError(f"Specified model mode not recognized: {mode}")
         new_module_forward = module_forward_wrapper(model_graph)

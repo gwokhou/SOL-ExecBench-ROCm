@@ -36,8 +36,6 @@ The output format matches the original process_torchview_graph.py output:
 
 from pathlib import Path
 
-import yaml
-
 from solar.composition import BoundComponent
 from solar.graph.torchview.models import NodeInfo
 from solar.types import NodeDict
@@ -85,16 +83,9 @@ class GraphReporter(BoundComponent):
         for node in layer_nodes:
             layers[node.node_id] = node.to_dict()
 
-        with open(filename, "w") as f:
-            from solar.artifacts.yaml import NoAliasDumper
+        from solar.artifacts.yaml import write_yaml_atomic
 
-            yaml.dump(
-                graph_dict,
-                f,
-                Dumper=NoAliasDumper,
-                sort_keys=False,
-                default_flow_style=False,
-            )
+        write_yaml_atomic(filename, graph_dict, no_aliases=True)
 
         if self.debug:
             print(f"PyTorch graph YAML saved to {filename}")

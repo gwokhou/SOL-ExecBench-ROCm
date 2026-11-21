@@ -164,17 +164,28 @@ class GraphTopology:
         dtypes = producer.get("tensor_dtypes") or {}
         inputs = list(dtypes.get("inputs") or [])
         outputs = list(dtypes.get("outputs") or [])
-        if target == "to" and inputs and outputs:
+        if target in {"to", "float", "half", "bfloat16", "type_as"} and (
+            inputs and outputs
+        ):
             source = profile.tensor_precision(inputs[0], fallback_precision)
             destination = profile.tensor_precision(
                 outputs[0],
                 fallback_precision,
             )
-            return (
-                source
-                if source in {"fp8", "int8", "int4"} and source != destination
-                else None
-            )
+            if source in {"fp8", "int8", "int4"} and source != destination:
+                return source
+            if (
+                names
+                and source in {"fp32", "fp16", "bf16"}
+                and destination in {"fp32", "fp16", "bf16"}
+            ):
+                return self.dequantized_payload_precision(
+                    str(names[0]),
+                    profile,
+                    fallback_precision,
+                    seen,
+                )
+            return None
         if target in QUANTIZED_PAYLOAD_PASSTHROUGH and names:
             return self.dequantized_payload_precision(
                 str(names[0]),

@@ -14,8 +14,6 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import cast
 
-import yaml
-
 from solar.analysis.access_contract import read_external_report
 from solar.analysis.views import read_analysis_views
 from solar.artifacts import sha256_file
@@ -24,6 +22,7 @@ from solar.artifacts.names import (
     CONVERSION_ATTESTATION_FILENAME,
     MANIFEST_FILENAME,
 )
+from solar.artifacts.yaml import write_yaml_atomic
 from solar.contracts import (
     FORMAL_BOUND_KIND,
     SOL_BOUND_KINDS,
@@ -88,7 +87,7 @@ def finish_artifacts(
     old_path = staging / "analysis.yaml"
     analysis_path = staging / ANALYSIS_FILENAME
     old_path.unlink(missing_ok=True)
-    analysis_path.write_text(yaml.safe_dump(analysis, sort_keys=False))
+    write_yaml_atomic(analysis_path, analysis, no_aliases=False)
     required = {
         ACCESS_FILENAME,
         OPERATOR_GRAPH_FILENAME,

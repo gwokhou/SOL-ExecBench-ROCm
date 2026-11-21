@@ -57,6 +57,32 @@ def extract_operator_graph(
         return _extract_real(reference, source_inputs, output, name)
 
 
+def _clone_real_arg(value: DynamicValue) -> DynamicValue:
+    import torch
+
+    if isinstance(value, torch.Tensor):
+        if value.is_meta:
+            return value.clone()
+        elem_count = value.untyped_storage().nbytes() // max(
+            1, value.element_size()
+        )
+        base = torch.empty(elem_count, dtype=value.dtype, device=value.device)
+        base.untyped_storage().copy_(value.untyped_storage())
+        return torch.as_strided(
+            base,
+            tuple(value.shape),
+            tuple(value.stride()),
+            value.storage_offset(),
+        )
+    if isinstance(value, tuple):
+        return tuple(_clone_real_arg(item) for item in value)
+    if isinstance(value, list):
+        return [_clone_real_arg(item) for item in value]
+    if isinstance(value, dict):
+        return {k: _clone_real_arg(item) for k, item in value.items()}
+    return value
+
+
 def _extract_fake_static(
     reference: Callable[..., DynamicValue],
     source_inputs: tuple[DynamicValue, ...],
@@ -68,26 +94,38 @@ def _extract_fake_static(
     from torch._subclasses.fake_tensor import FakeTensorMode
 
     with FakeTensorMode(allow_non_fake_inputs=True) as fake_mode:
-        fake_inputs = tuple(
+        observe_inputs = tuple(
             fake_mode.from_tensor(value)
             if isinstance(value, torch.Tensor)
             else value
             for value in source_inputs
         )
-        observed = reference(*fake_inputs)
+        trace_inputs = tuple(
+            fake_mode.from_tensor(value)
+            if isinstance(value, torch.Tensor)
+            else value
+            for value in source_inputs
+        )
+        observed = reference(*observe_inputs)
         reference_outputs = tuple(
             _tensor_signature(value) for value in _outputs(observed)
         )
         tensor_inputs, used_indices, operator_path = trace_make_fx_reference(
             reference,
-            fake_inputs,
+            trace_inputs,
             output=output,
             name=name,
         )
+    del tensor_inputs
+    unmutated_tensors = {
+        index: value
+        for index, value in enumerate(source_inputs)
+        if isinstance(value, torch.Tensor)
+    }
     return _artifact(
         operator_path,
         reference_outputs,
-        tensor_inputs,
+        unmutated_tensors,
         used_indices,
     )
 
@@ -99,20 +137,29 @@ def _extract_real(
     name: str,
 ) -> OperatorGraphArtifact:
     """Legacy real-tensor observe plus trace (fallback path)."""
-    observed = reference(*source_inputs)
+    import torch
+
+    unmutated_tensors = {
+        index: _clone_real_arg(value)
+        for index, value in enumerate(source_inputs)
+        if isinstance(value, torch.Tensor)
+    }
+    observe_inputs = tuple(_clone_real_arg(item) for item in source_inputs)
+    trace_inputs = tuple(_clone_real_arg(item) for item in source_inputs)
+    observed = reference(*observe_inputs)
     reference_outputs = tuple(
         _tensor_signature(value) for value in _outputs(observed)
     )
-    tensor_inputs, used_indices, operator_path = trace_make_fx_reference(
+    _, used_indices, operator_path = trace_make_fx_reference(
         reference,
-        source_inputs,
+        trace_inputs,
         output=output,
         name=name,
     )
     return _artifact(
         operator_path,
         reference_outputs,
-        tensor_inputs,
+        unmutated_tensors,
         used_indices,
     )
 

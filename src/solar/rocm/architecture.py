@@ -796,7 +796,15 @@ class ArchitectureProfile:
                     f"Tensor dtype {key!r} is not supported by {self.name}",
                 )
             return precision
-        return normalize_dtype(key, fallback)
+        precision = normalize_dtype(key, fallback)
+        if (
+            precision in {"fp64", "complex128"}
+            and "fp64" not in self.peak_ops_per_second
+        ):
+            raise ValueError(
+                f"Tensor dtype {key!r} is not supported by {self.name}",
+            )
+        return precision
 
     def resource_rate_for(self, resource: str, mode: str) -> float:
         """Return the declared architectural upper rate for one resource mode."""

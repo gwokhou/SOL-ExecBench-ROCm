@@ -309,9 +309,19 @@ class MetadataExtractor(BoundComponent):
 
     def _dtypes_from_side(self, node: Any, name: str) -> list[str]:
         """Extract every available dtype from one connected tensor side."""
+        items = getattr(node, name, None)
+        if not items:
+            if name == "inputs":
+                items = getattr(node, "ordered_input_nodes", None) or getattr(
+                    node, "parents", None
+                )
+            elif name == "outputs":
+                items = getattr(node, "output_nodes", None) or getattr(
+                    node, "children", None
+                )
         return [
             dtype
-            for item in (getattr(node, name, None) or ())
+            for item in (items or ())
             if (dtype := self._tensor_like_dtype(item)) is not None
         ]
 

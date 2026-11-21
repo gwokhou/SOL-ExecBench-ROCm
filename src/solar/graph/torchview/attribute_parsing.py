@@ -17,6 +17,9 @@ _TORCH_DTYPES = frozenset(
     {
         "bool",
         "bfloat16",
+        "complex32",
+        "complex64",
+        "complex128",
         "float16",
         "float32",
         "float64",
@@ -26,7 +29,9 @@ _TORCH_DTYPES = frozenset(
         "int64",
         "uint8",
         "float8_e4m3fn",
+        "float8_e4m3fnuz",
         "float8_e5m2",
+        "float8_e5m2fnuz",
     }
 )
 _REDUCTION_OPERATIONS = frozenset(

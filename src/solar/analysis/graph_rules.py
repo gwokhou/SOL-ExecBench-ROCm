@@ -3,8 +3,53 @@
 
 """Declarative operation sets used by graph accounting stages."""
 
+from __future__ import annotations
+
+from collections.abc import Mapping
+from types import MappingProxyType
+
+from solar.ir.contracts import operation_operands
+from solar.types import DynamicValue
+
 # Proven executable operations whose tensor operands supply metadata only.
-METADATA_INPUT_TARGETS = frozenset({"ones_like"})
+METADATA_INPUT_TARGETS = frozenset(
+    {"ones_like", "zeros_like", "empty_like", "full_like"}
+)
+
+METADATA_INPUT_SLOTS = MappingProxyType(
+    {
+        "ones_like": frozenset({0}),
+        "zeros_like": frozenset({0}),
+        "empty_like": frozenset({0}),
+        "full_like": frozenset({0}),
+        "type_as": frozenset({1}),
+    }
+)
+
+
+def is_metadata_only_input_slot(
+    semantic: Mapping[str, DynamicValue],
+    input_slot: int,
+    *,
+    op_type: str = "",
+) -> bool:
+    """Return whether ``input_slot`` is used strictly for shape/dtype metadata."""
+    target = str(semantic.get("target") or op_type).lower()
+    slots = METADATA_INPUT_SLOTS.get(target)
+    if slots is None:
+        return False
+    operands = operation_operands(semantic)
+    if not operands:
+        return input_slot in slots
+    positions = [
+        pos
+        for pos, operand in enumerate(operands)
+        if isinstance(operand, Mapping) and operand.get("tensor") == input_slot
+    ]
+    if not positions:
+        return input_slot in slots
+    return all(pos in slots for pos in positions)
+
 
 BOOL_DTYPES = frozenset({"torch.bool", "bool"})
 
@@ -95,6 +140,8 @@ LOW_PRECISION_DEQUANT_DTYPES = frozenset(
 TRANSPARENT_OPS = frozenset(
     {
         "alias",
+        "detach",
+        "identity",
         "expand",
         "expand_as",
         "view",
@@ -146,7 +193,11 @@ ZERO_COMPUTE_OPS = frozenset(
         "flatten",
         "unfold",
         "unflatten",
+        "alias",
+        "detach",
+        "identity",
         "__getitem__",
+        "getitem",
         "narrow",
         "slice",
         "select",
@@ -184,7 +235,9 @@ ZERO_COMPUTE_OPS = frozenset(
 )
 
 ZERO_COPY_VIEW_OPS = TRANSPARENT_OPS
-SLICE_VIEW_OPS = frozenset({"__getitem__", "narrow", "slice", "select"})
+SLICE_VIEW_OPS = frozenset(
+    {"__getitem__", "getitem", "narrow", "slice", "select"}
+)
 SCATTER_OPS = frozenset(
     {
         "__setitem__",
@@ -200,6 +253,8 @@ SCATTER_OPS = frozenset(
 __all__ = [
     "BOOL_DTYPES",
     "LOW_PRECISION_DEQUANT_DTYPES",
+    "METADATA_INPUT_SLOTS",
+    "METADATA_INPUT_TARGETS",
     "QUANTIZED_PAYLOAD_PASSTHROUGH",
     "RECOMPUTABLE_OPERAND_TARGETS",
     "SCATTER_OPS",
@@ -209,4 +264,5 @@ __all__ = [
     "TRANSPARENT_OPS",
     "ZERO_COMPUTE_OPS",
     "ZERO_COPY_VIEW_OPS",
+    "is_metadata_only_input_slot",
 ]

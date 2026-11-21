@@ -67,12 +67,27 @@ class MatmulHandler(EinsumOpHandler):
         other_batch_rank = max(0, other_rank - 2)
         output_batch_rank = max(input_batch_rank, other_batch_rank)
         output_batch = [f"B{index}" for index in range(output_batch_rank)]
-        input_batch = (
-            output_batch[-input_batch_rank:] if input_batch_rank else []
-        )
-        other_batch = (
-            output_batch[-other_batch_rank:] if other_batch_rank else []
-        )
+        in_pad = output_batch_rank - input_batch_rank
+        other_pad = output_batch_rank - other_batch_rank
+        input_batch: list[str] = []
+        other_batch: list[str] = []
+        for axis in range(output_batch_rank):
+            in_dim = input_shape[axis - in_pad] if axis >= in_pad else None
+            other_dim = (
+                other_shape[axis - other_pad] if axis >= other_pad else None
+            )
+            in_unit = type(in_dim) is int and in_dim == 1
+            other_unit = type(other_dim) is int and other_dim == 1
+            if in_dim is not None:
+                if in_unit and other_dim is not None and not other_unit:
+                    input_batch.append(f"U{axis}")
+                else:
+                    input_batch.append(output_batch[axis])
+            if other_dim is not None:
+                if other_unit and in_dim is not None and not in_unit:
+                    other_batch.append(f"V{axis}")
+                else:
+                    other_batch.append(output_batch[axis])
         input_dims = input_batch + (["K"] if input_rank == 1 else ["M", "K"])
         other_dims = other_batch + (["K"] if other_rank == 1 else ["K", "N"])
         output_dims = [

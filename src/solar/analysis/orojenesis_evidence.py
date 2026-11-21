@@ -60,22 +60,21 @@ from solar.rocm.architecture import ArchitectureProfile, MemoryLevel
 def _layer_compulsory_bytes(
     layer: Mapping[str, Any],
     *,
-    word_bytes: int,
+    word_bits: int,
 ) -> float:
     names = layer.get("tensor_names") or {}
     shapes = layer.get("tensor_shapes") or {}
-    modeled_tensors = {
-        str(name): list(shape)
+    slot_shapes = [
+        list(shape)
         for side in ("inputs", "outputs")
-        for name, shape in zip(
+        for _, shape in zip(
             names.get(side) or [],
             shapes.get(side) or [],
             strict=True,
         )
-    }
-    return float(
-        sum(product(shape) for shape in modeled_tensors.values()) * word_bytes
-    )
+    ]
+    total_words = sum(product(shape) for shape in slot_shapes)
+    return (total_words * int(word_bits)) / 8.0
 
 
 def _is_zero_excess_compulsory_witness(
@@ -85,10 +84,10 @@ def _is_zero_excess_compulsory_witness(
 ) -> bool:
     certificate = result.get("optimality_certificate") or {}
     try:
-        word_bytes = int(result["word_bits"]) // 8
+        word_bits = int(result["word_bits"])
         certificate_bytes = (
-            int(certificate["compulsory_accesses_words"]) * word_bytes
-        )
+            int(certificate["compulsory_accesses_words"]) * word_bits
+        ) / 8.0
         solver_bytes = float((point or {})["dram_bytes"])
     except KeyError, TypeError, ValueError:
         return False
@@ -390,10 +389,10 @@ class OrojenesisEvidenceEvaluator(BoundComponent):
                 region,
                 all_layers,
             )
-            word_bytes = int(result["word_bits"]) // 8
+            word_bits = int(result["word_bits"])
             compulsory_bytes = _layer_compulsory_bytes(
                 layer,
-                word_bytes=word_bytes,
+                word_bits=word_bits,
             )
             zero_excess = _is_zero_excess_compulsory_witness(
                 result,
@@ -401,22 +400,20 @@ class OrojenesisEvidenceEvaluator(BoundComponent):
                 compulsory_bytes,
             )
             applicable = bool(
-                point and (external or region_boundary or zero_excess)
+                point and ((external and region_boundary) or zero_excess)
             )
-            if external:
+            if external and region_boundary:
                 provenance = "graph_input_or_recomputable_preprocess"
                 reason = "graph_input_or_recomputable_preprocess_contraction"
-            elif region_boundary:
-                provenance = (
-                    "materialized_region_boundary_and_tile_local_postprocess"
-                )
-                reason = "materialized_region_boundary_contraction"
             elif zero_excess:
                 provenance = "selected_capacity_compulsory_zero_excess"
                 reason = "internal_contraction_zero_excess_witness"
-            else:
+            elif not external:
                 provenance = "unproven_internal_operand"
                 reason = "internal_operand_requires_composition_proof"
+            else:
+                provenance = "unproven_region_output_postprocess"
+                reason = "region_output_postprocess_requires_tile_proof"
             result["formal_applicability"] = {
                 "applicable": applicable,
                 "region": region["id"],
@@ -488,9 +485,9 @@ class OrojenesisEvidenceEvaluator(BoundComponent):
                 int(item["k"]) * int(item["n"]) for item in descriptors
             )
             compulsory_elements += int(last["m"]) * int(last["n"])
-            compulsory_bytes = float(
-                compulsory_elements * (int(result["word_bits"]) // 8),
-            )
+            compulsory_bytes = (
+                compulsory_elements * int(result["word_bits"])
+            ) / 8.0
             solver_bytes = float(point["dram_bytes"])
             result["audited_dram_bytes"] = solver_bytes
             result["modeled_compulsory_bytes"] = compulsory_bytes
@@ -553,9 +550,9 @@ class OrojenesisEvidenceEvaluator(BoundComponent):
             compulsory_elements += sum(
                 int(by_id[leaf]["m"]) * int(by_id[leaf]["n"]) for leaf in leaves
             )
-            compulsory_bytes = float(
-                compulsory_elements * (int(result["word_bits"]) // 8),
-            )
+            compulsory_bytes = (
+                compulsory_elements * int(result["word_bits"])
+            ) / 8.0
             solver_bytes = float(point["dram_bytes"])
             result["audited_dram_bytes"] = solver_bytes
             result["modeled_compulsory_bytes"] = compulsory_bytes

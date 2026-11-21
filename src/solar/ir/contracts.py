@@ -207,6 +207,31 @@ def operation_attributes(
     return value if isinstance(value, Mapping) else {}
 
 
+def resolve_operand_tensor_slots(
+    semantic: Mapping[str, Any],
+    positions: Sequence[int],
+    input_arity: int,
+) -> tuple[int, ...] | None:
+    """Resolve call argument ``positions`` to ``tensor_*['inputs']`` indices."""
+    operands = operation_operands(semantic)
+    if not operands:
+        if all(0 <= pos < input_arity for pos in positions):
+            return tuple(positions)
+        return None
+    resolved: list[int] = []
+    for pos in positions:
+        if not 0 <= pos < len(operands):
+            return None
+        entry = operands[pos]
+        if not isinstance(entry, Mapping):
+            return None
+        slot = entry.get("tensor")
+        if type(slot) is not int or not 0 <= slot < input_arity:
+            return None
+        resolved.append(slot)
+    return tuple(resolved)
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class LayerContractionAnalysis:
     """Contraction analysis facts carried consistently by every IR layer.
@@ -251,4 +276,5 @@ __all__ = [
     "normalize_ir_path",
     "operation_attributes",
     "operation_operands",
+    "resolve_operand_tensor_slots",
 ]

@@ -9,8 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-import yaml
-
+from solar.artifacts.yaml import write_yaml_atomic
 from solar.graph.contracts import OPERATOR_GRAPH_FILENAME
 
 
@@ -81,7 +80,7 @@ def trace_make_fx_reference(
             f"make_fx reference extraction failed: {extraction_error}",
         ) from extraction_error
     operator_path = output / OPERATOR_GRAPH_FILENAME
-    operator_path.write_text(yaml.safe_dump(graph, sort_keys=False))
+    write_yaml_atomic(operator_path, graph, no_aliases=False)
     return tensor_inputs, [index for _, index in used], operator_path
 
 

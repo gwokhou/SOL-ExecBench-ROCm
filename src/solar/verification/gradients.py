@@ -7,12 +7,34 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 
-from solar.errors import GradientVerificationError
+from solar.errors import GradientVerificationError, SolarError
 from solar.types import GraphValue
 from solar.verification.contracts import VerificationPolicy
 from solar.verification.errors import VerificationError
 from solar.verification.executor import IRGraphExecutor
 from solar.verification.numerics import assert_close, clone, tensor_leaves
+
+_COTANGENT_BASE_SEED = 0x501A_2026
+_COTANGENT_STRIDE = 1_000_003
+_AUTOGRAD_ERROR_MARKERS: tuple[tuple[str, str], ...] = (
+    (
+        "leaf variable that requires grad is being used in an in-place operation",
+        "inplace_on_grad_leaf",
+    ),
+    (
+        "view of a leaf variable that requires grad is being used in an in-place operation",
+        "inplace_on_leaf_view",
+    ),
+    (
+        "one of the variables needed for gradient computation has been modified by an inplace operation",
+        "saved_tensor_mutated_inplace",
+    ),
+    ("derivative for", "missing_derivative"),
+    (
+        "element 0 of tensors does not require grad and does not have a grad_fn",
+        "non_differentiable_backward",
+    ),
+)
 
 
 def capture_rng_state() -> tuple[GraphValue, list[GraphValue] | None]:
@@ -88,6 +110,85 @@ def _gradient_inputs(
     return tuple(result)
 
 
+def _cotangent_for(
+    tensor: GraphValue,
+    *,
+    probe_index: int,
+) -> GraphValue:
+    import torch
+
+    if not isinstance(tensor, torch.Tensor):
+        raise TypeError("cotangent target must be a tensor")
+    generator = torch.Generator(device="cpu")
+    generator.manual_seed(
+        _COTANGENT_BASE_SEED + probe_index * _COTANGENT_STRIDE
+    )
+    numel = max(1, tensor.numel())
+    magnitudes = torch.empty(numel, dtype=torch.float64).uniform_(
+        0.5,
+        1.5,
+        generator=generator,
+    )
+    signs = torch.where(
+        torch.randint(0, 2, (numel,), generator=generator) == 0,
+        1.0,
+        -1.0,
+    )
+    values = (magnitudes * signs).reshape(tensor.shape)
+    return values.to(device=tensor.device, dtype=tensor.dtype)
+
+
+def _autograd_error_kind(exc: BaseException | None) -> str | None:
+    if (
+        exc is None
+        or isinstance(exc, SolarError)
+        or type(exc) is not RuntimeError
+    ):
+        return None
+    message = str(exc).lower()
+    for marker, kind in _AUTOGRAD_ERROR_MARKERS:
+        if marker in message:
+            if (
+                kind == "missing_derivative"
+                and "not implemented" not in message
+            ):
+                continue
+            return kind
+    return None
+
+
+def _probe_leaf_gradients(
+    value: GraphValue,
+    watched: tuple[GraphValue, ...],
+    *,
+    probe_offset: int,
+    retain_after: bool,
+) -> tuple[bool, list[GraphValue | None], int]:
+    import torch
+
+    if not isinstance(value, torch.Tensor) or not value.requires_grad:
+        return False, [], probe_offset
+    targets = (value.real, value.imag) if value.is_complex() else (value,)
+    collected: list[GraphValue | None] = []
+    for idx, target in enumerate(targets):
+        cotangent = _cotangent_for(target, probe_index=probe_offset + idx)
+        scalar = (target * cotangent).sum()
+        keep_graph = retain_after or (idx + 1 < len(targets))
+        grads = torch.autograd.grad(
+            scalar,
+            watched,
+            allow_unused=True,
+            retain_graph=keep_graph,
+        )
+        collected.extend(grads)
+    connected = any(grad is not None for grad in collected)
+    return (
+        connected,
+        (collected if connected else []),
+        probe_offset + len(targets),
+    )
+
+
 def _run_gradients(
     callable_: Callable[..., GraphValue],
     inputs: tuple[GraphValue, ...],
@@ -101,30 +202,29 @@ def _run_gradients(
     try:
         with torch.enable_grad():
             leaves = tensor_leaves(callable_(*inputs))
-            differentiable = tuple(
-                bool(value.requires_grad) for value in leaves
+            last_grad_idx = max(
+                (
+                    idx
+                    for idx, leaf in enumerate(leaves)
+                    if bool(leaf.requires_grad)
+                ),
+                default=-1,
             )
-            # Separate outputs (and complex components) cannot cancel each
-            # other's VJP. This remains a first-order replay check, not a Jacobian.
-            scalars = []
-            for value in leaves:
-                if value.requires_grad:
-                    scalars.extend(
-                        (value.real.sum(), value.imag.sum())
-                        if value.is_complex()
-                        else (value.sum(),)
-                    )
-            gradients = []
-            for index, scalar in enumerate(scalars):
-                gradients.extend(
-                    torch.autograd.grad(
-                        scalar,
-                        watched,
-                        allow_unused=True,
-                        retain_graph=index + 1 < len(scalars),
-                    )
+            differentiable: list[bool] = []
+            gradients: list[GraphValue | None] = []
+            probe_offset = 0
+            for idx, value in enumerate(leaves):
+                connected, leaf_grads, probe_offset = _probe_leaf_gradients(
+                    value,
+                    watched,
+                    probe_offset=probe_offset,
+                    retain_after=idx < last_grad_idx,
                 )
-            return differentiable, tuple(gradients), None
+                differentiable.append(connected)
+                gradients.extend(leaf_grads)
+            return tuple(differentiable), tuple(gradients), None
+    except SolarError as exc:
+        return (), (), exc
     except (RuntimeError, ValueError, TypeError) as exc:
         return (), (), exc
 
@@ -163,9 +263,16 @@ def verify_gradients(
         executor, executor_inputs, executor_selected
     )
     if reference_error is not None or executor_error is not None:
-        if type(reference_error) is type(executor_error):
+        ref_kind = _autograd_error_kind(reference_error)
+        exec_kind = _autograd_error_kind(executor_error)
+        if ref_kind is not None and ref_kind == exec_kind:
             return {"gradient_error_semantics_verified": 1.0}
-        raise GradientVerificationError("gradient error semantics differ")
+        cause = (
+            executor_error if executor_error is not None else reference_error
+        )
+        raise GradientVerificationError(
+            "gradient error semantics differ"
+        ) from cause
     if expected_pattern != actual_pattern:
         raise GradientVerificationError("output differentiability differs")
     if len(expected) != len(actual):

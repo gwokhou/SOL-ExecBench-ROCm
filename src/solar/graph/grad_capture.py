@@ -36,22 +36,39 @@ class GradientBoundaryCapture(TorchDispatchMode):
     ) -> object:
         """Observe gradient mode and preserve the original operation result."""
         disabled = not torch.is_grad_enabled()
-        result = func(*args, **(kwargs or {}))
         schema = getattr(func, "_schema", None)
-        pure = (
-            schema is not None
-            and not any(
-                value.alias_info is not None for value in schema.returns
+        if disabled and schema is not None and schema.is_mutable:
+            self._reject_no_grad_mutation_on_grad_input(
+                func, schema, args, kwargs or {}
             )
-            and not any(
-                value.alias_info is not None and value.alias_info.is_write
-                for value in schema.arguments
-            )
-        )
+        result = func(*args, **(kwargs or {}))
+        readonly_op = schema is not None and not schema.is_mutable
         explicit_detach = func is torch.ops.aten.detach.default
-        if explicit_detach or (disabled and pure):
+        if explicit_detach or (disabled and readonly_op):
             self._record(result)
         return result
+
+    @staticmethod
+    def _reject_no_grad_mutation_on_grad_input(
+        func: Callable[..., object],
+        schema: torch.FunctionSchema,
+        args: tuple[object, ...],
+        kwargs: dict[str, object],
+    ) -> None:
+        for index, argument in enumerate(schema.arguments):
+            if argument.alias_info is None or not argument.alias_info.is_write:
+                continue
+            value = (
+                args[index] if index < len(args) else kwargs.get(argument.name)
+            )
+            if any(
+                isinstance(leaf, torch.Tensor) and leaf.requires_grad
+                for leaf in tree_leaves(value)
+            ):
+                raise RuntimeError(
+                    f"Mutable operation {func} under torch.no_grad() on a "
+                    "grad-requiring tensor cannot be captured as pure detach"
+                )
 
     def _record(self, result: object) -> None:
         mode = get_proxy_mode()

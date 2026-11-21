@@ -5,9 +5,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from solar.analysis.graph_validation import validate_current_ir_schema
+from solar.analysis.orojenesis.configuration import (
+    OROJENESIS_TRUSTED_MAPPER_SHA256,
+)
 from solar.artifacts import ArtifactDocument, sha256_bytes, stable_json_checksum
 from solar.artifacts.bundle import (
     capture_bound_files,
@@ -207,3 +211,32 @@ def _require_analysis_binding(
         or manifest.publication_eligible != (bound.kind == FORMAL_BOUND_KIND)
     ):
         raise ValueError("analysis identity or bound differs from its manifest")
+    orojenesis = metadata.get("orojenesis")
+    if (
+        bound.kind == FORMAL_BOUND_KIND
+        or manifest.analysis_contract.require_orojenesis
+        or (
+            isinstance(orojenesis, Mapping)
+            and orojenesis.get("status") == "complete"
+        )
+    ):
+        toolchain = (
+            orojenesis.get("toolchain")
+            if isinstance(orojenesis, Mapping)
+            else None
+        )
+        artifact = (
+            toolchain.get("artifact")
+            if isinstance(toolchain, Mapping)
+            else None
+        )
+        mapper_sha256 = (
+            artifact.get("sha256") if isinstance(artifact, Mapping) else None
+        )
+        if (
+            not isinstance(mapper_sha256, str)
+            or mapper_sha256 not in OROJENESIS_TRUSTED_MAPPER_SHA256
+        ):
+            raise ValueError(
+                "Orojenesis mapper artifact is not trusted by this SOLAR release"
+            )

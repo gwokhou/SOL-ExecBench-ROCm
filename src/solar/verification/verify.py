@@ -23,6 +23,7 @@ from typing import Any
 import yaml
 
 from solar.artifacts import sha256_file, stable_json_checksum
+from solar.artifacts.yaml import write_yaml_atomic
 from solar.graph.storage import capture_source_storage
 from solar.ir.access_artifact import (
     ACCESS_FILENAME,
@@ -158,7 +159,7 @@ def _prepare_case(
         )
     reference_inputs = clone(
         pattern_inputs(
-            inputs,
+            clone(inputs),
             pattern,
             preserved_input_indices=preserved_input_indices,
         ),
@@ -174,6 +175,54 @@ def _prepare_case(
         reference_tensor_inputs,
         clone(reference_tensor_inputs),
     )
+
+
+def _compare_case_outputs(
+    graph: Mapping[str, Any],
+    actual: Any,
+    expected: Any,
+    executor_inputs: tuple[Any, ...],
+    pattern: str,
+    policy: TolerancePolicy,
+) -> dict[str, float]:
+    atol, rtol = policy.atol, policy.rtol
+    error_cap = policy.max_error_cap
+    allow_negative_inf = policy.allow_negative_inf
+    allow_nan = pattern in {"zeros", "boundary"}
+    try:
+        return assert_close(
+            actual,
+            expected,
+            atol,
+            rtol,
+            required_matched_ratio=policy.required_matched_ratio,
+            max_error_cap=error_cap,
+            allow_negative_inf=allow_negative_inf,
+            allow_matching_nan=allow_nan,
+        )
+    except VerificationError as error:
+        if (
+            error_cap is not None
+            or not str(error).startswith("numerical mismatch:")
+            or not _einsum_roundoff_equivalent(
+                graph,
+                executor_inputs,
+                actual,
+                expected,
+            )
+        ):
+            raise
+        stats = assert_close(
+            actual,
+            expected,
+            atol,
+            rtol,
+            required_matched_ratio=0.0,
+            allow_negative_inf=allow_negative_inf,
+            allow_matching_nan=allow_nan,
+        )
+        stats["roundoff_bound_verified"] = 1.0
+        return stats
 
 
 def _verify_case(
@@ -193,50 +242,23 @@ def _verify_case(
         reference_tensor_inputs,
         executor_inputs,
     ) = prepared
-    atol, rtol = policy.atol, policy.rtol
-    required_ratio = policy.required_matched_ratio
-    error_cap = policy.max_error_cap
-    allow_negative_inf = policy.allow_negative_inf
+    gradient_inputs = (
+        clone(reference_inputs)
+        if isinstance(policy, VerificationPolicy) and policy.verify_gradients
+        else ()
+    )
     with torch.enable_grad():
         rng_state = capture_rng_state()
         expected = reference(*reference_inputs)
     with torch.inference_mode():
         restore_rng_state(rng_state)
         actual = executor(*executor_inputs)
-        try:
-            stats = assert_close(
-                actual,
-                expected,
-                atol,
-                rtol,
-                required_matched_ratio=required_ratio,
-                max_error_cap=error_cap,
-                allow_negative_inf=allow_negative_inf,
-                allow_matching_nan=pattern in {"zeros", "boundary"},
-            )
-        except VerificationError as error:
-            if (
-                error_cap is not None
-                or not str(error).startswith("numerical mismatch:")
-                or not _einsum_roundoff_equivalent(
-                    graph,
-                    executor_inputs,
-                    actual,
-                    expected,
-                )
-            ):
-                raise
-            stats = assert_close(
-                actual,
-                expected,
-                atol,
-                rtol,
-                required_matched_ratio=0.0,
-                allow_negative_inf=allow_negative_inf,
-                allow_matching_nan=pattern in {"zeros", "boundary"},
-            )
-            stats["roundoff_bound_verified"] = 1.0
-        assert_close(executor_inputs, reference_tensor_inputs, atol, rtol)
+        stats = _compare_case_outputs(
+            graph, actual, expected, executor_inputs, pattern, policy
+        )
+        assert_close(
+            executor_inputs, reference_tensor_inputs, policy.atol, policy.rtol
+        )
         if alias_relation(actual, executor_inputs) != alias_relation(
             expected,
             reference_tensor_inputs,
@@ -251,7 +273,7 @@ def _verify_case(
                 reference,
                 executor,
                 graph,
-                reference_inputs,
+                gradient_inputs,
                 policy,
             )
         )
@@ -459,7 +481,7 @@ def create_verification_artifact(
         cases=cases,
         results=results,
     )
-    Path(output_path).write_text(yaml.safe_dump(artifact, sort_keys=False))
+    write_yaml_atomic(output_path, artifact, no_aliases=False)
     return artifact
 
 
@@ -553,7 +575,7 @@ def verify_callable_conversion(
         cases=cases,
         results=results,
     )
-    Path(output_path).write_text(yaml.safe_dump(artifact, sort_keys=False))
+    write_yaml_atomic(output_path, artifact, no_aliases=False)
     return artifact
 
 

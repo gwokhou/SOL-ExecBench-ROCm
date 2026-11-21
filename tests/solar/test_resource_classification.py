@@ -282,9 +282,9 @@ def test_rocm_fused_rms_norm_uses_canonical_normalization_rule() -> None:
 
     assert result["classification"] == "modeled"
     assert result["work"] == {
-        "reduction": {"fp32": 22},
-        "sfu": {"fp32": 1},
-        "valu": {"fp32": 60},
+        "reduction": {"fp32": 9},
+        "sfu": {"fp32": 3},
+        "valu": {"fp32": 36},
     }
 
 

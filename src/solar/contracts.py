@@ -18,6 +18,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from solar.artifacts.names import MANIFEST_FILENAME
+from solar.artifacts.yaml import write_yaml_atomic
 from solar.graph.contracts import (
     ExtractionKind,
     normalize_extraction_kind,
@@ -96,6 +97,10 @@ class ConversionRequest:
             raise ValueError("analysis_id and reference_name must be non-empty")
         if re.fullmatch(r"[0-9a-f]{64}", self.reference_sha256) is None:
             raise ValueError("reference_sha256 must be a lowercase SHA-256")
+        if self.trace_seed in self.verification.seeds:
+            raise ValueError(
+                "trace_seed must be disjoint from verification.seeds",
+            )
 
 
 class ConversionRequestEnvelope:
@@ -424,8 +429,10 @@ def write_request_manifest(
             },
         },
     )
-    (staging / MANIFEST_FILENAME).write_text(
-        yaml.safe_dump(manifest.model_dump(mode="json"), sort_keys=False),
+    write_yaml_atomic(
+        staging / MANIFEST_FILENAME,
+        manifest.model_dump(mode="json"),
+        no_aliases=False,
     )
 
 

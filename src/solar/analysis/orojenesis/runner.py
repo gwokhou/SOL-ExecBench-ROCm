@@ -11,14 +11,12 @@ import csv
 import json
 import os
 import subprocess
-import xml.etree.ElementTree as ET
+import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from math import isfinite, prod
+from math import isfinite
 from pathlib import Path
 from typing import Any
-
-import yaml
 
 from solar.analysis.orojenesis.configuration import (
     IDENTITY_POLICY,
@@ -62,7 +60,12 @@ from solar.analysis.orojenesis.regions import (
     multi_einsum_region_mapper_role,
     multi_einsum_region_problem,
 )
+from solar.analysis.orojenesis.witness import (
+    attach_compulsory_witness as _attach_compulsory_witness,
+    exact_nonnegative_integer as _exact_nonnegative_integer,
+)
 from solar.artifacts import sha256_file
+from solar.artifacts.yaml import write_yaml_atomic
 from solar.observation import ObservationStage, observed_stage
 
 __all__ = [
@@ -75,12 +78,28 @@ __all__ = [
     "multi_einsum_region_problem",
 ]
 
-_WITNESS_OUTPUT_FILES = (
-    "timeloop-mapper.map+stats.xml",
-    "timeloop-mapper.map.txt",
-    "timeloop-mapper.stats.txt",
-    "timeloop-mapper.map.yaml",
-)
+MAX_MULTI_EINSUM_DIVISORS = 128
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _MultiSweepSpec:
+    row_tile: int
+    role: str
+    word_bits: int
+    word_bytes: int
+    environment: Mapping[str, str]
+    context: str
+    deadline: float | None = None
+
+
+def _bounded_row_tiles(m_dim: int, *, context: str) -> list[int]:
+    tiles = _divisors(int(m_dim))
+    if len(tiles) > MAX_MULTI_EINSUM_DIVISORS:
+        raise OrojenesisError(
+            f"multi-einsum row tile divisor count {len(tiles)} exceeds "
+            f"cap {MAX_MULTI_EINSUM_DIVISORS} for {context}"
+        )
+    return tiles
 
 
 def _multi_word_bytes(word_bits: int) -> int:
@@ -96,7 +115,7 @@ def _write_yaml_documents(
     paths: dict[str, Path] = {}
     for name, document in documents.items():
         path = output / name
-        path.write_text(yaml.safe_dump(document, sort_keys=False))
+        write_yaml_atomic(path, document, no_aliases=False)
         paths[name] = path
     return paths
 
@@ -135,238 +154,6 @@ def _multi_evidence(
         }
         for name, path in paths.items()
     }
-
-
-def _exact_nonnegative_integer(value: Any, *, field: str) -> int:
-    try:
-        number = float(value)
-    except (TypeError, ValueError) as exc:
-        raise OrojenesisError(f"{field} is not numeric") from exc
-    if not isfinite(number) or number < 0 or not number.is_integer():
-        raise OrojenesisError(f"{field} must be a finite nonnegative integer")
-    return int(number)
-
-
-def _xml_vector(
-    stats: ET.Element,
-    name: str,
-    spaces: Sequence[str],
-) -> dict[str, int]:
-    items = stats.findall(f"./{name}/PerDataSpace/item")
-    if len(items) != len(spaces):
-        raise OrojenesisError(f"mapper XML has invalid {name} arity")
-    return {
-        space: _exact_nonnegative_integer(item.text, field=f"{name}.{space}")
-        for space, item in zip(spaces, items, strict=True)
-    }
-
-
-def _witness_level_stats(
-    path: Path,
-    spaces: Sequence[str],
-    *,
-    word_bits: int,
-) -> dict[str, dict[str, dict[str, int]]]:
-    try:
-        root = ET.parse(path).getroot()
-    except (ET.ParseError, OSError) as exc:
-        raise OrojenesisError("invalid mapper map+stats XML") from exc
-    result: dict[str, dict[str, dict[str, int]]] = {}
-    for level in root.findall(".//levels_/item/px"):
-        name = level.findtext("./specs_/LevelSpecs/level_name")
-        if name not in {"Buffer", "MainMemory"}:
-            continue
-        stats = level.find("./stats_")
-        if stats is None:
-            raise OrojenesisError(f"mapper XML omits {name} stats")
-        xml_word_bits = _exact_nonnegative_integer(
-            level.findtext("./specs_/word_bits/t_"),
-            field=f"{name}.word_bits",
-        )
-        if xml_word_bits != int(word_bits):
-            raise OrojenesisError(f"mapper XML {name} word width mismatch")
-        result[name] = {
-            metric: _xml_vector(stats, metric, spaces)
-            for metric in (
-                "keep",
-                "utilized_capacity",
-                "utilized_instances",
-                "reads",
-                "updates",
-                "fills",
-            )
-        }
-    if set(result) != {"Buffer", "MainMemory"}:
-        raise OrojenesisError("mapper XML omits witness memory levels")
-    return result
-
-
-def _tensor_element_counts(layer: Mapping[str, Any]) -> list[int]:
-    shapes = layer.get("tensor_shapes") or {}
-    ordered = [*(shapes.get("inputs") or []), *(shapes.get("outputs") or [])]
-    counts = [prod(int(dimension) for dimension in shape) for shape in ordered]
-    if not counts or any(count <= 0 for count in counts):
-        raise OrojenesisError("proof tensor shapes must be positive")
-    return counts
-
-
-def _audit_compulsory_witness(
-    point: Mapping[str, Any],
-    level_stats: Mapping[str, Mapping[str, Mapping[str, int]]],
-    spaces: Sequence[str],
-    element_counts: Sequence[int],
-    *,
-    capacity_bytes: int,
-    word_bits: int,
-) -> dict[str, Any]:
-    if len(spaces) != 3 or len(element_counts) != 3:
-        raise OrojenesisError(
-            "contraction witness requires two inputs and one output",
-        )
-    accesses = point.get("data_space_accesses_words") or {}
-    expected = dict(zip(spaces, element_counts, strict=True))
-    main_memory = level_stats["MainMemory"]
-    buffer = level_stats["Buffer"]
-    input_spaces = list(spaces[:-1])
-    output_space = spaces[-1]
-    main_accesses = {
-        "reads": {
-            space: expected[space] if space in input_spaces else 0
-            for space in spaces
-        },
-        "updates": {
-            space: expected[space] if space == output_space else 0
-            for space in spaces
-        },
-        "fills": dict.fromkeys(spaces, 0),
-    }
-    keep = dict.fromkeys(spaces, 1)
-    instances = dict.fromkeys(spaces, 1)
-    buffer_words = sum(buffer["utilized_capacity"].values())
-    buffer_bytes = buffer_words * (int(word_bits) // 8)
-    if (
-        buffer_bytes != int(point["buffer_bytes"])
-        or buffer_bytes > int(capacity_bytes)
-        or _exact_nonnegative_integer(
-            point["dram_accesses_words"],
-            field="dram_accesses_words",
-        )
-        != sum(element_counts)
-        or accesses != expected
-        or buffer["keep"] != keep
-        or main_memory["keep"] != keep
-        or buffer["utilized_instances"] != instances
-        or main_memory["utilized_instances"] != instances
-        or any(
-            main_memory[metric] != values
-            for metric, values in main_accesses.items()
-        )
-    ):
-        raise OrojenesisError(
-            "contraction compulsory witness did not reach the "
-            "selected-capacity optimum",
-        )
-    return {
-        "expected": expected,
-        "main_accesses": main_accesses,
-        "buffer_capacity": buffer["utilized_capacity"],
-        "instances": instances,
-    }
-
-
-def _compulsory_witness_certificate(
-    layer: Mapping[str, Any],
-    point: Mapping[str, Any],
-    level_stats: Mapping[str, Mapping[str, Mapping[str, int]]],
-    spaces: Sequence[str],
-    element_counts: Sequence[int],
-    *,
-    capacity_bytes: int,
-    word_bits: int,
-) -> dict[str, Any]:
-    audit = _audit_compulsory_witness(
-        point,
-        level_stats,
-        spaces,
-        element_counts,
-        capacity_bytes=capacity_bytes,
-        word_bits=word_bits,
-    )
-    return {
-        "kind": "selected_capacity_compulsory_witness_v1",
-        "scope": "selected_capacity_only",
-        "pareto_curve_complete": False,
-        "capacity_bytes": int(capacity_bytes),
-        "buffer_bytes": int(point["buffer_bytes"]),
-        "compulsory_accesses_words": sum(element_counts),
-        "data_space_accesses_words": audit["expected"],
-        "main_memory_accesses_words": audit["main_accesses"],
-        "buffer_utilized_capacity_words": audit["buffer_capacity"],
-        "buffer_utilized_instances": audit["instances"],
-        "proof": "feasible traffic equals the universal compulsory lower bound",
-        "portability": {
-            "compulsory_lower_bound": "architecture_independent",
-            "achievability": "selected_architecture_cache_only",
-        },
-        "theorem_inputs": {
-            "proof_source": dict(
-                (layer.get("semantic_op") or {}).get("proof_source") or {},
-            ),
-            "equation": str(
-                (layer.get("semantic_op") or {}).get("equation") or "",
-            ),
-            "tensor_shapes": layer.get("tensor_shapes"),
-            "data_spaces": list(spaces),
-            "word_bits": int(word_bits),
-            "dense": True,
-            "first_read_elision": True,
-            "instances": 1,
-        },
-    }
-
-
-def _attach_compulsory_witness(
-    result: dict[str, Any],
-    layer: Mapping[str, Any],
-    plan: _LayerRunPlan,
-    curve: Sequence[Mapping[str, Any]],
-    *,
-    word_bits: int,
-) -> None:
-    witness_paths = {name: plan.output / name for name in _WITNESS_OUTPUT_FILES}
-    missing = [
-        name for name, path in witness_paths.items() if not path.is_file()
-    ]
-    if missing:
-        raise OrojenesisError(
-            "compulsory witness omits mapper evidence: " + ", ".join(missing),
-        )
-    result["evidence_files"].update(
-        {
-            name: {"path": name, "sha256": sha256_file(path)}
-            for name, path in witness_paths.items()
-        },
-    )
-    result["environment"] = plan.environment
-    result["optimality_certificate"] = _compulsory_witness_certificate(
-        layer,
-        curve[0],
-        _witness_level_stats(
-            witness_paths["timeloop-mapper.map+stats.xml"],
-            plan.spaces,
-            word_bits=word_bits,
-        ),
-        plan.spaces,
-        _tensor_element_counts(layer),
-        capacity_bytes=int(plan.selected_capacity_bytes or 0),
-        word_bits=word_bits,
-    )
-    result["optimality_certificate"].update(
-        {
-            "streaming_axis": "B",
-            "streaming_dimension": plan.streaming_dimension,
-        },
-    )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -412,13 +199,17 @@ class OrojenesisRunner:
         *,
         cwd: Path,
         env: Mapping[str, str] | None = None,
+        timeout: float | None = None,
     ) -> subprocess.CompletedProcess[str]:
         runner = getattr(self, "_process_runner", _default_mapper_runner)
+        effective_timeout = (
+            float(self.timeout_seconds) if timeout is None else float(timeout)
+        )
         return invoke_mapper_process(
             runner,
             command,
             cwd=cwd,
-            timeout=self.timeout_seconds,
+            timeout=effective_timeout,
             env=env,
         )
 
@@ -472,7 +263,7 @@ class OrojenesisRunner:
     def parse_curve(
         path: str | Path,
         *,
-        word_bytes: int,
+        word_bytes: float,
         spaces: Sequence[str] = (),
     ) -> list[dict[str, Any]]:
         """Parse and Pareto-filter an OAVES traffic curve."""
@@ -651,10 +442,17 @@ class OrojenesisRunner:
             word_bits=word_bits,
             selected_capacity_bytes=selected_capacity_bytes,
         )
+        if int(word_bits) <= 0:
+            raise OrojenesisError("word_bits must be positive")
+        word_bytes: int | float = (
+            int(word_bits) // 8
+            if int(word_bits) % 8 == 0
+            else int(word_bits) / 8.0
+        )
         raw = self._execute_layer_run(plan)
         curve = self.parse_curve(
             raw,
-            word_bytes=max(1, word_bits // 8),
+            word_bytes=word_bytes,
             spaces=plan.spaces,
         )
         result: dict[str, Any] = {
@@ -705,7 +503,11 @@ class OrojenesisRunner:
                 "environment.yaml": environment,
             },
         )
-        row_tiles = _divisors(int(descriptor["chain"]["layers"][0]["m"]))
+        row_tiles = _bounded_row_tiles(
+            int(descriptor["chain"]["layers"][0]["m"]),
+            context="chain layer 0",
+        )
+        deadline = time.monotonic() + float(self.timeout_seconds)
         raw_paths, sweeps = self._collect_chain_sweeps(
             descriptor,
             output,
@@ -714,6 +516,7 @@ class OrojenesisRunner:
             word_bits=word_bits,
             word_bytes=word_bytes,
             environment=environment,
+            deadline=deadline,
         )
         curve = compose_multi_einsum_curve(
             raw_paths,
@@ -746,6 +549,7 @@ class OrojenesisRunner:
         word_bits: int,
         word_bytes: int,
         environment: Mapping[str, str],
+        deadline: float,
     ) -> tuple[list[list[Path]], list[dict[str, Any]]]:
         raw_paths: list[list[Path]] = []
         sweeps: list[dict[str, Any]] = []
@@ -762,12 +566,15 @@ class OrojenesisRunner:
                     output,
                     f"layer-{layer_index}-m-{row_tile}",
                     problem,
-                    row_tile=row_tile,
-                    role=role,
-                    word_bits=word_bits,
-                    word_bytes=word_bytes,
-                    environment=environment,
-                    context=f"layer {layer_index}",
+                    _MultiSweepSpec(
+                        row_tile=row_tile,
+                        role=role,
+                        word_bits=word_bits,
+                        word_bytes=word_bytes,
+                        environment=environment,
+                        context=f"layer {layer_index}",
+                        deadline=deadline,
+                    ),
                 )
                 for row_tile in row_tiles
             ]
@@ -808,6 +615,7 @@ class OrojenesisRunner:
                 "environment.yaml": environment,
             },
         )
+        deadline = time.monotonic() + float(self.timeout_seconds)
         raw_paths, row_tiles_by_node, sweeps = self._collect_region_sweeps(
             descriptor,
             output,
@@ -815,6 +623,7 @@ class OrojenesisRunner:
             word_bits=word_bits,
             word_bytes=word_bytes,
             environment=environment,
+            deadline=deadline,
         )
         curve = compose_multi_einsum_region_curve(
             descriptor,
@@ -847,6 +656,7 @@ class OrojenesisRunner:
         word_bits: int,
         word_bytes: int,
         environment: Mapping[str, str],
+        deadline: float,
     ) -> tuple[
         dict[str, list[Path]],
         dict[str, list[int]],
@@ -857,7 +667,10 @@ class OrojenesisRunner:
         sweeps: list[dict[str, Any]] = []
         for node_index, node in enumerate(descriptor["nodes"]):
             node_id = str(node["id"])
-            row_tiles = _divisors(int(node["m"]))
+            row_tiles = _bounded_row_tiles(
+                int(node["m"]),
+                context=f"node {node_id}",
+            )
             row_tiles_by_node[node_id] = row_tiles
             role = multi_einsum_region_mapper_role(descriptor, node_id)
             problem = multi_einsum_layer_problem(node)
@@ -870,12 +683,15 @@ class OrojenesisRunner:
                     output,
                     f"node-{node_index}-m-{row_tile}",
                     problem,
-                    row_tile=row_tile,
-                    role=role,
-                    word_bits=word_bits,
-                    word_bytes=word_bytes,
-                    environment=environment,
-                    context=f"node {node_id}",
+                    _MultiSweepSpec(
+                        row_tile=row_tile,
+                        role=role,
+                        word_bits=word_bits,
+                        word_bytes=word_bytes,
+                        environment=environment,
+                        context=f"node {node_id}",
+                        deadline=deadline,
+                    ),
                 )
                 for row_tile in row_tiles
             ]
@@ -899,21 +715,28 @@ class OrojenesisRunner:
         output: Path,
         prefix: str,
         problem: Mapping[str, Any],
-        *,
-        row_tile: int,
-        role: str,
-        word_bits: int,
-        word_bytes: int,
-        environment: Mapping[str, str],
-        context: str,
+        spec: _MultiSweepSpec,
     ) -> Path:
+        remaining = (
+            float(self.timeout_seconds)
+            if spec.deadline is None
+            else spec.deadline - time.monotonic()
+        )
+        if remaining <= 0:
+            raise OrojenesisTimeoutError(
+                "multi-einsum Orojenesis mapper exceeded "
+                f"{self.timeout_seconds}s timeout for "
+                f"{spec.context}, M={spec.row_tile}",
+            )
         sweep_dir = output / prefix
         sweep_dir.mkdir(parents=True, exist_ok=True)
         documents = _write_yaml_documents(
             sweep_dir,
             {
-                "architecture.yaml": self.multi_architecture(word_bits),
-                "mapper.yaml": self.multi_mapper_config(row_tile, role=role),
+                "architecture.yaml": self.multi_architecture(spec.word_bits),
+                "mapper.yaml": self.multi_mapper_config(
+                    spec.row_tile, role=spec.role
+                ),
                 "problem.yaml": problem,
             },
         )
@@ -928,12 +751,14 @@ class OrojenesisRunner:
                     str(sweep_dir),
                 ],
                 cwd=sweep_dir,
-                env=environment,
+                env=spec.environment,
+                timeout=remaining,
             )
         except subprocess.TimeoutExpired as exc:
             raise OrojenesisTimeoutError(
                 "multi-einsum Orojenesis mapper exceeded "
-                f"{self.timeout_seconds}s timeout for {context}, M={row_tile}",
+                f"{self.timeout_seconds}s timeout for "
+                f"{spec.context}, M={spec.row_tile}",
             ) from exc
         except (OSError, subprocess.SubprocessError) as exc:
             raise OrojenesisError(
@@ -942,10 +767,10 @@ class OrojenesisRunner:
         if completed.returncode != 0:
             raise OrojenesisError(
                 "multi-einsum Orojenesis exited with status "
-                f"{completed.returncode} for {context}, M={row_tile}",
+                f"{completed.returncode} for {spec.context}, M={spec.row_tile}",
             )
         raw_path = sweep_dir / "timeloop-mapper.oaves.csv"
-        parse_multi_mapping_records(raw_path, word_bytes=word_bytes)
+        parse_multi_mapping_records(raw_path, word_bytes=spec.word_bytes)
         return raw_path
 
     @staticmethod

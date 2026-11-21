@@ -77,7 +77,7 @@ def compulsory_witness_streaming_dimension(
         len(tensors) != 3
         or any(len(shape) != 3 for shape in tensors)
         or int(word_bits) <= 0
-        or int(word_bits) % 8
+        or (int(word_bits) != 4 and int(word_bits) % 8 != 0)
     ):
         return None
     batch_sizes = {int(shape[0]) for shape in tensors}
@@ -88,7 +88,7 @@ def compulsory_witness_streaming_dimension(
     )
     return (
         dimensions[0]
-        if slice_words * (int(word_bits) // 8) <= int(capacity_bytes)
+        if (slice_words * int(word_bits)) / 8.0 <= int(capacity_bytes)
         else None
     )
 

@@ -108,7 +108,12 @@ def _formal_plan() -> tuple[FusionPlan, dict]:
     fusion_regions = [
         {"id": "fusion_chain", "layers": ["c0", "c1"]},
         {"id": "fusion_region", "layers": ["r0", "r1"]},
-        {"id": "fusion_single", "layers": ["single"]},
+        {
+            "id": "fusion_single",
+            "layers": ["single"],
+            "external_inputs": ["sx", "sw"],
+            "external_outputs": ["sy"],
+        },
     ]
     plan = FusionPlan(
         fusion={"regions": fusion_regions},
@@ -432,7 +437,16 @@ def test_tile_aware_bound_accepts_pointwise_add_operand(tmp_path: Path):
         },
     }
     plan = FusionPlan(
-        fusion={"regions": [{"id": "fusion", "layers": ["matmul"]}]},
+        fusion={
+            "regions": [
+                {
+                    "id": "fusion",
+                    "layers": ["matmul"],
+                    "external_inputs": ["left", "sum"],
+                    "external_outputs": ["output"],
+                }
+            ]
+        },
         chains=[],
         regions=[],
         proof_layers={"matmul": matmul},
@@ -479,7 +493,7 @@ def test_tile_aware_bound_accepts_pointwise_add_operand(tmp_path: Path):
         "applicable": True,
         "region": "fusion",
         "graph_input_operands": True,
-        "region_boundary_operands": False,
+        "region_boundary_operands": True,
         "operand_provenance": ("graph_input_or_recomputable_preprocess"),
         "reason": "graph_input_or_recomputable_preprocess_contraction",
     }
@@ -539,23 +553,16 @@ def test_tile_aware_bound_accepts_materialized_region_boundary(
         {"status": "complete", "toolchain": runner.toolchain_identity}
     )
     evidence["layers"]["matmul"] = result
-    internal_producer = {
-        "type": "conv2d",
-        "semantic_op": {"kind": "aten", "target": "conv2d", "effects": {}},
-        "tensor_names": {"inputs": ["root"], "outputs": ["left"]},
-    }
     prepared = SimpleNamespace(
         all_layers={
-            "left_producer": internal_producer,
-            "right_producer": {
-                **internal_producer,
-                "tensor_names": {
-                    "inputs": ["root"],
-                    "outputs": ["right"],
-                },
-            },
+            "left_start": _start("left"),
+            "right_start": _start("right"),
             "matmul": matmul,
-            **({"bias_add": bias} if with_bias else {}),
+            **(
+                {"bias_start": _start("bias"), "bias_add": bias}
+                if with_bias
+                else {}
+            ),
         },
         output_dir=tmp_path,
     )
@@ -574,12 +581,10 @@ def test_tile_aware_bound_accepts_materialized_region_boundary(
     assert evidence["layers"]["matmul"]["formal_applicability"] == {
         "applicable": True,
         "region": "fusion",
-        "graph_input_operands": False,
+        "graph_input_operands": True,
         "region_boundary_operands": True,
-        "operand_provenance": (
-            "materialized_region_boundary_and_tile_local_postprocess"
-        ),
-        "reason": "materialized_region_boundary_contraction",
+        "operand_provenance": "graph_input_or_recomputable_preprocess",
+        "reason": "graph_input_or_recomputable_preprocess_contraction",
     }
 
 

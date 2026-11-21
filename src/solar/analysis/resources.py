@@ -16,7 +16,12 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from solar.analysis.resource_dtypes import resource_compute_dtype
-from solar.analysis.resource_geometry import transposed_convolution_macs
+from solar.analysis.resource_geometry import (
+    attention_counts,
+    contraction_macs,
+    normalization_counts,
+    reduction_groups,
+)
 from solar.analysis.resource_targets import (
     _ATOMIC_OPS,
     _COMPOSITE_SFU_OPS,
@@ -33,11 +38,7 @@ from solar.analysis.resource_targets import (
     _VARIANCE_OPS,
     _VIEW_OPS,
 )
-from solar.ir.contracts import (
-    layer_operation,
-    operation_attributes,
-    operation_operands,
-)
+from solar.ir.contracts import layer_operation
 from solar.precision import normalize_dtype
 from solar.schema_versions import (
     ResourceModelVersion as SolarResourceModelVersion,
@@ -56,31 +57,10 @@ def mandatory_mfma_macs(
     semantic: Mapping[str, Any],
 ) -> int:
     """Return exact dense MAC count for canonical public contractions."""
-    if not input_shapes or not output_shapes:
-        return 0
-    output_n = max(_elements(output_shapes), default=0)
-    if target in {"mm", "bmm", "matmul"} and len(input_shapes) >= 2:
-        left = input_shapes[0]
-        return output_n * int(left[-1]) if left else 0
-    if target == "addmm" and len(input_shapes) >= 3:
-        left = input_shapes[1]
-        return output_n * int(left[-1]) if left else 0
-    if target == "linear" and len(input_shapes) >= 2:
-        activation = input_shapes[0]
-        return output_n * int(activation[-1]) if activation else 0
-    if target.startswith("conv_transpose") and len(input_shapes) >= 2:
-        try:
-            return transposed_convolution_macs(
-                input_shapes, output_shapes, semantic
-            )
-        except ValueError as exc:
-            raise ResourceClassificationError(str(exc)) from exc
-    if target.startswith("conv") and len(input_shapes) >= 2:
-        weight = input_shapes[1]
-        if len(weight) < 3:
-            return 0
-        return output_n * math.prod(int(item) for item in weight[1:])
-    return 0
+    try:
+        return contraction_macs(target, input_shapes, output_shapes, semantic)
+    except ValueError as exc:
+        raise ResourceClassificationError(str(exc)) from exc
 
 
 class ResourceClassificationError(ValueError):
@@ -123,6 +103,8 @@ def _mode(dtype: Any, fallback: str) -> str:
 
 def _accumulation_mode(dtype: Any, fallback: str) -> str:
     source = normalize_dtype(dtype, fallback)
+    if source == "float4_e2m1fn_x2":
+        source = "nvfp4"
     if source in {"fp16", "bf16", "fp8", "nvfp4"}:
         return f"{source}->fp32"
     if source.startswith(("int", "uint")):
@@ -134,27 +116,7 @@ def _reduction_groups(
     shape: list[int] | None,
     semantic: Mapping[str, Any],
 ) -> int:
-    if not shape:
-        return 1
-    kwargs = operation_attributes(semantic)
-    dim = _unwrap(kwargs.get("dim"))
-    if dim is None:
-        positional = [
-            _unwrap(argument)
-            for argument in operation_operands(semantic)
-            if not (isinstance(argument, Mapping) and "tensor" in argument)
-        ]
-        if positional:
-            dim = positional[0]
-    if dim is None:
-        return 1
-    dims = [dim] if isinstance(dim, int) else list(dim)
-    rank = len(shape)
-    reduced = 1
-    for item in dims:
-        index = int(item) % rank
-        reduced *= int(shape[index])
-    return max(1, int(math.prod(shape)) // max(1, reduced))
+    return reduction_groups(shape, semantic)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -209,6 +171,8 @@ class _ResourceContext:
             "max_pool2d_with_indices": "max_pool2d",
             "miopen_batch_norm": "batch_norm",
             "native_batch_norm": "batch_norm",
+            "native_group_norm": "group_norm",
+            "native_layer_norm": "layer_norm",
             "split_with_sizes": "split",
             "upsample_bicubic2d": "interpolate",
             "upsample_bilinear2d": "interpolate",
@@ -320,35 +284,35 @@ def _attention_rule(
 ) -> _RuleResult:
     if context.target != "scaled_dot_product_attention":
         return _NO_MATCH
-    q_shape = context.input_shapes[0] if context.input_shapes else []
-    k_shape = context.input_shapes[1] if len(context.input_shapes) > 1 else []
-    if len(q_shape) < 2 or len(k_shape) < 2:
+    counts = attention_counts(
+        context.input_shapes,
+        context.output_shapes,
+        context.semantic,
+    )
+    if counts is None:
         if context.strict:
             raise ResourceClassificationError(
                 "scaled_dot_product_attention requires ranked Q/K tensors",
             )
         return _MATCHED
-    q_rows = int(math.prod(q_shape[:-1]))
-    q_width = int(q_shape[-1])
-    k_rows_per_batch = int(k_shape[-2])
-    score_elements = q_rows * k_rows_per_batch
+    mfma_flops, reduction_ops, sfu_ops, valu_ops = counts
     accumulator.add(
         "mfma",
         _accumulation_mode(context.dtype, context.fallback_precision),
-        4 * q_rows * k_rows_per_batch * q_width,
+        mfma_flops,
         "QK and probability-V contractions",
     )
     accumulator.add(
         "reduction",
         context.mode,
-        2 * max(0, score_elements - q_rows),
+        reduction_ops,
         "softmax max+sum combines",
     )
-    accumulator.add("sfu", context.mode, score_elements, "softmax exponentials")
+    accumulator.add("sfu", context.mode, sfu_ops, "softmax exponentials")
     accumulator.add(
         "valu",
         context.mode,
-        2 * score_elements,
+        valu_ops,
         "softmax subtract+divide",
     )
     return _MATCHED
@@ -622,9 +586,9 @@ def _normalization_rule(
         if context.output_shapes and isinstance(context.output_shapes[0], list)
         else None
     )
-    groups = _reduction_groups(shape, context.semantic)
-    combines = max(0, context.output_n - groups)
     if context.target in {"softmax", "log_softmax"}:
+        groups = _reduction_groups(shape, context.semantic)
+        combines = max(0, context.output_n - groups)
         accumulator.add(
             "reduction",
             context.mode,
@@ -644,25 +608,69 @@ def _normalization_rule(
             "normalization arithmetic",
         )
     else:
+        reduction_ops, sfu_ops, valu_ops = normalization_counts(
+            context.target,
+            context.input_shapes,
+            context.output_shapes,
+            context.output_n,
+            context.semantic,
+        )
         accumulator.add(
             "reduction",
             context.mode,
-            2 * combines,
-            "mean and variance reductions",
+            reduction_ops,
+            "normalization reductions",
         )
         accumulator.add(
             "sfu",
             context.mode,
-            groups,
+            sfu_ops,
             "inverse square root per group",
         )
         accumulator.add(
             "valu",
             context.mode,
-            5 * context.output_n,
+            valu_ops,
             "center, scale, normalize, affine",
         )
     return _MATCHED
+
+
+def _add_cross_entropy_work(
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
+    output_items: int,
+) -> None:
+    labels = (
+        context.input_elements[1]
+        if len(context.input_elements) > 1
+        else output_items
+    )
+    rows = max(1, labels)
+    accumulator.add(
+        "reduction",
+        context.mode,
+        2 * max(0, context.input_n - rows) + max(0, rows - output_items),
+        "log-softmax max/sum and loss reduction combines",
+    )
+    accumulator.add(
+        "sfu",
+        context.mode,
+        context.input_n,
+        "one log-softmax exponential/logarithm per logit",
+    )
+    accumulator.add(
+        "valu",
+        context.mode,
+        2 * context.input_n + labels,
+        "log-softmax normalization and selected loss values",
+    )
+    accumulator.add(
+        "valu",
+        "integer",
+        labels,
+        "one class-index selection per label",
+    )
 
 
 def _loss_rule(
@@ -698,48 +706,26 @@ def _loss_rule(
         )
         return _MATCHED
     if context.target in {"cross_entropy", "cross_entropy_loss"}:
-        labels = (
-            context.input_elements[1]
-            if len(context.input_elements) > 1
-            else output_items
-        )
-        rows = max(1, labels)
-        accumulator.add(
-            "reduction",
-            context.mode,
-            2 * max(0, context.input_n - rows) + max(0, rows - output_items),
-            "log-softmax max/sum and loss reduction combines",
-        )
-        accumulator.add(
-            "sfu",
-            context.mode,
-            context.input_n,
-            "one log-softmax exponential/logarithm per logit",
-        )
-        accumulator.add(
-            "valu",
-            context.mode,
-            2 * context.input_n + labels,
-            "log-softmax normalization and selected loss values",
-        )
-        accumulator.add(
-            "valu",
-            "integer",
-            labels,
-            "one class-index selection per label",
-        )
+        _add_cross_entropy_work(context, accumulator, output_items)
         return _MATCHED
+    loss_n = max(context.input_n, context.output_n)
     accumulator.add(
         "sfu",
         context.mode,
-        context.output_n,
-        "one logarithm per KL/xlogy output element",
+        loss_n,
+        "one logarithm per KL/xlogy element",
     )
     accumulator.add(
         "valu",
         context.mode,
-        (3 if context.target == "kl_div" else 1) * context.output_n,
+        (3 if context.target == "kl_div" else 1) * loss_n,
         "KL/xlogy mandatory multiply/subtract arithmetic",
+    )
+    accumulator.add(
+        "reduction",
+        context.mode,
+        max(0, loss_n - output_items),
+        "KL/xlogy loss reduction combines",
     )
     return _MATCHED
 

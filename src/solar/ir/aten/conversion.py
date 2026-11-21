@@ -10,8 +10,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-import yaml
-
+from solar.artifacts.yaml import write_yaml_atomic
 from solar.graph.contracts import OperatorGraphArtifact
 from solar.ir.access_artifact import write_access_document
 from solar.ir.bindings import bind_graph
@@ -151,7 +150,7 @@ def convert_operator_graph(
     bind_graph(converted, operator)
     validate_aten_graph(converted)
     path = Path(output_dir) / "aten_graph.yaml"
-    path.write_text(yaml.safe_dump(converted, sort_keys=False))
+    write_yaml_atomic(path, converted, no_aliases=False)
     artifact = IRGraphArtifact(path=path, kind=IRKind.ATEN)
     write_access_document(artifact, operator)
     return artifact

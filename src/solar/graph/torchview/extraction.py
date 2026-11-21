@@ -10,6 +10,7 @@ from pathlib import Path
 
 import yaml
 
+from solar.artifacts.yaml import write_yaml_atomic
 from solar.graph.contracts import (
     OPERATOR_GRAPH_FILENAME,
     ExtractionKind,
@@ -43,7 +44,7 @@ def extract_operator_graph(
     graph["schema_version"] = OPERATOR_GRAPH_SCHEMA_VERSION
     graph["extraction_kind"] = ExtractionKind.TORCHVIEW.value
     _record_source_input_indices(graph, used_indices)
-    operator_path.write_text(yaml.safe_dump(graph, sort_keys=False))
+    write_yaml_atomic(operator_path, graph, no_aliases=False)
     return OperatorGraphArtifact(
         path=operator_path,
         source_inputs=tuple(
@@ -111,23 +112,42 @@ def _record_root_source_identity(
         root.source_input_index = source_index
 
 
-def _trace_reference(
-    reference: Callable[..., DynamicValue],
-    inputs: tuple[DynamicValue, ...],
-    *,
-    device: str,
-    output: Path,
-    name: str,
-) -> tuple[DynamicValue, dict[int, DynamicValue], set[int]]:
+def _clone_arg(value: DynamicValue) -> DynamicValue:
     import torch
-    from torch import nn
+
+    if isinstance(value, torch.Tensor):
+        if value.is_meta:
+            return value.clone()
+        elem_count = value.untyped_storage().nbytes() // max(
+            1, value.element_size()
+        )
+        base = torch.empty(elem_count, dtype=value.dtype, device=value.device)
+        base.untyped_storage().copy_(value.untyped_storage())
+        return torch.as_strided(
+            base,
+            tuple(value.shape),
+            tuple(value.stride()),
+            value.storage_offset(),
+        )
+    if isinstance(value, tuple):
+        return tuple(_clone_arg(item) for item in value)
+    if isinstance(value, list):
+        return [_clone_arg(item) for item in value]
+    if isinstance(value, dict):
+        return {k: _clone_arg(item) for k, item in value.items()}
+    return value
+
+
+def _observe_used_inputs(
+    reference: Callable[..., DynamicValue],
+    prerun_inputs: tuple[DynamicValue, ...],
+) -> tuple[DynamicValue, set[int]]:
+    import torch
     from torch.utils._python_dispatch import TorchDispatchMode
 
-    from solar._vendor import torchview
-
-    tensor_inputs = {
+    prerun_tensors = {
         index: value
-        for index, value in enumerate(inputs)
+        for index, value in enumerate(prerun_inputs)
         if isinstance(value, torch.Tensor)
     }
     used_indices: set[int] = set()
@@ -136,7 +156,7 @@ def _trace_reference(
         if isinstance(value, torch.Tensor):
             used_indices.update(
                 index
-                for index, tensor in tensor_inputs.items()
+                for index, tensor in prerun_tensors.items()
                 if value is tensor
             )
         elif isinstance(value, (tuple, list)):
@@ -159,18 +179,52 @@ def _trace_reference(
             observe(kwargs or {})
             return func(*args, **(kwargs or {}))
 
+    with InputUseMode():
+        observed = reference(*prerun_inputs)
+    observe(observed)
+    return observed, used_indices
+
+
+def _trace_reference(
+    reference: Callable[..., DynamicValue],
+    inputs: tuple[DynamicValue, ...],
+    *,
+    device: str,
+    output: Path,
+    name: str,
+) -> tuple[DynamicValue, dict[int, DynamicValue], set[int]]:
+    import torch
+    from torch import nn
+
+    from solar._vendor import torchview
+
+    original_tensors = {
+        index: _clone_arg(value)
+        for index, value in enumerate(inputs)
+        if isinstance(value, torch.Tensor)
+    }
+    prerun_inputs = tuple(_clone_arg(item) for item in inputs)
+    trace_inputs = tuple(_clone_arg(item) for item in inputs)
+    observed, used_indices = _observe_used_inputs(reference, prerun_inputs)
+
     class ReferenceModule(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            if isinstance(reference, nn.Module):
+                self.reference = reference
+
         def forward(self, *args: DynamicValue) -> DynamicValue:
             return reference(*args)
 
-    with InputUseMode():
-        observed = reference(*inputs)
-    observe(observed)
-    module = ReferenceModule().eval()
+    is_module = isinstance(reference, nn.Module)
+    module = ReferenceModule()
+    if not is_module:
+        module.eval()
     graph = torchview.draw_graph(
         module,
-        input_data=list(inputs),
+        input_data=list(trace_inputs),
         device=device,
+        mode="keep" if is_module else "eval",
         save_graph=False,
         expand_nested=True,
         depth=float("inf"),
@@ -180,9 +234,9 @@ def _trace_reference(
         strict=True,
         collect_attributes=True,
     )
-    _record_root_source_identity(graph, tuple(sorted(tensor_inputs)))
+    _record_root_source_identity(graph, tuple(sorted(original_tensors)))
     TorchviewProcessor().process_graph(graph, str(output), name, module)
-    return observed, tensor_inputs, used_indices
+    return observed, original_tensors, used_indices
 
 
 backend = GraphBackend(

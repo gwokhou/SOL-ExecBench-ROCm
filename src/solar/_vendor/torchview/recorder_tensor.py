@@ -299,7 +299,7 @@ class RecorderTensor(torch.Tensor):
         # This preserves arg order so torch.matmul(x, w) vs torch.matmul(w, x) are distinct.
         ordered_input_nodes: list[TensorNode] = []
         all_input_shapes: list[tuple[int, ...]] = []
-        _seen_param_ids: set[int] = set()
+        _state_nodes_by_id: dict[int, TensorNode] = {}
 
         for arg in _flatten_args((args, kwargs)):
             if (
@@ -308,28 +308,47 @@ class RecorderTensor(torch.Tensor):
             ):
                 continue
 
-            # Determine if this tensor is a model parameter or an activation.
+            # Determine if this tensor is a model parameter/buffer or an activation.
             # nn.Parameter is a subclass of torch.Tensor, and on meta device
             # it may also be a RecorderTensor. Check nn.Parameter first.
             is_model_param = isinstance(arg, nn.Parameter)
 
-            if is_model_param and id(arg) not in _seen_param_ids:
-                _seen_param_ids.add(id(arg))
-                param_node = TensorNode(
-                    tensor=arg,
-                    depth=cur_depth,
-                    name="parameter-tensor",
-                    context=input_context,
-                    is_aux=False,
-                    main_node=None,
-                    collect_attributes=collect_attributes,
-                )
-                param_node.is_param = True
+            if is_model_param:
+                param_node = _state_nodes_by_id.get(id(arg))
+                if param_node is None:
+                    param_node = TensorNode(
+                        tensor=arg,
+                        depth=cur_depth,
+                        name="parameter-tensor",
+                        context=input_context,
+                        is_aux=False,
+                        main_node=None,
+                        collect_attributes=collect_attributes,
+                    )
+                    param_node.is_param = True
+                    _state_nodes_by_id[id(arg)] = param_node
                 ordered_input_nodes.append(param_node)
                 all_input_shapes.append(tuple(arg.shape))
-            elif isinstance(arg, RecorderTensor) and not is_model_param:
+            elif isinstance(arg, RecorderTensor):
                 if getattr(arg, "tensor_nodes", None):
                     ordered_input_nodes.append(arg.tensor_nodes[-1])
+                all_input_shapes.append(tuple(arg.shape))
+            else:
+                buf_node = _state_nodes_by_id.get(id(arg))
+                if buf_node is None:
+                    buf_node = TensorNode(
+                        tensor=arg,
+                        depth=cur_depth,
+                        name="parameter-tensor",
+                        context=input_context,
+                        is_aux=False,
+                        main_node=None,
+                        collect_attributes=collect_attributes,
+                    )
+                    buf_node.is_param = True
+                    buf_node.is_buffer = True
+                    _state_nodes_by_id[id(arg)] = buf_node
+                ordered_input_nodes.append(buf_node)
                 all_input_shapes.append(tuple(arg.shape))
 
         # Build args_nodes: all parent TensorNodes (activation + parameter) in arg order

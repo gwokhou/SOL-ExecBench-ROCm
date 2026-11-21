@@ -188,9 +188,8 @@ def build_af_graph_from_yaml(
     af = build_af_graph_from_dict(graph)
 
     if output_path is not None:
-        out = Path(output_path)
-        out.parent.mkdir(parents=True, exist_ok=True)
+        from solar.artifacts.yaml import write_yaml_atomic
+
         af_to_write = {k: v for k, v in af.items() if not k.startswith("_")}
-        with open(out, "w") as f:
-            yaml.dump(af_to_write, f, default_flow_style=False, sort_keys=False)
+        write_yaml_atomic(output_path, af_to_write, no_aliases=False)
     return af

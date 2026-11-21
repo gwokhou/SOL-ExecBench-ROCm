@@ -23,6 +23,7 @@ formal-evidence contract.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -42,11 +43,11 @@ from solar.analysis.graph_models import (
     MemoryElements,
 )
 from solar.analysis.graph_rules import (
-    METADATA_INPUT_TARGETS,
     SCATTER_OPS,
     SLICE_VIEW_OPS,
     ZERO_COMPUTE_OPS,
     ZERO_COPY_VIEW_OPS,
+    is_metadata_only_input_slot,
 )
 from solar.analysis.graph_validation import (
     validate_graph_semantics,
@@ -68,6 +69,7 @@ from solar.ir.contracts import (
     OPERATION_KIND,
     layer_contraction_analysis,
     layer_operation,
+    resolve_operand_tensor_slots,
 )
 from solar.precision import (
     BYTES_PER_ELEMENT,
@@ -297,21 +299,46 @@ class GraphLoader(BoundComponent):
             ],
         )
 
-    def _compute_layer(self, data: LayerData, *, strict: bool) -> LayerCompute:
-        shapes = TensorShapes(
-            inputs=data.input_shapes,
+    @staticmethod
+    def _contraction_shapes(
+        data: LayerData,
+        semantic: Mapping[str, Any],
+    ) -> tuple[str, TensorShapes]:
+        operation = data.op_type
+        input_shapes = data.input_shapes
+        if operation == "addmm":
+            slots = resolve_operand_tensor_slots(
+                semantic, (1, 2), len(data.input_shapes)
+            )
+            if slots is not None:
+                operation = "matmul"
+                input_shapes = [data.input_shapes[slot] for slot in slots]
+        elif data.is_real_einsum and data.equation and "->" in data.equation:
+            arity = len(data.equation.split("->", 1)[0].split(","))
+            if len(data.input_shapes) != arity:
+                slots = resolve_operand_tensor_slots(
+                    semantic, tuple(range(arity)), len(data.input_shapes)
+                )
+                if slots is not None:
+                    input_shapes = [data.input_shapes[slot] for slot in slots]
+        elif operation in {"mm", "bmm", "matmul", "linear"} and (
+            len(data.input_shapes) == 1
+        ):
+            slots = resolve_operand_tensor_slots(
+                semantic, (0, 1), len(data.input_shapes)
+            )
+            if slots is not None:
+                input_shapes = [data.input_shapes[slot] for slot in slots]
+        return operation, TensorShapes(
+            inputs=input_shapes,
             outputs=data.output_shapes,
         )
-        operation = data.op_type
-        if operation == "addmm" and len(data.input_shapes) >= 3:
-            operation = "matmul"
-            shapes = TensorShapes(
-                inputs=data.input_shapes[1:3],
-                outputs=data.output_shapes,
-            )
-        semantic_kind = str(layer_operation(data.layer).get("kind", ""))
+
+    def _compute_layer(self, data: LayerData, *, strict: bool) -> LayerCompute:
         semantic = layer_operation(data.layer)
+        semantic_kind = str(semantic.get("kind", ""))
         semantic_target = str(semantic.get("target", data.op_type))
+        operation, shapes = self._contraction_shapes(data, semantic)
         try:
             if semantic_kind == OPERATION_KIND:
                 cost = mandatory_mfma_macs(
@@ -365,9 +392,15 @@ class GraphLoader(BoundComponent):
         compute: LayerCompute,
         topology: GraphTopology,
     ) -> MemoryElements:
-        reads = list(data.input_sizes)
-        if layer_operation(data.layer).get("target") in METADATA_INPUT_TARGETS:
-            reads = [0] * len(reads)
+        semantic = layer_operation(data.layer)
+        reads = [
+            0
+            if is_metadata_only_input_slot(
+                semantic, index, op_type=data.op_type
+            )
+            else size
+            for index, size in enumerate(data.input_sizes)
+        ]
         writes = list(data.output_sizes)
         other_ops = compute.other_ops
         if data.op_type in {"embedding", "embedding_bag"}:

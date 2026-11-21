@@ -52,6 +52,7 @@ from solar.analysis.orojenesis.runner import (
     OrojenesisRunner,
 )
 from solar.analysis.orojenesis_evidence import OrojenesisEvidenceEvaluator
+from solar.analysis.output_writes import resolve_external_output_writes
 from solar.analysis.reporting import build_analysis_result, write_analysis
 from solar.composition import BoundComponent, component_attribute
 from solar.ir.access import AccessQuality
@@ -204,10 +205,20 @@ class IRGraphAnalyzer:
             self._validate_profile_dtypes(
                 prepared.all_layers, architecture, prepared.requested_precision
             )
+        external_writes = resolve_external_output_writes(
+            intrinsic.layers,
+            topology,
+            prepared.declared_graph_outputs,
+            prepared.fallback_precision,
+        )
         accumulator = AnalysisAccumulator()
         for layer in intrinsic.layers:
             self._account_intrinsic_layer(
-                layer, topology, prepared, accumulator
+                layer,
+                topology,
+                prepared,
+                accumulator,
+                external_writes=external_writes,
             )
         reads = intrinsic.external_reads
         accumulator.external_reads = reads

@@ -10,6 +10,33 @@ from solar.types import DynamicValue
 from solar.verification.contracts import IRVerificationBackend
 from solar.verification.errors import IRExecutionError
 
+_CANONICAL_EXEC_DTYPES = {
+    "bf16": "bfloat16",
+    "byte": "uint8",
+    "cdouble": "complex128",
+    "cfloat": "complex64",
+    "chalf": "complex32",
+    "char": "int8",
+    "double": "float64",
+    "float": "float32",
+    "fp16": "float16",
+    "fp32": "float32",
+    "fp64": "float64",
+    "half": "float16",
+    "int": "int32",
+    "long": "int64",
+    "short": "int16",
+    "single": "float32",
+}
+
+
+def _dtype_matches(actual: DynamicValue, expected: DynamicValue) -> bool:
+    actual_name = str(actual).strip().lower().removeprefix("torch.")
+    expected_name = str(expected or "").strip().lower().removeprefix("torch.")
+    actual_name = _CANONICAL_EXEC_DTYPES.get(actual_name, actual_name)
+    expected_name = _CANONICAL_EXEC_DTYPES.get(expected_name, expected_name)
+    return bool(expected_name) and actual_name == expected_name
+
 
 def _shapes(layer: Mapping[str, DynamicValue]) -> list[tuple[int, ...]]:
     outputs = (layer.get("tensor_shapes") or {}).get("outputs") or []
@@ -133,6 +160,9 @@ class IRGraphExecutor:
             contracts = (self.layers[layer_id].get("tensor_shapes") or {}).get(
                 "outputs"
             ) or []
+            dtype_contracts = (
+                self.layers[layer_id].get("tensor_dtypes") or {}
+            ).get("outputs") or []
             for slot, name in enumerate(names):
                 if input_index >= len(inputs):
                     raise IRExecutionError(
@@ -148,6 +178,18 @@ class IRGraphExecutor:
                     raise IRExecutionError(
                         f"graph input {name} produced {tuple(shape)}, "
                         f"expected {contracts[slot]}"
+                    )
+                dtype = getattr(value, "dtype", None)
+                if (
+                    self.check_shapes
+                    and dtype is not None
+                    and slot < len(dtype_contracts)
+                    and dtype_contracts[slot] is not None
+                    and not _dtype_matches(dtype, dtype_contracts[slot])
+                ):
+                    raise IRExecutionError(
+                        f"graph input {name} produced {dtype}, "
+                        f"expected {dtype_contracts[slot]}"
                     )
                 values[str(name)] = value
                 input_index += 1
@@ -242,6 +284,16 @@ class IRGraphExecutor:
                 raise IRExecutionError(
                     f"layer {layer_id} output {index} produced "
                     f"{tuple(output.shape)}, expected {contract}",
+                )
+            expected_dtype = (
+                (layer.get("tensor_dtypes") or {}).get("outputs") or []
+            )[index]
+            if self.check_shapes and not _dtype_matches(
+                output.dtype, expected_dtype
+            ):
+                raise IRExecutionError(
+                    f"layer {layer_id} output {index} produced "
+                    f"{output.dtype}, expected {expected_dtype}",
                 )
             values[output_name] = output
 

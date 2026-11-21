@@ -44,12 +44,13 @@ from solar.analysis.graph_models import (
     OutputIo,
     ResourceAccounting,
 )
+from solar.analysis.output_writes import ExternalSlotWrite
 from solar.analysis.resources import (
     classify_layer_resources,
     merge_resource_work,
 )
 from solar.composition import BoundComponent
-from solar.ir.contracts import layer_operation
+from solar.ir.contracts import layer_operation, resolve_operand_tensor_slots
 from solar.precision import (
     BYTES_PER_ELEMENT,
     normalize_dtype,
@@ -154,6 +155,55 @@ class LayerAccountant(BoundComponent):
         )
 
     @staticmethod
+    def _contraction_payload_names(
+        data: LayerData,
+        semantic: Mapping[str, Any],
+    ) -> list[str]:
+        if semantic.get("kind") == "einsum":
+            equation = str(semantic.get("equation") or data.equation or "")
+            lhs = equation.split("->", 1)[0] if "->" in equation else ""
+            arity = len(lhs.split(",")) if lhs else len(data.input_names)
+            slots = resolve_operand_tensor_slots(
+                semantic,
+                tuple(range(arity)),
+                len(data.input_names),
+            )
+            if slots is not None:
+                return [data.input_names[slot] for slot in slots]
+            return list(data.input_names)
+        target = str(semantic.get("target") or data.op_type).lower()
+        positions: tuple[int, ...] | None = None
+        if target == "addmm":
+            positions = (1, 2)
+        elif target in {
+            "mm",
+            "bmm",
+            "matmul",
+            "linear",
+            "conv1d",
+            "conv2d",
+            "conv3d",
+            "conv_transpose1d",
+            "conv_transpose2d",
+            "conv_transpose3d",
+        }:
+            positions = (0, 1)
+        elif target == "scaled_dot_product_attention":
+            positions = (0, 1, 2)
+        if positions is not None:
+            slots = resolve_operand_tensor_slots(
+                semantic,
+                positions,
+                len(data.input_names),
+            )
+            return (
+                [data.input_names[slot] for slot in slots]
+                if slots is not None
+                else []
+            )
+        return list(data.input_names)
+
+    @staticmethod
     def _resource_precision(
         data: LayerData,
         compute: LayerCompute,
@@ -161,7 +211,7 @@ class LayerAccountant(BoundComponent):
         prepared: PreparedAnalysis,
     ) -> tuple[str, str | None]:
         compute_precisions = [
-            normalized
+            "nvfp4" if normalized == "float4_e2m1fn_x2" else normalized
             for dtype in data.input_dtypes
             if (
                 normalized := normalize_dtype(
@@ -177,6 +227,7 @@ class LayerAccountant(BoundComponent):
                 "fp16",
                 "fp8",
                 "nvfp4",
+                "float4_e2m1fn_x2",
                 "int8",
                 "int4",
             }
@@ -188,14 +239,18 @@ class LayerAccountant(BoundComponent):
         )
         resource_precision: str | None = None
         semantic = layer_operation(data.layer)
-        if compute.macs and semantic.get("kind") == "einsum":
+        if compute.macs > 0:
+            payload_names = LayerAccountant._contraction_payload_names(
+                data,
+                semantic,
+            )
             payload_precisions = [
                 topology.dequantized_payload_precision(
                     name,
                     prepared.profile,
                     prepared.fallback_precision,
                 )
-                for name in data.input_names
+                for name in payload_names
             ]
             if (
                 len(payload_precisions) >= 2
@@ -258,43 +313,38 @@ class LayerAccountant(BoundComponent):
         )
 
     @staticmethod
-    def _classify_layer_outputs(
+    def _record_resolved_output_writes(
+        data: LayerData,
+        external_writes: Mapping[tuple[str, int], ExternalSlotWrite],
+        accumulator: AnalysisAccumulator,
+    ) -> tuple[int, float]:
+        model_elems = 0
+        model_bytes = 0.0
+        for index in range(len(data.output_names)):
+            slot_write = external_writes.get((data.layer_id, index))
+            if slot_write is None:
+                continue
+            model_elems += slot_write.elements
+            model_bytes += slot_write.bytes
+            name = slot_write.tensor_name
+            accumulator.unique_external_outputs[name] = max(
+                accumulator.unique_external_outputs.get(name, 0),
+                int(slot_write.elements),
+            )
+            accumulator.unique_external_output_bytes[name] = max(
+                accumulator.unique_external_output_bytes.get(name, 0.0),
+                float(slot_write.bytes),
+            )
+        return model_elems, model_bytes
+
+    @staticmethod
+    def _record_direct_output_writes(
         data: LayerData,
         memory: MemoryElements,
         byte_counts: MemoryBytes,
-        topology: GraphTopology,
-        declared_outputs: set[str],
+        external_flags: list[bool],
         accumulator: AnalysisAccumulator,
-    ) -> OutputIo:
-        intermediate_flags = [
-            any(
-                consumer not in topology.transparent_layer_ids
-                or topology.has_real_consumer(consumer)
-                for consumer in topology.tensor_consumers.get(name) or set()
-            )
-            for name in data.output_names
-        ]
-        external_flags = (
-            [str(name) in declared_outputs for name in data.output_names]
-            if declared_outputs
-            else [not intermediate for intermediate in intermediate_flags]
-        )
-        intermediate_elems = sum(
-            value
-            for value, intermediate in zip(
-                memory.writes, intermediate_flags, strict=True
-            )
-            if intermediate
-        )
-        intermediate_bytes = sum(
-            value
-            for value, intermediate in zip(
-                byte_counts.output_bytes,
-                intermediate_flags,
-                strict=True,
-            )
-            if intermediate
-        )
+    ) -> tuple[int, float]:
         model_elems = sum(
             value
             for value, external in zip(
@@ -328,6 +378,61 @@ class LayerAccountant(BoundComponent):
                 accumulator.unique_external_output_bytes.get(name, 0.0),
                 bytes_,
             )
+        return model_elems, model_bytes
+
+    @staticmethod
+    def _classify_layer_outputs(
+        data: LayerData,
+        memory: MemoryElements,
+        byte_counts: MemoryBytes,
+        topology: GraphTopology,
+        declared_outputs: set[str],
+        accumulator: AnalysisAccumulator,
+        *,
+        external_writes: Mapping[tuple[str, int], ExternalSlotWrite]
+        | None = None,
+    ) -> OutputIo:
+        intermediate_flags = [
+            any(
+                consumer not in topology.transparent_layer_ids
+                or topology.has_real_consumer(consumer)
+                for consumer in topology.tensor_consumers.get(name) or set()
+            )
+            for name in data.output_names
+        ]
+        intermediate_elems = sum(
+            value
+            for value, intermediate in zip(
+                memory.writes, intermediate_flags, strict=True
+            )
+            if intermediate
+        )
+        intermediate_bytes = sum(
+            value
+            for value, intermediate in zip(
+                byte_counts.output_bytes,
+                intermediate_flags,
+                strict=True,
+            )
+            if intermediate
+        )
+        if declared_outputs and external_writes is not None:
+            model_elems, model_bytes = (
+                LayerAccountant._record_resolved_output_writes(
+                    data, external_writes, accumulator
+                )
+            )
+        else:
+            external_flags = (
+                [str(name) in declared_outputs for name in data.output_names]
+                if declared_outputs
+                else [not intermediate for intermediate in intermediate_flags]
+            )
+            model_elems, model_bytes = (
+                LayerAccountant._record_direct_output_writes(
+                    data, memory, byte_counts, external_flags, accumulator
+                )
+            )
         return OutputIo(
             intermediate_elems=intermediate_elems,
             model_elems=model_elems,
@@ -344,6 +449,9 @@ class LayerAccountant(BoundComponent):
         topology: GraphTopology,
         prepared: PreparedAnalysis,
         accumulator: AnalysisAccumulator,
+        *,
+        external_writes: Mapping[tuple[str, int], ExternalSlotWrite]
+        | None = None,
     ) -> LayerIo:
         inputs = self._classify_layer_inputs(
             data,
@@ -359,6 +467,7 @@ class LayerAccountant(BoundComponent):
             topology,
             prepared.declared_graph_outputs,
             accumulator,
+            external_writes=external_writes,
         )
         return LayerIo(
             intermediate_elems=inputs.intermediate_elems
@@ -448,6 +557,9 @@ class LayerAccountant(BoundComponent):
         topology: GraphTopology,
         prepared: PreparedAnalysis,
         accumulator: AnalysisAccumulator,
+        *,
+        external_writes: Mapping[tuple[str, int], ExternalSlotWrite]
+        | None = None,
     ) -> None:
         data, compute = intrinsic.data, intrinsic.compute
         memory, byte_counts = intrinsic.memory, intrinsic.byte_counts
@@ -469,6 +581,7 @@ class LayerAccountant(BoundComponent):
             topology,
             prepared,
             accumulator,
+            external_writes=external_writes,
         )
         accumulator.record(
             data.layer_id,

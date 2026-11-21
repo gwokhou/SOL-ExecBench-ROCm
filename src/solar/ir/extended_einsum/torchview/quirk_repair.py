@@ -5,10 +5,13 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from functools import reduce
 from typing import Protocol
 
+import torch
+
 from solar.ir.extended_einsum.torchview.converter_models import ConversionError
-from solar.types import NodeDict
+from solar.types import DynamicValue, NodeDict
 
 type Shape = tuple[int, ...]
 type Layer = NodeDict
@@ -47,6 +50,7 @@ class TorchviewRepairContext:
     tensor_to_producer: dict[str, str] = field(default_factory=dict)
     tensor_to_producer_slot: dict[str, int] = field(default_factory=dict)
     state: _RepairState = field(default_factory=_RepairState)
+    dirty_dtype_ops: set[str] = field(default_factory=set)
 
     @property
     def operation_id_set(self) -> set[str]:
@@ -108,6 +112,8 @@ def _repair_recorded_input_dtypes(context: TorchviewRepairContext) -> None:
         input_shapes = operation.get("input_shapes") or []
         if not raw_dtypes or len(raw_dtypes) != len(input_shapes):
             continue
+        if list(operation.get("input_dtypes") or []) != list(raw_dtypes):
+            context.dirty_dtype_ops.add(operation_id)
         operation["input_dtypes"] = list(raw_dtypes)
         input_tensors = (operation.get("connections") or {}).get("inputs") or []
         if len(input_tensors) != len(raw_dtypes):
@@ -331,13 +337,47 @@ def _repair_output_dtypes(context: TorchviewRepairContext) -> None:
     for layer_id, operation in context.layers.items():
         if layer_id not in operation_ids:
             continue
+        prev_inputs = list(operation.get("input_dtypes") or [])
         input_dtypes = _corrected_input_dtypes(context, operation)
+        inputs_changed = (
+            layer_id in context.dirty_dtype_ops or input_dtypes != prev_inputs
+        )
         if input_dtypes:
             operation["input_dtypes"] = input_dtypes
-        if _correct_multi_output_reduction_dtypes(context, operation):
+        if not inputs_changed and _preserve_traced_output_slots(
+            context, operation
+        ):
+            continue
+        if _correct_multi_output_reduction_dtypes(
+            context, operation, input_dtypes, inputs_changed=inputs_changed
+        ):
             continue
         output_dtype = _select_output_dtype(context, operation, input_dtypes)
         _propagate_output_dtype(context, operation, output_dtype)
+
+
+def _preserve_traced_output_slots(
+    context: TorchviewRepairContext,
+    operation: Layer,
+) -> bool:
+    slots = operation.get("output_slots")
+    if not isinstance(slots, list) or not slots:
+        return False
+    slot_dtypes: list[str] = []
+    for slot in slots:
+        if not isinstance(slot, Mapping) or not slot.get("dtype"):
+            return False
+        dtype = str(slot["dtype"])
+        slot_dtypes.append(dtype)
+        tensor_id = str(slot.get("tensor_node") or "")
+        if tensor_id in context.layers:
+            tensor = context.layers[tensor_id]
+            count = len(tensor.get("output_dtypes") or []) or 1
+            tensor["output_dtypes"] = [dtype] * count
+        if tensor_id:
+            context.state.corrected_dtypes[tensor_id] = dtype
+    operation["output_dtypes"] = slot_dtypes
+    return True
 
 
 def _corrected_input_dtypes(
@@ -352,34 +392,129 @@ def _corrected_input_dtypes(
     return dtypes
 
 
+_EXPLICIT_CAST_OPERATIONS = {
+    "bfloat16": "torch.bfloat16",
+    "bool": "torch.bool",
+    "byte": "torch.uint8",
+    "cdouble": "torch.complex128",
+    "cfloat": "torch.complex64",
+    "char": "torch.int8",
+    "double": "torch.float64",
+    "float": "torch.float32",
+    "half": "torch.float16",
+    "int": "torch.int32",
+    "long": "torch.int64",
+    "short": "torch.int16",
+}
+
+_INDEX_RETURN_OPERATIONS = frozenset(
+    {
+        "argmax",
+        "argmin",
+        "argsort",
+        "bincount",
+        "bucketize",
+        "multinomial",
+        "nonzero",
+        "searchsorted",
+    }
+)
+
+_DTYPE_KWARG_OPERATIONS = frozenset(
+    {
+        "_to_copy",
+        "arange",
+        "cumprod",
+        "cumsum",
+        "empty",
+        "empty_like",
+        "eye",
+        "full",
+        "full_like",
+        "linspace",
+        "log_softmax",
+        "logspace",
+        "logsumexp",
+        "mean",
+        "nanmean",
+        "nansum",
+        "ones",
+        "ones_like",
+        "prod",
+        "rand",
+        "rand_like",
+        "randn",
+        "randn_like",
+        "softmax",
+        "sum",
+        "to",
+        "view",
+        "zeros",
+        "zeros_like",
+    }
+)
+
+_INT64_PROMOTING_REDUCTIONS = frozenset({"cumprod", "cumsum", "prod", "sum"})
+_NARROW_INTEGER_DTYPES = frozenset(
+    {
+        "torch.bool",
+        "torch.int8",
+        "torch.int16",
+        "torch.int32",
+        "torch.uint8",
+    }
+)
+
+
+def _promote_input_dtypes(
+    context: TorchviewRepairContext,
+    input_dtypes: list[str],
+) -> str:
+    torch_dtypes: list[torch.dtype] = []
+    for name in input_dtypes:
+        clean = str(name).strip().removeprefix("torch.")
+        candidate = getattr(torch, clean, None)
+        if isinstance(candidate, torch.dtype):
+            torch_dtypes.append(candidate)
+    if len(torch_dtypes) == len(input_dtypes) and torch_dtypes:
+        try:
+            return str(reduce(torch.promote_types, torch_dtypes))
+        except RuntimeError:
+            pass
+    return max(input_dtypes, key=context.dtype_bits)
+
+
 def _select_output_dtype(
     context: TorchviewRepairContext,
     operation: Layer,
     input_dtypes: list[str],
 ) -> str:
     operation_type = str(operation.get("type") or "").lower()
-    explicit = {
-        "bfloat16": "torch.bfloat16",
-        "float": "torch.float32",
-        "half": "torch.float16",
-        "int": "torch.int32",
-        "long": "torch.int64",
-    }
-    if operation_type in explicit:
-        return explicit[operation_type]
+    if operation_type in _EXPLICIT_CAST_OPERATIONS:
+        return _EXPLICIT_CAST_OPERATIONS[operation_type]
+    if operation_type in _INDEX_RETURN_OPERATIONS:
+        return "torch.int64"
     if operation_type in _COMPARISON_OPERATIONS:
         return "torch.bool"
     if operation_type in {"bitwise_and", "__and__"}:
         return _first_input_or_output(operation, input_dtypes, "torch.bool")
-    if operation_type in {"to", "view"}:
+    if operation_type in _DTYPE_KWARG_OPERATIONS:
         requested = _requested_dtype(operation)
         if requested is not None:
             return f"torch.{requested.removeprefix('torch.')}"
-        return _first_input_or_output(
-            operation,
-            input_dtypes,
-            "torch.float32",
-        )
+        if operation_type in {"to", "view", "_to_copy"}:
+            return _first_input_or_output(
+                operation,
+                input_dtypes,
+                "torch.float32",
+            )
+    if (
+        operation_type in _INT64_PROMOTING_REDUCTIONS
+        and input_dtypes
+        and f"torch.{str(input_dtypes[0]).removeprefix('torch.')}"
+        in _NARROW_INTEGER_DTYPES
+    ):
+        return "torch.int64"
     input_index = context.output_dtype_input_index.get(operation_type)
     if input_index is not None and len(input_dtypes) > input_index:
         return input_dtypes[input_index]
@@ -390,18 +525,27 @@ def _select_output_dtype(
             "torch.float32",
         )
     if input_dtypes:
-        return max(input_dtypes, key=context.dtype_bits)
+        return _promote_input_dtypes(context, input_dtypes)
     return str((operation.get("output_dtypes") or ["torch.float32"])[0])
 
 
 _COMPARISON_OPERATIONS = frozenset(
     {
+        "all",
+        "any",
         "eq",
         "ne",
         "lt",
         "le",
         "gt",
         "ge",
+        "isfinite",
+        "isinf",
+        "isnan",
+        "logical_and",
+        "logical_not",
+        "logical_or",
+        "logical_xor",
         "__eq__",
         "__ne__",
         "__lt__",
@@ -422,12 +566,33 @@ def _first_input_or_output(
     return str((operation.get("output_dtypes") or [fallback])[0])
 
 
+def _extract_encoded_dtype(value: DynamicValue) -> str | None:
+    if isinstance(value, dict) and "dtype" in value:
+        raw = value["dtype"]
+        if raw is not None and str(raw) != "None":
+            return str(raw)
+    if isinstance(value, str) and value not in {"", "None"}:
+        clean = value.removeprefix("torch.")
+        if isinstance(getattr(torch, clean, None), torch.dtype):
+            return clean
+    return None
+
+
 def _requested_dtype(operation: Layer) -> str | None:
-    for argument in (operation.get("module_args") or {}).get(
-        "call_arguments"
-    ) or []:
-        if isinstance(argument, dict) and "dtype" in argument:
-            return str(argument["dtype"])
+    module_args = operation.get("module_args") or {}
+    call_kwargs = module_args.get("call_kwargs")
+    if isinstance(call_kwargs, Mapping) and "dtype" in call_kwargs:
+        kw_dtype = _extract_encoded_dtype(call_kwargs["dtype"])
+        if kw_dtype is not None:
+            return kw_dtype
+    for argument in module_args.get("call_arguments") or []:
+        arg_dtype = _extract_encoded_dtype(argument)
+        if arg_dtype is not None:
+            return arg_dtype
+    if "dtype" in module_args:
+        mod_dtype = _extract_encoded_dtype(module_args["dtype"])
+        if mod_dtype is not None:
+            return mod_dtype
     return None
 
 
@@ -447,19 +612,48 @@ def _propagate_output_dtype(
         context.state.corrected_dtypes[tensor_id] = output_dtype
 
 
+_VALUE_INDEX_REDUCTIONS = frozenset(
+    {
+        "cummax",
+        "cummin",
+        "kthvalue",
+        "max",
+        "median",
+        "min",
+        "mode",
+        "nanmedian",
+        "sort",
+        "topk",
+    }
+)
+
+
 def _correct_multi_output_reduction_dtypes(
     context: TorchviewRepairContext,
     operation: Layer,
+    input_dtypes: list[str],
+    *,
+    inputs_changed: bool = False,
 ) -> bool:
     operation_type = str(operation.get("type") or "").lower()
-    if operation_type not in {"max", "min", "topk"}:
+    if operation_type not in _VALUE_INDEX_REDUCTIONS:
+        return False
+    outputs = list((operation.get("connections") or {}).get("outputs") or [])
+    if len(outputs) == 1 and operation_type in {
+        "max",
+        "min",
+        "median",
+        "nanmedian",
+    }:
         return False
     slot_dtypes = list(operation.get("output_dtypes") or [])
-    outputs = list((operation.get("connections") or {}).get("outputs") or [])
     if len(slot_dtypes) != 2 or len(outputs) != 2:
         raise ValueError(
             f"{operation_type} requires two exact output dtype slots",
         )
+    if inputs_changed and input_dtypes:
+        slot_dtypes = [input_dtypes[0], "torch.int64"]
+        operation["output_dtypes"] = slot_dtypes
     for index, tensor_id in enumerate(outputs):
         if tensor_id in context.layers:
             tensor = context.layers[tensor_id]

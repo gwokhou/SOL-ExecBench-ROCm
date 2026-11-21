@@ -8,8 +8,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
-import yaml
-
+from solar.artifacts.yaml import write_yaml_atomic
 from solar.errors import (
     ReferenceOutputBindingError,
     SourceInputBindingError,
@@ -45,7 +44,7 @@ def convert_operator_graph(
     converted = converter(operator, output, traced)
     validate_extended_einsum_graph(converted)
     einsum_path = output / "einsum_graph.yaml"
-    einsum_path.write_text(yaml.safe_dump(converted, sort_keys=False))
+    write_yaml_atomic(einsum_path, converted, no_aliases=False)
     artifact = IRGraphArtifact(path=einsum_path, kind=IRKind.EXTENDED_EINSUM)
     write_access_document(artifact, operator)
     return artifact

@@ -27,7 +27,6 @@ _MAPPER_ENV_NAMES = frozenset(
     {
         "LANG",
         "LC_ALL",
-        "LD_LIBRARY_PATH",
         "OMP_NUM_THREADS",
         "PATH",
         "VIRTUAL_ENV",
@@ -124,16 +123,17 @@ def run_mapper_process(
     stdout_tail = _ByteTail(MAPPER_LOG_MAX_BYTES + _CAPTURE_OVERLAP_BYTES)
     stderr_tail = _ByteTail(MAPPER_LOG_MAX_BYTES + _CAPTURE_OVERLAP_BYTES)
     capture_errors: list[BaseException] = []
-    process = subprocess.Popen(
-        list(command),
-        cwd=cwd,
-        env=process_env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        process_group=0,
-    )
+    process: subprocess.Popen[bytes] | None = None
     readers: tuple[threading.Thread, ...] = ()
     try:
+        process = subprocess.Popen(
+            list(command),
+            cwd=cwd,
+            env=process_env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            process_group=0,
+        )
         if process.stdout is None or process.stderr is None:
             raise RuntimeError("mapper process streams were not captured")
         readers = (
@@ -145,7 +145,8 @@ def run_mapper_process(
         # Keep the leader unreaped until the entire owned session is signaled.
         # This also runs for caller interruption and normal leader exit with
         # surviving children; a recycled PID cannot become our cleanup target.
-        _terminate_process_group(process)
+        if process is not None:
+            _terminate_process_group(process)
         for reader in readers:
             reader.join(timeout=_PROCESS_WAIT_SECONDS)
         _write_redacted_tail(stdout_path, stdout_tail.value())

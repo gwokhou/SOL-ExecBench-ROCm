@@ -50,7 +50,7 @@ from typing import Any
 import networkx as nx
 import yaml
 
-from solar.artifacts.yaml import NoAliasDumper
+from solar.artifacts.yaml import write_yaml_atomic
 from solar.composition import BoundComponent
 from solar.ir.extended_einsum.torchview.af_graph_builder import (
     build_af_graph_from_dict,
@@ -214,15 +214,7 @@ class GraphEmitter(BoundComponent):
         path: Path, value: dict[str, Any], *, no_aliases: bool
     ) -> None:
         """Serialize one graph with PyYAML's safe repository dumper."""
-        dumper = NoAliasDumper if no_aliases else yaml.SafeDumper
-        with path.open("w") as stream:
-            yaml.dump(
-                value,
-                stream,
-                Dumper=dumper,
-                sort_keys=False,
-                default_flow_style=False,
-            )
+        write_yaml_atomic(path, value, no_aliases=no_aliases)
 
     def _copy_input_graph(
         self,
@@ -237,14 +229,7 @@ class GraphEmitter(BoundComponent):
                 if src.resolve() != dst.resolve():
                     dst.write_text(src.read_text())
             elif not dst.exists():
-                with open(dst, "w") as f:
-                    yaml.dump(
-                        pytorch_graph,
-                        f,
-                        Dumper=NoAliasDumper,
-                        sort_keys=False,
-                        default_flow_style=False,
-                    )
+                write_yaml_atomic(dst, dict(pytorch_graph), no_aliases=True)
         except Exception:  # noqa: BLE001 - optional backend fallback
             if self._debug:
                 print(

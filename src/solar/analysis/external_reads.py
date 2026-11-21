@@ -21,7 +21,10 @@ from solar.analysis.access_regions import (
     AccessBudget,
     union_accesses,
 )
-from solar.analysis.graph_rules import METADATA_INPUT_TARGETS
+from solar.analysis.graph_rules import (
+    METADATA_INPUT_TARGETS,
+    is_metadata_only_input_slot,
+)
 from solar.ir.access import AccessQuality, AccessReason, TensorAccess
 from solar.ir.access_artifact import AccessDocument
 from solar.ir.access_calls import STATIC_VIEW_TARGETS
@@ -100,7 +103,6 @@ FULL_OPERAND_READS = frozenset(
         "leaky_relu",
         "bitwise_and",
         "xlogy",
-        "masked_fill",
         "expand",
         "repeat",
         # Batch-2 vocabulary (spec: solar-l3e-batch2): stride-decidable
@@ -431,6 +433,63 @@ def _where_has_external_values(layer: NodeDict, access: AccessDocument) -> bool:
     return False
 
 
+def _masked_fill_has_external_values(
+    layer: NodeDict, access: AccessDocument
+) -> bool:
+    """Masked fill skips overwritten self/value elements when mask is all-1/0."""
+    names = (layer.get("tensor_names") or {}).get("inputs") or []
+    operands = operation_operands(layer_operation(layer))
+    if len(operands) != 3:
+        return True
+    mask_operand = operands[1]
+    if not (isinstance(mask_operand, Mapping) and "tensor" in mask_operand):
+        return True
+    for pos in (0, 2):
+        operand = operands[pos]
+        if isinstance(operand, Mapping) and "tensor" in operand:
+            index = operand["tensor"]
+            if type(index) is not int or not 0 <= index < len(names):
+                return True
+            if names[index] in access.tensors:
+                return True
+    return False
+
+
+def _special_target_reason(
+    target: str,
+    layer: NodeDict,
+    access: AccessDocument,
+) -> tuple[bool, AccessReason | None]:
+    if target == "nll_loss_forward":
+        data_external = _nll_data_operand_external(layer, access)
+        if data_external is None:
+            return True, AccessReason.UNKNOWN_READS
+        return True, (AccessReason.DYNAMIC_INDEX if data_external else None)
+    if target == "cross_entropy":
+        if _cross_entropy_has_extra_tensor_operand(layer):
+            return True, AccessReason.UNKNOWN_READS
+        return True, None
+    if target in POOL_WINDOW_TARGETS:
+        return True, (
+            None
+            if _pool_window_reads_cover_input(layer)
+            else AccessReason.UNKNOWN_READS
+        )
+    if target == "where":
+        return True, (
+            AccessReason.UNKNOWN_READS
+            if _where_has_external_values(layer, access)
+            else None
+        )
+    if target == "masked_fill":
+        return True, (
+            AccessReason.UNKNOWN_READS
+            if _masked_fill_has_external_values(layer, access)
+            else None
+        )
+    return False, None
+
+
 def _blocking_reason(
     layer: NodeDict,
     access: AccessDocument,
@@ -457,8 +516,6 @@ def _blocking_reason(
     if semantic.get("kind") == "einsum":
         return _einsum_read_reason(semantic)
     if target in {"addmm", "conv2d"}:
-        # Batch-8 spec: window coverage generalizes the 1x1 contraction
-        # special case; both prove the unique-element union read.
         return (
             None
             if (
@@ -470,31 +527,9 @@ def _blocking_reason(
             )
             else AccessReason.UNKNOWN_READS
         )
-    if target == "nll_loss_forward":
-        # Batch-7 spec: the target operand is read fully; a gathered data (or
-        # weight) operand keeps the layer in the dynamic-index domain.
-        data_external = _nll_data_operand_external(layer, access)
-        if data_external is None:
-            return AccessReason.UNKNOWN_READS
-        return AccessReason.DYNAMIC_INDEX if data_external else None
-    if target == "cross_entropy":
-        # Batch-7 spec: the fused loss reads both tensor operands exactly;
-        # a weight operand is a per-class gather and stays unproved.
-        if _cross_entropy_has_extra_tensor_operand(layer):
-            return AccessReason.UNKNOWN_READS
-        return None
-    if target in POOL_WINDOW_TARGETS:
-        return (
-            None
-            if _pool_window_reads_cover_input(layer)
-            else AccessReason.UNKNOWN_READS
-        )
-    if target == "where":
-        return (
-            AccessReason.UNKNOWN_READS
-            if _where_has_external_values(layer, access)
-            else None
-        )
+    handled, special_reason = _special_target_reason(target, layer, access)
+    if handled:
+        return special_reason
     if target in METADATA_INPUT_TARGETS:
         return None
     if target == "scalar_tensor":
@@ -569,10 +604,18 @@ def _union_reads(
 
 
 def _operand_accesses(
-    layer: NodeDict, view: TensorAccess, budget: AccessBudget
+    layer: NodeDict,
+    view: TensorAccess,
+    budget: AccessBudget,
+    *,
+    input_slot: int,
 ) -> tuple[TensorAccess, ...]:
     semantic = layer_operation(layer)
-    if semantic.get("target") in METADATA_INPUT_TARGETS:
+    if is_metadata_only_input_slot(
+        semantic,
+        input_slot,
+        op_type=str(layer.get("type", "")),
+    ):
         return ()
     if semantic.get("target") in TRIANGULAR_TARGETS:
         return triangular_accesses(view, semantic, max_regions=budget.regions)
@@ -632,11 +675,13 @@ def external_reads(
             for s in shapes
         ):
             continue
-        for name in names.get("inputs") or []:
+        for input_slot, name in enumerate(names.get("inputs") or []):
             if name in access.tensors:
                 view = access.tensors[name]
                 try:
-                    operands = _operand_accesses(layer, view, budget)
+                    operands = _operand_accesses(
+                        layer, view, budget, input_slot=input_slot
+                    )
                     if operands:
                         reads[view.base_id].extend(operands)
                 except UnsupportedAccessError as exc:

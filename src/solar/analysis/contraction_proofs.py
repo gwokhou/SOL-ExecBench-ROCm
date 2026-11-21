@@ -9,7 +9,7 @@ from collections.abc import Mapping, Sequence
 from copy import deepcopy
 
 from solar.analysis.resources import is_mfma_operation
-from solar.ir.contracts import layer_operation
+from solar.ir.contracts import layer_operation, resolve_operand_tensor_slots
 from solar.ir.extended_einsum.operations.analyzer import EinsumAnalyzer
 from solar.types import GraphValue, NodeDict, TensorShapes
 
@@ -50,6 +50,17 @@ def _select_input_metadata(
     proof: NodeDict,
     indices: tuple[int, ...],
 ) -> tuple[list[GraphValue], list[GraphValue]] | None:
+    semantic = layer_operation(proof)
+    names_container = proof.get("tensor_names")
+    if not isinstance(names_container, dict) or not isinstance(
+        names_container.get("inputs"), list
+    ):
+        return None
+    slots = resolve_operand_tensor_slots(
+        semantic, indices, len(names_container["inputs"])
+    )
+    if slots is None:
+        return None
     containers = ("tensor_names", "tensor_shapes", "tensor_dtypes")
     for container_name in containers:
         container = proof.get(container_name)
@@ -58,16 +69,17 @@ def _select_input_metadata(
         inputs = container.get("inputs")
         if not isinstance(inputs, list):
             return None
-        selected = _select(inputs, indices)
+        selected = _select(inputs, slots)
         if selected is None:
             return None
         container["inputs"] = selected
     tensor_types = proof.get("tensor_types")
-    if isinstance(tensor_types, dict) and isinstance(
-        tensor_types.get("inputs"),
-        list,
+    if (
+        isinstance(tensor_types, dict)
+        and isinstance(tensor_types.get("inputs"), list)
+        and tensor_types["inputs"]
     ):
-        selected_types = _select(tensor_types["inputs"], indices)
+        selected_types = _select(tensor_types["inputs"], slots)
         if selected_types is None:
             return None
         tensor_types["inputs"] = selected_types
@@ -172,6 +184,29 @@ def _convolution_values(
     return None
 
 
+def _normalize_einsum_layer_proof(
+    layer: Mapping[str, GraphValue],
+    equation: str,
+) -> NodeDict | None:
+    if "->" not in equation:
+        return None
+    proof = deepcopy(dict(layer))
+    arity = len(equation.split("->", 1)[0].split(","))
+    inputs = (proof.get("tensor_shapes") or {}).get("inputs") or []
+    if len(inputs) != arity:
+        if _select_input_metadata(proof, tuple(range(arity))) is None:
+            return None
+        if isinstance(proof.get("semantic_op"), dict):
+            refs = [{"tensor": index} for index in range(arity)]
+            key = (
+                "arguments"
+                if "arguments" in proof["semantic_op"]
+                else "operands"
+            )
+            proof["semantic_op"][key] = refs
+    return proof
+
+
 def build_orojenesis_proof_layer(
     layer: Mapping[str, GraphValue],
     *,
@@ -180,8 +215,10 @@ def build_orojenesis_proof_layer(
     """Return an exact einsum proof view for a supported contraction layer."""
     semantic = layer_operation(layer)
     if semantic.get("kind") == "einsum":
-        equation = str(semantic.get("equation", ""))
-        return deepcopy(dict(layer)) if "->" in equation else None
+        return _normalize_einsum_layer_proof(
+            layer,
+            str(semantic.get("equation", "")),
+        )
 
     target = str(semantic.get("target") or layer.get("type") or "").lower()
     proof_spec = (

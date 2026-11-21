@@ -232,6 +232,10 @@ class PyTorchToEinsum:
         "byte": 8,
         "uint8": 8,
         "int8": 8,
+        "float8_e4m3fn": 8,
+        "float8_e4m3fnuz": 8,
+        "float8_e5m2": 8,
+        "float8_e5m2fnuz": 8,
         "short": 16,
         "int16": 16,
         "half": 16,
@@ -265,6 +269,7 @@ class PyTorchToEinsum:
         "scatter_": 0,
         "scatter_add": 0,
         "scatter_add_": 0,
+        "type_as": 1,
         "where": 1,
         "xlogy": 0,
     }
