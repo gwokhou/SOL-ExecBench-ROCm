@@ -23,8 +23,10 @@ from scripts.mvp_v1 import (
 )
 from scripts.mvp_v1.anti_distortion import (
     RotatingBufferPool,
+    time_kernel_isolated,
     validate_materialized_outputs,
 )
+from scripts.mvp_v1.cloud_runner import _select_workload_specs
 from scripts.mvp_v1.kernels import (
     KernelBackend,
     ref_fused_moe,
@@ -34,6 +36,7 @@ from scripts.mvp_v1.kernels import (
     run_fused_moe_grouped,
     run_swiglu_fp8_quant_pytorch,
 )
+from scripts.mvp_v1.report import _format_sol_ms
 from scripts.mvp_v1.triton_ops_ext import supports_splitk_mla
 from scripts.mvp_v1.vendor_adapters import (
     PreparedRunner,
@@ -362,3 +365,246 @@ def test_py312_compat_module_emits_no_runpy_warning(tmp_path: Path) -> None:
     )
     assert proc.returncode == 0, proc.stderr + proc.stdout
     assert "RuntimeWarning" not in proc.stderr
+
+
+def test_stage3b_vllm034_and_aiter_adapter_signatures(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "scripts.mvp_v1.vendor_adapters._is_rocm_torch", lambda: True
+    )
+    # 1. vLLM 0.34 FusedMoEQuantConfig FP8 MoE
+    tok = torch.randn((4, 16), dtype=torch.bfloat16).to(torch.float8_e4m3fnuz)
+    gw = (torch.randn((4, 16, 8), dtype=torch.bfloat16) * 0.2).to(
+        torch.float8_e4m3fnuz
+    )
+    uw = (torch.randn((4, 16, 8), dtype=torch.bfloat16) * 0.2).to(
+        torch.float8_e4m3fnuz
+    )
+    dw = (torch.randn((4, 8, 16), dtype=torch.bfloat16) * 0.2).to(
+        torch.float8_e4m3fnuz
+    )
+    lg = torch.randn((4, 4), dtype=torch.bfloat16)
+    moe_args: list[Any] = [tok, gw, uw, dw, lg, 2]
+    moe_expected = ref_fused_moe(*moe_args)
+
+    def _fp8_quant_cfg(*, w1_scale, w2_scale, a1_scale=None):
+        return {"w1_s": w1_scale, "w2_s": w2_scale, "a1_s": a1_scale}
+
+    def _vllm034_experts(t, _w1, _w2, _wn, _ids, *, quant_config=None):
+        if quant_config is None or t.dtype is not torch.bfloat16:
+            raise TypeError(
+                "vLLM 0.34 expects bf16 hidden_states + quant_config"
+            )
+        return moe_expected.clone()
+
+    fake_moe_cfg = types.SimpleNamespace(
+        fp8_w8a8_moe_quant_config=_fp8_quant_cfg
+    )
+    fake_moe_pkg = types.SimpleNamespace(
+        fused_experts=_vllm034_experts, config=fake_moe_cfg
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "vllm.model_executor.layers.fused_moe",
+        cast(Any, fake_moe_pkg),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "vllm.model_executor.layers.fused_moe.config",
+        cast(Any, fake_moe_cfg),
+    )
+    moe_v = try_make_vllm_fp8_moe_runner(
+        moe_args, ref_fn=ref_fused_moe, max_atol=1e-2
+    )
+    assert moe_v.implementation_name == "vllm_fp8_fused_moe"
+
+    # 2. AITER MLA page_size=1 token-expanded + vLLM triton_decode_attention
+    q = torch.randn((2, 4, 24), dtype=torch.bfloat16) * 0.5
+    kv = torch.randn((6, 16, 24), dtype=torch.bfloat16) * 0.5
+    ind = torch.tensor([0, 2, 4], dtype=torch.int32)
+    idx = torch.tensor([3, 1, 4, 0], dtype=torch.int32)
+    last = torch.tensor([16, 8], dtype=torch.int32)
+    mla_args: list[Any] = [q, kv, ind, idx, last, 16]
+    mla_expected = ref_mla_paged_decode(*mla_args)
+
+    def _aiter_mla_ps1(
+        q_in,
+        kv_buf,
+        out,
+        _qo,
+        kv_ind,
+        kv_idx,
+        kv_last,
+        _mq,
+        *,
+        page_size=1,
+        **_kw,
+    ):
+        if page_size != 1 or kv_buf.shape[1] != 1 or int(kv_idx.numel()) != 56:
+            raise RuntimeError("ASM MLA requires page_size=1 token-level CSR")
+        assert int(kv_ind[-1].item()) == 56
+        assert int(kv_last[1].item()) == 1
+        out.copy_(mla_expected)
+
+    monkeypatch.setitem(
+        sys.modules,
+        "aiter",
+        cast(
+            Any,
+            types.SimpleNamespace(
+                mla=types.SimpleNamespace(mla_decode_fwd=_aiter_mla_ps1)
+            ),
+        ),
+    )
+    mla_a = try_make_aiter_mla_runner(
+        mla_args, ref_fn=ref_mla_paged_decode, max_atol=1e-2
+    )
+    assert mla_a.implementation_name == "aiter_mla_decode_fwd"
+
+    def _vllm_triton_dec(
+        _q, k_buf, v_buf, out, req_tok, _b_idx, _sl, _logits, _splits, _sc, ps
+    ):
+        if ps != 1 or v_buf.shape[-1] != 16 or req_tok.shape != (2, 32):
+            raise RuntimeError("unexpected triton_decode_attention layout")
+        assert k_buf.shape[-1] == 24
+        out.copy_(mla_expected)
+
+    monkeypatch.setitem(
+        sys.modules, "vllm", cast(Any, types.SimpleNamespace(_custom_ops=None))
+    )
+    monkeypatch.setitem(sys.modules, "vllm._custom_ops", cast(Any, None))
+    monkeypatch.setitem(
+        sys.modules,
+        "vllm.attention.ops.triton_decode_attention",
+        cast(Any, types.SimpleNamespace(decode_attention_fwd=_vllm_triton_dec)),
+    )
+    mla_v = try_make_vllm_mla_runner(
+        mla_args, ref_fn=ref_mla_paged_decode, max_atol=1e-2
+    )
+    assert mla_v.implementation_name == "vllm_triton_mla_decode"
+
+
+def test_stage3b_norm_rope_zero_clone_and_swiglu_scaled_quant(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "scripts.mvp_v1.vendor_adapters._is_rocm_torch", lambda: True
+    )
+    x = torch.randn((4, 4, 32), dtype=torch.bfloat16)
+    res = torch.randn((4, 4, 32), dtype=torch.bfloat16)
+    w = torch.randn((32,), dtype=torch.bfloat16)
+    angles = torch.randn((4, 16), dtype=torch.float32)
+    cs = torch.cat([torch.cos(angles), torch.sin(angles)], dim=-1)
+    nr_args: list[Any] = [x, res, w, cs]
+    nr_expected = ref_fused_rmsnorm_rope(*nr_args)
+
+    def _vllm_12arg_qk(
+        qkv, hq, hk, hv, hd, _eps, qw, _kw, cs_in, is_neox, _pos
+    ):
+        assert (hq, hk, hv, hd, is_neox) == (4, 0, 0, 32, True)
+        q3 = qkv.view(4, hq, hd)
+        rms = torch.rsqrt(q3.float().pow(2).mean(dim=-1, keepdim=True) + 1e-6)
+        n3 = (q3.float() * rms * qw.float()).to(qkv.dtype)
+        u, v = n3[..., :16].float(), n3[..., 16:].float()
+        c, s = cs_in[:, None, :16].float(), cs_in[:, None, 16:].float()
+        q3.copy_(
+            torch.cat([u * c - v * s, v * c + u * s], dim=-1).to(qkv.dtype)
+        )
+
+    gu = torch.randn((4, 64), dtype=torch.bfloat16) * 0.5
+
+    def _silu_c(out, inp):
+        g, u = inp[:, :32].float(), inp[:, 32:].float()
+        out.copy_((torch.nn.functional.silu(g) * u).to(inp.dtype))
+
+    def _scaled_fp8_quant(inp, *, use_per_token_if_dynamic=False):
+        assert use_per_token_if_dynamic is True
+        return run_swiglu_fp8_quant_pytorch(
+            torch.cat([torch.zeros_like(inp), inp], dim=-1),
+            fp8_dtype=torch.float8_e4m3fnuz,
+        )
+
+    fake_vops = types.SimpleNamespace(
+        fused_qk_norm_rope=_vllm_12arg_qk,
+        scaled_fp8_quant=lambda inp, *, use_per_token_if_dynamic=False: (
+            (
+                (inp.float()).to(torch.float8_e4m3fnuz),
+                torch.ones((inp.shape[0], 1), dtype=torch.float32),
+            )
+            if use_per_token_if_dynamic
+            else None
+        ),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "vllm",
+        cast(Any, types.SimpleNamespace(_custom_ops=fake_vops)),
+    )
+    monkeypatch.setitem(sys.modules, "vllm._custom_ops", cast(Any, fake_vops))
+    monkeypatch.setattr(
+        torch.ops,
+        "_C",
+        types.SimpleNamespace(silu_and_mul=_silu_c),
+        raising=False,
+    )
+
+    nr_v = try_make_vllm_rmsnorm_rope_runner(
+        nr_args, ref_fn=ref_fused_rmsnorm_rope, max_atol=5e-2
+    )
+    assert nr_v.implementation_name == "vllm_fused_qk_norm_rope"
+    assert nr_v.fn is not None
+    stats = time_kernel_isolated(
+        nr_v.fn,
+        nr_v.candidate_args,
+        device="cpu",
+        llc_bytes=64 * 1024,
+        warmup=2,
+        rep=5,
+    )
+    assert stats.ring_replicas >= 8
+
+    sq_v = try_make_vllm_swiglu_quant_runner(
+        [gu],
+        fp8_dtype=torch.float8_e4m3fnuz,
+        ref_fn=ref_swiglu_fp8_quant,
+        max_atol=2.5e-1,
+    )
+    assert sq_v.implementation_name == "vllm_silu_mul_then_fp8_quant"
+
+    # AITER 2D rmsnorm2d_fwd_with_add + rotary_embedding_fwd
+    def _aiter_norm2d(out2d, x2d, r2d, rout2d, w_in, eps):
+        if x2d.ndim != 2:
+            raise RuntimeError("rmsnorm2d_fwd_with_add expects 2D tensors")
+        rout2d.copy_(x2d + r2d)
+        rms = torch.rsqrt(
+            rout2d.float().pow(2).mean(dim=-1, keepdim=True) + eps
+        )
+        out2d.copy_((rout2d.float() * rms * w_in.float()).to(x2d.dtype))
+
+    def _aiter_rot_fwd(_pos, q_flat, _k, hd, cs_in, is_neox):
+        assert (hd, is_neox) == (32, True)
+        q_flat.view(4, 4, 32).copy_(nr_expected)
+
+    monkeypatch.setitem(
+        sys.modules,
+        "aiter",
+        cast(Any, types.SimpleNamespace(rmsnorm2d_fwd_with_add=_aiter_norm2d)),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "aiter.ops.pos_encoding",
+        cast(Any, types.SimpleNamespace(rotary_embedding_fwd=_aiter_rot_fwd)),
+    )
+    nr_a = try_make_aiter_rmsnorm_rope_runner(
+        nr_args, ref_fn=ref_fused_rmsnorm_rope, max_atol=5e-2
+    )
+    assert nr_a.implementation_name == "aiter_rmsnorm_rope"
+
+    assert _format_sol_ms(4.2e-6) == "0.000004"
+    assert _format_sol_ms(0.01234) == "0.0123"
+    filtered = _select_workload_specs(
+        SweepMode.FULL, "mla_paged_decode_bf16_b8_kv4096,swiglu_fp8_quant_m1024"
+    )
+    assert [s.workload_id for s in filtered] == [
+        "mla_paged_decode_bf16_b8_kv4096",
+        "swiglu_fp8_quant_m1024_i4096",
+    ]

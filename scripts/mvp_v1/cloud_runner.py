@@ -248,6 +248,19 @@ def run_single_op_replay(
     return 0
 
 
+def _select_workload_specs(
+    mode: SweepMode,
+    workload_filter: str | None,
+) -> list[WorkloadSpec]:
+    specs = build_workload_specs(mode)
+    if not workload_filter:
+        return specs
+    tokens = [t.strip() for t in workload_filter.split(",") if t.strip()]
+    if not tokens:
+        return specs
+    return [s for s in specs if any(tok in s.workload_id for tok in tokens)]
+
+
 def run_benchmark_campaign(
     *,
     mode: SweepMode,
@@ -257,8 +270,9 @@ def run_benchmark_campaign(
     output_dir: Path,
     collect_counters: bool,
     lock_clocks: bool,
+    workload_filter: str | None = None,
 ) -> dict[str, Path]:
-    """Run startup microbench + 3-operator sweep and emit report artifacts."""
+    """Run startup microbench + operator sweep and emit report artifacts."""
     ceiling = detect_hardware_ceiling(device, target_override=target_override)
     env_probe = probe_runtime_environment(device, ceiling)
     materialize_trace_corpus(output_dir, mode)
@@ -266,6 +280,7 @@ def run_benchmark_campaign(
     traces: list[Trace] = []
     profiler_blocked_note: str | None = None
     seen_collected = False
+    selected_specs = _select_workload_specs(mode, workload_filter)
     with acquire_dvfs_telemetry_window(
         device, ceiling.vendor, lock_clocks=lock_clocks
     ) as dvfs_holder:
@@ -273,7 +288,7 @@ def run_benchmark_campaign(
             device, ceiling, smoke=(mode is SweepMode.SMOKE)
         )
         locked = dvfs_holder["receipt"].lock_acquired
-        for spec in build_workload_specs(mode):
+        for spec in selected_specs:
             row, trace = _evaluate_one_case(
                 spec,
                 mode=mode,
@@ -342,6 +357,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=False,
     )
     parser.add_argument("--single-op-replay", default=None)
+    parser.add_argument("--workload-filter", default=None)
     parser.add_argument("--compare", nargs="+", type=Path, default=None)
     return parser
 
@@ -378,6 +394,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         output_dir=args.output_dir,
         collect_counters=args.collect_counters,
         lock_clocks=args.lock_clocks,
+        workload_filter=args.workload_filter,
     )
     print(f"Report written to {paths['report_md']}")
     return 0

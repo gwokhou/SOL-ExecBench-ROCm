@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import contextlib
 import importlib
+import inspect
 import math
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -990,39 +991,27 @@ def _probe_vllm_pa_op(
     scale = 1.0 / math.sqrt(packed.head_dim)
     k_scale = torch.ones(1, dtype=torch.float32, device=q.device)
     v_scale = torch.ones(1, dtype=torch.float32, device=q.device)
-    candidates = (
-        _make_vllm_pa_v2_runner(
-            pa_fn,
-            packed,
-            q,
-            scale,
-            k_scale,
-            v_scale,
-            partition_size=256,
-            with_query_start_loc=True,
-        ),
-        _make_vllm_pa_v2_runner(
-            pa_fn,
-            packed,
-            q,
-            scale,
-            k_scale,
-            v_scale,
-            partition_size=256,
-            with_query_start_loc=False,
-        ),
-        _make_vllm_pa_v2_runner(
-            pa_fn,
-            packed,
-            q,
-            scale,
-            k_scale,
-            v_scale,
-            partition_size=512,
-            with_query_start_loc=False,
+    has_qsl = False
+    with contextlib.suppress(TypeError, ValueError):
+        has_qsl = "query_start_loc" in inspect.signature(pa_fn).parameters
+    qsl_order = (True, False) if has_qsl else (False, True)
+    candidates = [
+        *(
+            _make_vllm_pa_v2_runner(
+                pa_fn,
+                packed,
+                q,
+                scale,
+                k_scale,
+                v_scale,
+                partition_size=part_sz,
+                with_query_start_loc=use_qsl,
+            )
+            for use_qsl in qsl_order
+            for part_sz in (256, 512)
         ),
         _make_vllm_pa_v1_runner(pa_fn, packed, scale, k_scale, v_scale),
-    )
+    ]
 
     for runner in candidates:
         if _self_validate(runner, cand_args, ref_fn, prototype_args, max_atol):

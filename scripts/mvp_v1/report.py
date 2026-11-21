@@ -262,6 +262,10 @@ def _format_opt(value: float | None, fmt: str = ".2f") -> str:
     return "-" if value is None else format(value, fmt)
 
 
+def _format_sol_ms(value: float) -> str:
+    return f"{value:.6f}" if 0.0 < value < 1e-3 else f"{value:.4f}"
+
+
 def render_report_markdown(
     *,
     ceiling: HardwareCeiling,
@@ -313,13 +317,14 @@ def render_report_markdown(
     for r in rows:
         unavail = r.implementation.startswith("unavailable")
         med_cell = "-" if unavail else f"{r.median_ms:.4f}"
+        spec_ms = _format_sol_ms(r.t_sol_ms_spec)
         spec_cell = (
-            f"{r.t_sol_ms_spec:.4f} / -"
+            f"{spec_ms} / -"
             if unavail
-            else f"{r.t_sol_ms_spec:.4f} / {r.sol_pct_spec:.1f}%"
+            else f"{spec_ms} / {r.sol_pct_spec:.1f}%"
         )
         emp_cell = (
-            f"{r.t_sol_ms_empirical:.4f} / {r.sol_pct_empirical:.1f}%"
+            f"{_format_sol_ms(r.t_sol_ms_empirical)} / {r.sol_pct_empirical:.1f}%"
             if not unavail
             and r.t_sol_ms_empirical is not None
             and r.sol_pct_empirical is not None

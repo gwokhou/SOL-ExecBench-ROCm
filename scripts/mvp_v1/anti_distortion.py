@@ -209,6 +209,7 @@ class RotatingBufferPool:
         prototype_args: list[Any],
         *,
         min_ring_bytes: int,
+        min_replicas: int = 2,
         max_replicas: int = 8,
     ) -> None:
         """Clone non-overlapping input replicas up to *max_replicas*."""
@@ -218,7 +219,10 @@ class RotatingBufferPool:
             if isinstance(arg, torch.Tensor)
         )
         replicas = (
-            max(2, min(max_replicas, math.ceil(min_ring_bytes / tensor_bytes)))
+            max(
+                min_replicas,
+                min(max_replicas, math.ceil(min_ring_bytes / tensor_bytes)),
+            )
             if tensor_bytes > 0
             else 1
         )
@@ -506,6 +510,30 @@ def validate_materialized_outputs(output: Any, device: str) -> None:
             raise RuntimeError("output tensor contains NaN or Inf")
 
 
+def _build_timing_pool(
+    prototype_args: list[Any],
+    *,
+    device: str,
+    flush_bytes: int,
+    total_calls: int,
+) -> RotatingBufferPool:
+    pool_budget = 64 * 1024 if device == "cpu" else flush_bytes
+    tensor_bytes = sum(
+        arg.numel() * arg.element_size()
+        for arg in prototype_args
+        if isinstance(arg, torch.Tensor)
+    )
+    in_place_safe_cap = max(pool_budget, 16 * 1024 * 1024)
+    if tensor_bytes > 0 and tensor_bytes * total_calls <= in_place_safe_cap:
+        return RotatingBufferPool(
+            prototype_args,
+            min_ring_bytes=pool_budget,
+            min_replicas=total_calls,
+            max_replicas=max(8, total_calls),
+        )
+    return RotatingBufferPool(prototype_args, min_ring_bytes=pool_budget)
+
+
 def time_kernel_isolated(
     fn: Callable[..., Any],
     prototype_args: list[Any],
@@ -524,8 +552,12 @@ def time_kernel_isolated(
         free_memory_bytes=free_bytes,
     )
     flusher = LLCRotatingFlusher(device, flush_bytes)
-    pool_budget = 64 * 1024 if device == "cpu" else flush_bytes
-    pool = RotatingBufferPool(prototype_args, min_ring_bytes=pool_budget)
+    pool = _build_timing_pool(
+        prototype_args,
+        device=device,
+        flush_bytes=flush_bytes,
+        total_calls=1 + warmup + rep,
+    )
 
     is_gpu = device != "cpu" and torch.cuda.is_available()
     dev_ctx = torch.cuda.device(device) if is_gpu else contextlib.nullcontext()

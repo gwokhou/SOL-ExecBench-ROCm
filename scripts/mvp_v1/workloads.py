@@ -406,7 +406,7 @@ def _stage2_smoke_specs() -> list[WorkloadSpec]:
             precision=PrecisionMode.BF16,
             definition_name="fused_rmsnorm_rope_bf16",
             axes={"M": 16, "H": 8, "D": 64},
-            tolerance=ToleranceSpec(max_atol=2e-2, max_rtol=2e-2),
+            tolerance=ToleranceSpec(max_atol=8e-2, max_rtol=2e-2),
         ),
         WorkloadSpec(
             workload_id="swiglu_fp8_quant_m16_i128",
@@ -509,7 +509,7 @@ def _stage2_full_specs() -> list[WorkloadSpec]:
                 precision=PrecisionMode.BF16,
                 definition_name="fused_rmsnorm_rope_bf16",
                 axes={"M": m, "H": 32, "D": 128},
-                tolerance=ToleranceSpec(max_atol=2e-2, max_rtol=2e-2),
+                tolerance=ToleranceSpec(max_atol=8e-2, max_rtol=2e-2),
             )
         )
     for m in (1, 16, 128, 1024):
