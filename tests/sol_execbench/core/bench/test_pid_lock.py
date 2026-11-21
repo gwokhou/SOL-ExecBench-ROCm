@@ -207,3 +207,19 @@ with acquire_pid_lock(output_dir):
         with acquire_pid_lock(nested_dir):
             assert nested_dir.exists()
             assert (nested_dir / ".sol-execbench.lock").exists()
+
+    def test_body_blocking_io_error_is_not_swallowed_as_lock_contention(
+        self, tmp_path
+    ):
+        lock_file = tmp_path / ".sol-execbench.lock"
+        lock_file.write_text("preserve-existing", encoding="utf-8")
+
+        def run_section() -> None:
+            with acquire_pid_lock(tmp_path):
+                assert (
+                    lock_file.read_text(encoding="utf-8") == "preserve-existing"
+                )
+                raise BlockingIOError("inner nonblocking io")
+
+        with pytest.raises(BlockingIOError, match="inner nonblocking io"):
+            run_section()

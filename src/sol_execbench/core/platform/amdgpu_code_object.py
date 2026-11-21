@@ -14,7 +14,10 @@ from pathlib import Path
 
 from sol_execbench.core.integrity.checksums import sha256_bytes, sha256_file
 from sol_execbench.core.platform.runtime import resolve_rocm_tool
-from sol_execbench.core.process.subprocesses import run_in_process_group
+from sol_execbench.core.process.subprocesses import (
+    TRUNCATED_OUTPUT_PREFIX,
+    run_in_process_group_bounded,
+)
 
 MAX_DISASSEMBLY_BYTES = 64 * 1024 * 1024
 _TARGET_ARCH = re.compile(r"--(gfx[0-9a-z]+)(?::[^\s]+)?$")
@@ -85,7 +88,11 @@ def extract_code_object(
             [str(objdump), "--disassemble", str(code_object)],
             timeout_seconds,
         ).stdout
-        if len(disassembly.encode("utf-8")) > MAX_DISASSEMBLY_BYTES:
+        stdout_truncated = disassembly.startswith(TRUNCATED_OUTPUT_PREFIX)
+        if (
+            stdout_truncated
+            or len(disassembly.encode("utf-8")) > MAX_DISASSEMBLY_BYTES
+        ):
             raise ValueError("ISA disassembly exceeds output limit")
         return ExtractedCodeObject(
             architecture=architecture,
@@ -173,7 +180,11 @@ def _run(
     command: list[str],
     timeout_seconds: float,
 ) -> subprocess.CompletedProcess[str]:
-    result = run_in_process_group(command, timeout=timeout_seconds)
+    result = run_in_process_group_bounded(
+        command,
+        timeout=timeout_seconds,
+        max_capture_bytes=MAX_DISASSEMBLY_BYTES + 1,
+    )
     if result.returncode != 0:
         detail = (result.stderr or result.stdout)[-4000:]
         raise RuntimeError(f"ISA artifact command failed: {detail}")

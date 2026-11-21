@@ -41,14 +41,14 @@ def test_setup_failure_persists_bounded_redacted_output(
     monkeypatch.setenv(ENV_HOST_AMD_SMI, "/fixture/amd-smi")
 
     def fail(command, **_):
-        raise subprocess.CalledProcessError(
-            1,
+        return subprocess.CompletedProcess(
             command,
-            output="setup stdout",
-            stderr="x" * 5000 + " password=secret-value\nsetup rejected",
+            1,
+            "setup stdout",
+            "x" * 5000 + " password=secret-value\nsetup rejected",
         )
 
-    monkeypatch.setattr(clock_lock.subprocess, "run", fail)
+    monkeypatch.setattr(clock_lock, "run_in_process_group_bounded", fail)
     with pytest.raises(clock_lock.ClockSetupError):
         clock_lock.set_peak_clocks(UUID)
     (event,) = diagnostics(diagnostic_log)
@@ -81,11 +81,11 @@ def test_restore_failure_persists_output_and_still_returns_false(
     monkeypatch.setenv(ENV_HOST_AMD_SMI, "/fixture/amd-smi")
 
     def fail(command, **_):
-        raise subprocess.CalledProcessError(
-            1, command, output="restore stdout", stderr="restore rejected"
+        return subprocess.CompletedProcess(
+            command, 1, "restore stdout", "restore rejected"
         )
 
-    monkeypatch.setattr(clock_lock.subprocess, "run", fail)
+    monkeypatch.setattr(clock_lock, "run_in_process_group_bounded", fail)
     assert clock_lock.unlock_clocks(UUID) is False
     (event,) = diagnostics(diagnostic_log)
     assert event["phase"] == "restore"
@@ -133,7 +133,7 @@ def test_successful_commands_are_persisted_without_changing_readback(
             "",
         )
 
-    monkeypatch.setattr(clock_lock.subprocess, "run", run)
+    monkeypatch.setattr(clock_lock, "run_in_process_group_bounded", run)
     assert clock_lock.set_peak_clocks(UUID) is None
     assert clock_lock.unlock_clocks(UUID) is True
     events = diagnostics(diagnostic_log)
@@ -152,8 +152,8 @@ def test_zero_exit_failure_marker_remains_failure_and_is_logged(
 ):
     monkeypatch.setenv(ENV_HOST_AMD_SMI, "/fixture/amd-smi")
     monkeypatch.setattr(
-        clock_lock.subprocess,
-        "run",
+        clock_lock,
+        "run_in_process_group_bounded",
         lambda command, **_: subprocess.CompletedProcess(
             command,
             0,
@@ -183,7 +183,7 @@ def test_setup_timeout_or_missing_executable_preserves_failure(
             )
         raise FileNotFoundError("fixture executable missing")
 
-    monkeypatch.setattr(clock_lock.subprocess, "run", fail)
+    monkeypatch.setattr(clock_lock, "run_in_process_group_bounded", fail)
     with pytest.raises(clock_lock.ClockSetupError):
         clock_lock.set_peak_clocks(UUID)
     (event,) = diagnostics(diagnostic_log)

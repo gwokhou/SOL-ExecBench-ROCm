@@ -13,7 +13,7 @@ from sol_execbench.core.evidence.runtime_evidence.models import (
 from sol_execbench.core.platform.amd_smi import (
     parse_gpu_identity,
     parse_gpu_metrics,
-    parse_performance_levels,
+    parse_gpu_performance_level,
     parse_processes,
 )
 from sol_execbench.core.platform.compatibility import (
@@ -172,6 +172,7 @@ def collect_runtime_gpu_telemetry(
     *,
     phase: Literal["pre", "post"],
     device_index: int = 0,
+    gpu_uuid: str | None = None,
 ) -> RuntimeGPUTelemetry:
     """Collect a bounded pre/post AMD SMI snapshot for replay admission."""
     amd_smi = resolve_rocm_tool("amd-smi")
@@ -182,10 +183,25 @@ def collect_runtime_gpu_telemetry(
     process_raw = _amd_smi_json(amd_smi, "process")
     if identity_raw is None or metric_raw is None:
         return RuntimeGPUTelemetry(phase=phase)
-    identity = parse_gpu_identity(identity_raw, device_index)
-    metrics = parse_gpu_metrics(metric_raw, device_index)
-    levels = parse_performance_levels(metric_raw)
-    processes = parse_processes(process_raw) if process_raw is not None else []
+    target_uuid = (
+        gpu_uuid
+        if gpu_uuid is not None
+        else os.environ.get("GPU_LOCK_UUID", "").strip() or None
+    )
+    identity = parse_gpu_identity(
+        identity_raw,
+        device_index,
+        gpu_uuid=target_uuid,
+        fallback_to_index=gpu_uuid is None,
+    )
+    resolved_gpu = identity.gpu
+    metrics = parse_gpu_metrics(metric_raw, resolved_gpu)
+    perf_level = parse_gpu_performance_level(metric_raw, resolved_gpu)
+    processes = (
+        parse_processes(process_raw, gpu_index=resolved_gpu)
+        if process_raw is not None
+        else []
+    )
     foreign = sum(process["pid"] != os.getpid() for process in processes)
     try:
         topology = (
@@ -200,9 +216,7 @@ def collect_runtime_gpu_telemetry(
         gpu_id=identity.uuid,
         gpu_bdf=identity.bdf,
         pcie_topology=topology,
-        performance_level=(
-            levels[device_index] if device_index < len(levels) else None
-        ),
+        performance_level=perf_level,
         sclk_mhz=metrics.sclk_mhz,
         mclk_mhz=metrics.mclk_mhz,
         temperature_c=metrics.temperature_c,

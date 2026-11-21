@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import time
 from pathlib import Path
 
 from sol_execbench.core.process.logs import (
@@ -99,3 +100,42 @@ def test_run_command_to_files_mirrors_output_from_test_runner(
     assert completed.returncode == 3
     assert stdout_path.read_text(encoding="utf-8") == "captured stdout"
     assert stderr_path.read_text(encoding="utf-8") == "captured stderr"
+
+
+def test_redacted_tails_cover_json_quotes_standalone_prefixes_and_linear_time(
+    tmp_path: Path,
+) -> None:
+    payload = (
+        '{"api_key": "json-secret-1", "nested": {"token": "json-secret-2"}}\n'
+        "url=https://ghp_1234567890abcdef@github.com/repo\n"
+        "pat=github_pat_abcdef123456_789\n"
+        "bare hf_AbCdEf12345678 and sk-proj-1234567890abcdef1234\n"
+        "HF_HOME=/cache/huggingface"
+    )
+    redacted = redacted_text_tail(payload, 4000)
+    for secret in (
+        "json-secret-1",
+        "json-secret-2",
+        "ghp_1234567890abcdef",
+        "github_pat_abcdef123456_789",
+        "hf_AbCdEf12345678",
+        "sk-proj-1234567890abcdef1234",
+    ):
+        assert secret not in redacted
+    assert "HF_HOME=/cache/huggingface" in redacted
+
+    adversarial = "A" * (1024 * 1024) + "_TOKEN"
+    start = time.perf_counter()
+    tail = redacted_text_tail(adversarial, 4000)
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    assert elapsed_ms < 50.0
+    assert len(tail) == 4000
+
+    large_log = tmp_path / "large.log"
+    large_log.write_text(
+        "A" * (1024 * 1024) + '\n{"secret": "eof-secret-val"}\n',
+        encoding="utf-8",
+    )
+    file_tail = redacted_file_tail(large_log, 128)
+    assert "eof-secret-val" not in file_tail
+    assert '"secret": "<redacted>"' in file_tail

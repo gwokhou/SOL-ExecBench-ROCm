@@ -551,6 +551,9 @@ if [ -t 0 ] && [ -t 1 ]; then
     TTY_ARGS=(-it)
 fi
 
+# Scrub legacy/ambiguous ordinal remapping before deriving single-GPU defaults.
+unset CUDA_VISIBLE_DEVICES GPU_DEVICE_ORDINAL
+
 # Auto-derive single-GPU defaults when omitted, then validate bind sources.
 if [ "${DRY_RUN}" = "1" ]; then
     _defaults_flags=()
@@ -565,7 +568,7 @@ done < <(run_host_python -m sol_execbench.core.bench.single_gpu_defaults ${_defa
 if [ -n "${SOL_EXECBENCH_CLOCK_STATE_DIR:-}" ]; then
     export SOL_EXECBENCH_CLOCK_STATE_DIR
     if [ "${DRY_RUN}" != "1" ]; then
-        mkdir -p "${SOL_EXECBENCH_CLOCK_STATE_DIR}"
+        mkdir -m 0700 -p "${SOL_EXECBENCH_CLOCK_STATE_DIR}"
     fi
 fi
 GPU_LOCK_UUID="$(run_host_python -c 'from sol_execbench.core.bench.gpu_lock_paths import configured_gpu_locks; print(configured_gpu_locks().uuid)')"
@@ -579,10 +582,27 @@ for layer in L1-ownership L2-execution; do
 done
 mkdir -p "${OUTPUT_DIR}"
 
+DRI_DEVICE_ARGS=(--device=/dev/dri)
+if [ "${DRY_RUN}" != "1" ] || [ -n "${SOL_EXECBENCH_DEV_DRI_BY_PATH_DIR:-}" ]; then
+    GPU_BDF="${SOL_EXECBENCH_GPU_BDF_OVERRIDE:-}"
+    if [ -z "${GPU_BDF}" ]; then
+        GPU_BDF="$(run_host_python -c 'import os; from sol_execbench.core.bench.clock_ownership import observe_clock_devices; want = os.environ["GPU_LOCK_UUID"].strip().lower(); bdfs = {d.bdf.strip().lower() for d in observe_clock_devices() if d.uuid.strip().lower() == want}; print(next(iter(bdfs)) if len(bdfs) == 1 else "")' 2>/dev/null || true)"
+    fi
+    DRI_BY_PATH_DIR="${SOL_EXECBENCH_DEV_DRI_BY_PATH_DIR:-/dev/dri/by-path}"
+    if [ -n "${GPU_BDF}" ] && [ -e "${DRI_BY_PATH_DIR}/pci-${GPU_BDF}-render" ]; then
+        RENDER_NODE="$(readlink -f "${DRI_BY_PATH_DIR}/pci-${GPU_BDF}-render")"
+        DRI_DEVICE_ARGS=("--device=${RENDER_NODE}")
+        if [ -e "${DRI_BY_PATH_DIR}/pci-${GPU_BDF}-card" ]; then
+            CARD_NODE="$(readlink -f "${DRI_BY_PATH_DIR}/pci-${GPU_BDF}-card")"
+            DRI_DEVICE_ARGS+=("--device=${CARD_NODE}")
+        fi
+    fi
+fi
+
 DOCKER_COMMON_ARGS=(
     docker run --rm
     --device=/dev/kfd
-    --device=/dev/dri
+    "${DRI_DEVICE_ARGS[@]}"
     --group-add video
     --network=none
     --cap-drop=ALL

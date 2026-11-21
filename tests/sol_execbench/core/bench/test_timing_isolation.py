@@ -262,3 +262,44 @@ class TestValidateGPUDeviceIsolation:
             result = validate_gpu_device_isolation()
             assert result["gpu_count"] == 0
             assert any("gpu_count_unknown" in w for w in result["warnings"])
+
+    def test_rocr_uuid_pattern_is_accepted_and_self_pid_excluded(
+        self, monkeypatch
+    ):
+        import unittest.mock
+
+        monkeypatch.setenv(
+            "GPU_LOCK_UUID", "22222222-3333-4444-5555-666666666666"
+        )
+        with (
+            unittest.mock.patch(
+                "sol_execbench.core.bench.timing_isolation._detect_gpu_count",
+                return_value=4,
+            ),
+            unittest.mock.patch.dict("os.environ", {}, clear=False),
+        ):
+            result = validate_gpu_device_isolation(
+                gpu_device="GPU-0123456789abcdef"
+            )
+            assert result["isolated"] is True
+            assert result["rocr_visible_devices"] == "GPU-0123456789abcdef"
+
+        mock_proc = json.dumps(
+            [
+                {
+                    "gpu": 0,
+                    "process_list": [
+                        {"pid": os.getpid(), "name": "self"},
+                        {"pid": 54321, "name": "other"},
+                    ],
+                }
+            ]
+        )
+        with unittest.mock.patch(
+            "subprocess.run",
+            return_value=subprocess.CompletedProcess(
+                ["amd-smi"], returncode=0, stdout=mock_proc, stderr=""
+            ),
+        ):
+            procs = detect_concurrent_gpu_processes()
+            assert procs == [{"pid": 54321, "device": "0", "name": "other"}]

@@ -70,3 +70,37 @@ def test_failed_remove_requires_successful_absence_check(
             docker_process.ContainerCleanupError, match="cleanup_unverified"
         ):
             docker_process._remove_owned_container("docker", cidfile)
+
+
+def test_pre_container_docker_failure_without_cidfile_verifies_deterministic_name(
+    monkeypatch, tmp_path
+) -> None:
+    lease_id = "b" * 32
+    cidfile = tmp_path / f"{lease_id}.container-id"
+    seen_commands: list[list[str]] = []
+
+    def attached(command, **_kwargs):
+        seen_commands.append(list(command))
+        return subprocess.CompletedProcess(command, 125)
+
+    def bounded(command, **_kwargs):
+        seen_commands.append(list(command))
+        assert command == [
+            "docker",
+            "ps",
+            "--all",
+            "--quiet",
+            "--no-trunc",
+            "--filter",
+            f"name=^/sol-execbench-{lease_id}$",
+        ]
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(docker_process, "run_attached_process_group", attached)
+    monkeypatch.setattr(docker_process, "run_in_process_group_bounded", bounded)
+
+    completed = docker_process.run_owned_docker_process(
+        ["docker", "run", "missing-image"], {}, cidfile=cidfile
+    )
+    assert completed.returncode == 125
+    assert f"sol-execbench-{lease_id}" in seen_commands[0]

@@ -157,6 +157,15 @@ def test_extract_rejects_unbounded_disassembly(
     with pytest.raises(ValueError, match="disassembly exceeds"):
         code_object.extract_code_object(binary, "gfx942", tmp_path / "work")
 
+    monkeypatch.setattr(code_object, "MAX_DISASSEMBLY_BYTES", 1024)
+    monkeypatch.setattr(
+        code_object,
+        "_run",
+        lambda *_args: _completed("[output truncated to final bytes]\ntail"),
+    )
+    with pytest.raises(ValueError, match="disassembly exceeds"):
+        code_object.extract_code_object(binary, "gfx942", tmp_path / "work")
+
 
 def test_dump_fatbin_requires_created_artifact(
     tmp_path: Path,
@@ -176,7 +185,7 @@ def test_tool_and_command_failures_are_actionable(monkeypatch) -> None:
 
     monkeypatch.setattr(
         code_object,
-        "run_in_process_group",
+        "run_in_process_group_bounded",
         lambda *_args, **_kwargs: _completed(
             stderr="compiler failed",
             returncode=1,

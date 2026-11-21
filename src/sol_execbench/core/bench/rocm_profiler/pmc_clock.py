@@ -35,6 +35,7 @@ from sol_execbench.core.bench.clock_ownership import (
 )
 from sol_execbench.core.bench.gpu_lock import gpu_lock_directory
 from sol_execbench.core.bench.gpu_lock_paths import (
+    GPU_LOCK_HOST_ENV,
     GPU_LOCK_UUID_ENV,
     normalize_gpu_uuid,
 )
@@ -54,13 +55,24 @@ from sol_execbench.core.platform.clock_commands import (
     ClockLevel,
     clock_arguments,
     clock_executable,
+    host_clock_executable,
 )
-from sol_execbench.core.process.environment import ENV_ROCR_VISIBLE_DEVICES
+from sol_execbench.core.platform.kfd_topology import (
+    DEFAULT_KFD_TOPOLOGY_NODES_ROOT,
+    DEFAULT_PCI_DEVICES_ROOT,
+    effective_kfd_nodes_root,
+    read_kfd_gpu_nodes,
+)
+from sol_execbench.core.process.environment import (
+    ENV_ROCR_VISIBLE_DEVICES,
+    ENV_SOL_EXECBENCH_CLOCKS_LOCKED,
+)
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 from sol_execbench.core.process.termination import cleanup_on_termination
 from sol_execbench.core.timestamps import utc_timestamp
 
-PCI_DEVICES_ROOT = Path("/sys/bus/pci/devices")
+PCI_DEVICES_ROOT = DEFAULT_PCI_DEVICES_ROOT
+KFD_TOPOLOGY_NODES_ROOT = DEFAULT_KFD_TOPOLOGY_NODES_ROOT
 CONTROL_TIMEOUT_SECONDS = 20
 CONTROL_OUTPUT_BYTES = 8192
 ARCHIVE_SUFFIX = ".pmc-clock"
@@ -88,7 +100,7 @@ def required_visible_rocr_uuid() -> str:
 
 
 def _resolve_visible_rocr_bdf(visible: str) -> str | None:
-    """Resolve one ROCr GPU-<unique_id> selector to its unique PCI BDF."""
+    """Resolve one ROCr GPU-<unique_id> selector to its unique target."""
     if re.fullmatch(ROCR_UUID_PATTERN, visible) is None:
         return None
     want = visible.removeprefix("GPU-").lower()
@@ -97,7 +109,20 @@ def _resolve_visible_rocr_bdf(visible: str) -> str | None:
         with suppress(OSError):
             if uid_path.read_text(encoding="utf-8").strip().lower() == want:
                 matches.append(uid_path.parent.name.lower())
-    return matches[0] if len(matches) == 1 else None
+    if len(matches) == 1:
+        return matches[0]
+    kfd_nodes = read_kfd_gpu_nodes(
+        effective_kfd_nodes_root(PCI_DEVICES_ROOT, KFD_TOPOLOGY_NODES_ROOT)
+    )
+    kfd_matches = [bdf for bdf, uid in kfd_nodes if uid == want]
+    if len(kfd_matches) != 1:
+        return None
+    matched_bdf = kfd_matches[0]
+    same_bdf_count = sum(bdf == matched_bdf for bdf, _ in kfd_nodes)
+    lock_uuid = os.environ.get(GPU_LOCK_UUID_ENV, "").strip()
+    if same_bdf_count > 1 and lock_uuid:
+        return normalize_gpu_uuid(lock_uuid)
+    return matched_bdf
 
 
 def _default_pmc_clock_target() -> str:
@@ -118,15 +143,17 @@ class PMCClockOptions:
 
     def __post_init__(self) -> None:
         """Normalize the policy and reject empty device selectors."""
+        normalized_target = self.target.strip().lower()
+        object.__setattr__(self, "target", normalized_target)
         object.__setattr__(self, "mode", PMCClockMode(self.mode))
-        if not self.target.strip() or self.target.startswith("-"):
+        if not normalized_target or normalized_target.startswith("-"):
             raise ValueError(
                 "pmc_clock_target_invalid: use a GPU BDF, UUID, index or all"
             )
 
 
 def configured_pmc_clock_options() -> PMCClockOptions | None:
-    """Auto-enable when ROCR_VISIBLE_DEVICES maps to one local PCI GPU."""
+    """Auto-enable when ROCR_VISIBLE_DEVICES maps to one local GPU."""
     target = os.environ.get(ENV_PMC_CLOCK_TARGET)
     if target is None:
         visible = os.environ.get(ENV_ROCR_VISIBLE_DEVICES, "").strip()
@@ -182,9 +209,11 @@ class PMCClockControl:
 
     def run(self, *arguments: str, mutate: bool = False) -> str:
         """Run one command; retain bounded tool output without environment."""
-        command = [self.executable, *arguments]
-        if mutate:
-            command = ["sudo", "-n", *command]
+        command = (
+            ["sudo", "-n", host_clock_executable(), *arguments]
+            if mutate
+            else [self.executable, *arguments]
+        )
         self.receipt.observations.append(
             {"started_arguments": " ".join(arguments)}
         )
@@ -210,13 +239,17 @@ class PMCClockControl:
             )
         return result.stdout
 
-    def verify(self, level: ClockLevel) -> None:
-        """Require exactly one selected device reporting the requested policy."""
+    def observe_levels(self) -> tuple[str, ...]:
+        """Read normalized performance levels for the selected target."""
         raw = self.run(
             "metric", "--gpu", self.options.target, "--perf-level", "--json"
         )
+        return parse_performance_levels(raw)
+
+    def verify(self, level: ClockLevel) -> None:
+        """Require every selected device reporting the requested policy."""
         if (
-            parse_performance_levels(raw)
+            self.observe_levels()
             != (f"AMDSMI_DEV_PERF_LEVEL_{level}",) * self.device_count
         ):
             raise RuntimeError(f"pmc_clock_readback_failed: expected {level}")
@@ -238,6 +271,12 @@ class PMCClockControl:
 
     def preflight(self) -> None:
         """Refuse wrong identity or an externally owned performance policy."""
+        lock_uuid = os.environ.get(GPU_LOCK_UUID_ENV, "").strip()
+        if self.options.target == ALL_GPU_TARGET and lock_uuid:
+            raise RuntimeError(
+                "pmc_clock_identity_mismatch: "
+                "all-GPU target disallowed when GPU_LOCK_UUID is set"
+            )
         identities = AMDSMIListPayload.model_validate_json(
             self.run("list", "--json"),
         ).root
@@ -246,9 +285,9 @@ class PMCClockControl:
             for item in identities
             if self.options.target
             in (
-                item.bdf,
-                item.uuid,
-                str(item.gpu),
+                (item.bdf or "").strip().lower(),
+                (item.uuid or "").strip().lower(),
+                str(item.gpu).strip().lower(),
                 ALL_GPU_TARGET,
             )
         ]
@@ -259,11 +298,10 @@ class PMCClockControl:
             raise RuntimeError("pmc_clock_identity_mismatch: refusing mutation")
         if any(not item.bdf or not item.uuid for item in selected):
             raise ClockOwnershipError("pmc_clock_identity_incomplete")
-        lock_uuid = os.environ.get(GPU_LOCK_UUID_ENV, "").strip()
         if (
             self.options.target != ALL_GPU_TARGET
             and lock_uuid
-            and (selected[0].uuid or "").lower()
+            and (selected[0].uuid or "").strip().lower()
             != normalize_gpu_uuid(lock_uuid)
         ):
             raise RuntimeError(
@@ -271,7 +309,10 @@ class PMCClockControl:
                 "target UUID disagrees with GPU_LOCK_UUID"
             )
         self.devices = tuple(
-            ClockDevice(bdf=str(item.bdf), uuid=str(item.uuid))
+            ClockDevice(
+                bdf=str(item.bdf).strip().lower(),
+                uuid=str(item.uuid).strip().lower(),
+            )
             for item in selected
         )
 
@@ -304,31 +345,89 @@ class PMCClockControl:
 
 
 @contextmanager
+def _elevate_natural_owner_window(
+    control: PMCClockControl, owner: str
+) -> Iterator[ClockLockLease]:
+    """Temporarily lock STABLE_PEAK under an active natural AUTO owner."""
+    control.receipt = control.receipt.model_copy(
+        update={"ownership": ClockOwnership.OWNED, "owner_lease_id": owner}
+    )
+    control.save()
+    activation_started = False
+
+    def rollback() -> bool:
+        return not activation_started or control.restore()
+
+    lease = ClockLockLease(locked=False, acquired=True, restore=rollback)
+    try:
+        with lease:
+            activation_started = True
+            control.set_level(ClockLevel.PEAK)
+            control.verify(ClockLevel.PEAK)
+            lease.locked = True
+            control.receipt = control.receipt.model_copy(
+                update={"peak_verified": True}
+            )
+            control.save()
+            lease.publish_environment()
+            try:
+                yield lease
+            finally:
+                lease.restore_environment()
+                verify_clock_owner(gpu_lock_directory(), owner, control.devices)
+    except BaseException as error:
+        if not lease.released and lease.release_blocker is None:
+            raise ClockRestoreError(
+                "clock_restore_unverified: failed to reset and verify owned "
+                "GPU policy at AUTO; inspect the clock owner record"
+            ) from error
+        raise
+
+
+@contextmanager
 def _lease_window(control: PMCClockControl) -> Iterator[ClockLockLease]:
     """Borrow a live verified owner or publish our own restoration obligation."""
     control.preflight()
     owner = os.environ.get(ENV_CLOCK_OWNER)
     if owner is not None:
         verify_clock_owner(gpu_lock_directory(), owner, control.devices)
-        control.verify(ClockLevel.PEAK)
-        control.receipt = control.receipt.model_copy(
-            update={
-                "ownership": ClockOwnership.BORROWED,
-                "owner_lease_id": owner,
-                "peak_verified": True,
-            }
-        )
-        control.save()
-        try:
-            with ClockLockLease(locked=True, acquired=False) as lease:
-                yield lease
-        finally:
+        levels = control.observe_levels()
+        expected_peak = (
+            f"AMDSMI_DEV_PERF_LEVEL_{ClockLevel.PEAK}",
+        ) * control.device_count
+        expected_auto = (
+            f"AMDSMI_DEV_PERF_LEVEL_{ClockLevel.AUTO}",
+        ) * control.device_count
+        if levels == expected_peak:
             control.receipt = control.receipt.model_copy(
-                update={"borrow_ended": True}
+                update={
+                    "ownership": ClockOwnership.BORROWED,
+                    "owner_lease_id": owner,
+                    "peak_verified": True,
+                }
             )
-            verify_clock_owner(gpu_lock_directory(), owner, control.devices)
-            control.verify(ClockLevel.PEAK)
-        return
+            control.save()
+            try:
+                with ClockLockLease(locked=True, acquired=False) as lease:
+                    yield lease
+            finally:
+                control.receipt = control.receipt.model_copy(
+                    update={"borrow_ended": True}
+                )
+                verify_clock_owner(gpu_lock_directory(), owner, control.devices)
+                control.verify(ClockLevel.PEAK)
+            return
+        if (
+            levels == expected_auto
+            and os.environ.get(ENV_SOL_EXECBENCH_CLOCKS_LOCKED) != "1"
+            and os.environ.get(GPU_LOCK_HOST_ENV) != "1"
+        ):
+            with _elevate_natural_owner_window(control, owner) as lease:
+                yield lease
+            return
+        raise RuntimeError(
+            f"pmc_clock_readback_failed: expected {ClockLevel.PEAK}"
+        )
     control.verify(ClockLevel.AUTO)
     control.receipt = control.receipt.model_copy(
         update={"ownership": ClockOwnership.OWNED}
@@ -369,8 +468,8 @@ def pmc_clock_window(
                     owned = control.receipt.ownership == ClockOwnership.OWNED
                     if (
                         options.mode == PMCClockMode.REQUIRED
-                        or os.environ.get(ENV_CLOCK_OWNER) is not None
-                        or (owned and not control.receipt.auto_verified)
+                        or not owned
+                        or not control.receipt.auto_verified
                     ):
                         raise
                     lease = ClockLockLease(locked=False, acquired=False)

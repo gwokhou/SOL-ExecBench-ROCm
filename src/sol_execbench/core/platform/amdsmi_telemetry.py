@@ -9,6 +9,7 @@ import argparse
 import ctypes
 import importlib
 import json
+import os
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -92,9 +93,22 @@ def collect_throttle_evidence(amdsmi: Path, index: int) -> dict[str, object]:
     api.amdsmi_init()
     try:
         handles = api.amdsmi_get_processor_handles()
-        if index < 0 or index >= len(handles):
-            raise ValueError("AMD-SMI device index is unavailable")
-        result = _raw_snapshot(api, handles[index])
+        env_uuid = os.environ.get("GPU_LOCK_UUID", "").strip().lower()
+        selected_handle: object | None = None
+        if env_uuid:
+            matched = [
+                handle
+                for handle in handles
+                if str(api.amdsmi_get_gpu_device_uuid(handle)).strip().lower()
+                == env_uuid
+            ]
+            if len(matched) == 1:
+                selected_handle = matched[0]
+        if selected_handle is None:
+            if index < 0 or index >= len(handles):
+                raise ValueError("AMD-SMI device index is unavailable")
+            selected_handle = handles[index]
+        result = _raw_snapshot(api, selected_handle)
         result["cli_version"] = version.stdout.strip()[:1000]
         result["cli_path"] = str(amdsmi.resolve())
         return result

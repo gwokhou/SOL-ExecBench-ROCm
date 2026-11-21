@@ -5,7 +5,10 @@
 
 from __future__ import annotations
 
+import io
+import os
 import re
+import stat
 import subprocess
 import tempfile
 from collections.abc import Callable
@@ -17,26 +20,38 @@ DEFAULT_LOG_TAIL_CHARS = 4000
 MAX_EMBEDDED_LOG_BYTES = 64 * 1024
 
 _TOKEN_PATTERN = re.compile(
-    r"(?ix)"
+    r"(?x)"
+    r"(?:"
+    r"(?i:"
     r"("
-    r"(?:[A-Z0-9_]*?(?:TOKEN|SECRET|PASSWORD|PASSWD|API[_-]?KEY|CREDENTIAL)[A-Z0-9_-]*?)"
-    r"|authorization"
+    r"[\"\']?"
+    r"(?:(?:TOKEN|SECRET|PASSWORD|PASSWD|API[_-]?KEY|CREDENTIAL)[A-Z0-9_-]{0,64}?"
+    r"|(?<![A-Z0-9_-])authorization)"
     r")"
-    r"(\s*:\s*bearer\s+|\s*[:=]\s*)"
-    r"([^\s'\"]+)",
+    r"([\"\']?\s*[:=]\s*[\"\']?(?:bearer\s+)?)"
+    r"([^\s\"\',}]+)"
+    r")"
+    r"|"
+    r"(?<![A-Za-z0-9_-])"
+    r"(?:gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+|hf_[A-Za-z0-9]+|sk-[A-Za-z0-9_-]{16,})"
+    r")",
 )
 _TOKEN_PREFIX_OVERLAP_CHARS = 512
-_TOKEN_VALUE_DELIMITERS = frozenset(" \t\r\n'\"")
+_TOKEN_VALUE_DELIMITERS = frozenset(" \t\r\n'\",}")
+
+
+def _replace_token_match(match: re.Match[str]) -> str:
+    if match.group(1) is not None:
+        return f"{match.group(1)}{match.group(2)}<redacted>"
+    return "<redacted>"
 
 
 def redacted_text_tail(value: str, limit: int = DEFAULT_LOG_TAIL_CHARS) -> str:
     """Return the bounded tail of *value* with common credentials redacted."""
     if limit <= 0:
         return ""
-    redacted = _TOKEN_PATTERN.sub(
-        lambda match: f"{match.group(1)}{match.group(2)}<redacted>",
-        value,
-    )
+    window = value[-(limit + _TOKEN_PREFIX_OVERLAP_CHARS) :]
+    redacted = _TOKEN_PATTERN.sub(_replace_token_match, window)
     return redacted[-limit:]
 
 
@@ -46,6 +61,20 @@ def _append_tail(tail: str, text: str, limit: int) -> str:
     return (tail + text)[-limit:]
 
 
+def _seek_near_tail(handle: io.BufferedReader, limit: int) -> None:
+    info = os.fstat(handle.fileno())
+    seek_span = limit * 4 + _TOKEN_PREFIX_OVERLAP_CHARS * 2
+    if not stat.S_ISREG(info.st_mode) or info.st_size <= seek_span:
+        return
+    handle.seek(info.st_size - seek_span)
+    prefix = handle.peek(4)[:4]
+    skip = 0
+    while skip < len(prefix) and 0x80 <= prefix[skip] < 0xC0:
+        skip += 1
+    if skip:
+        handle.read(skip)
+
+
 def _redacted_file_tail(path: Path, limit: int) -> str:
     tail = ""
     pending = ""
@@ -53,6 +82,7 @@ def _redacted_file_tail(path: Path, limit: int) -> str:
     chunk_size = max(limit, 8192)
 
     with path.open("rb") as handle:
+        _seek_near_tail(handle, limit)
         for raw_chunk in iter(lambda: handle.read(chunk_size), b""):
             text = raw_chunk.decode(errors="replace")
             if in_secret:
@@ -81,11 +111,7 @@ def _redacted_file_tail(path: Path, limit: int) -> str:
                     break
 
                 tail = _append_tail(tail, pending[: match.start()], limit)
-                tail = _append_tail(
-                    tail,
-                    f"{match.group(1)}{match.group(2)}<redacted>",
-                    limit,
-                )
+                tail = _append_tail(tail, _replace_token_match(match), limit)
                 if match.end() == len(pending):
                     pending = ""
                     in_secret = True

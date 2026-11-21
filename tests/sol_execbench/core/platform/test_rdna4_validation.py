@@ -34,14 +34,14 @@ def _environment() -> dict:
                     "gfx_target": "gfx1200",
                 },
             ],
-            "rocm": {"version": "7.2.0"},
+            "rocm": {"version": "10.1.0"},
             "pytorch": {
                 "available": True,
                 "device_count": 1,
                 "device_name": "AMD Radeon RX 9060 XT",
                 "gfx_target": "gfx1200",
-                "torch_version": "2.11.0+rocm7.2",
-                "hip_version": "7.2.26015",
+                "torch_version": "2.14.0+rocm10.1.0",
+                "hip_version": "7.16.26385",
             },
         },
     }
@@ -104,8 +104,8 @@ def test_verifies_content_addressed_local_rdna4_bundle(tmp_path: Path):
     assert verified == manifest
     assert verified["status"] == "passed"
     assert verified["release_eligible"] is False
-    assert verified["target"]["rocm_version"] == "7.2.0"
-    assert verified["target"]["torch_version"] == "2.11.0+rocm7.2"
+    assert verified["target"]["rocm_version"] == "10.1.0"
+    assert verified["target"]["torch_version"] == "2.14.0+rocm10.1.0"
 
 
 def test_local_validation_bundle_cannot_become_publisher_release(

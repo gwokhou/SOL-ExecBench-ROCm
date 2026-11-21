@@ -55,3 +55,19 @@ def test_release_workflow_publishes_only_supported_tag_scoped_assets() -> None:
     assert 'os.environ["TAG_SHA"]' in workflow
     assert "${{ github.sha }}" not in workflow
     assert "GH_TOKEN: ${{ github.token }}" in workflow
+
+
+def test_rdna4_hardware_and_score_release_workflows_are_hardened() -> None:
+    rdna4 = (WORKFLOW_DIR / "rdna4-hardware.yml").read_text(encoding="utf-8")
+    assert 'ROCR_VISIBLE_DEVICES: "0"' not in rdna4
+    assert (
+        "sol_execbench.core.bench.single_gpu_defaults --prepare-locks" in rdna4
+    )
+    assert "solar corpus-audit" not in rdna4
+    assert "solar qualify-static" in rdna4
+
+    score = (WORKFLOW_DIR / "score-release.yml").read_text(encoding="utf-8")
+    assert 'ref: "refs/tags/${{ inputs.tag }}"' in score
+    assert "refs/tags/${RELEASE_TAG}^{commit}" in score
+    assert "--verify-tag" in score
+    assert "-*" in score

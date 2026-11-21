@@ -29,7 +29,9 @@ from sol_execbench.core.process.process_observation import (
 _MAX_CAPTURE_BYTES = 5 * 1024 * 1024
 _OUTPUT_DRAIN_GRACE_SECONDS = 5.0
 _PROCESS_GROUP_GRACE_SECONDS = 1.0
+_POST_SIGKILL_WAIT_SECONDS = 5.0
 _WAIT_POLL_SECONDS = 0.01
+TRUNCATED_OUTPUT_PREFIX = "[output truncated to final bytes]\n"
 
 
 class TextSubprocessRunner(Protocol):
@@ -300,7 +302,7 @@ class _TailCapture:
     def text(self) -> str:
         value = b"".join(self.chunks).decode("utf-8", errors="replace")
         if self.truncated:
-            return "[output truncated to final bytes]\n" + value
+            return TRUNCATED_OUTPUT_PREFIX + value
         return value
 
 
@@ -378,13 +380,21 @@ def _terminate_unreaped_process_group(
     workers: tuple[_CaptureWorker, ...] = (),
 ) -> None:
     _signal_unreaped_process_group(process, signal.SIGTERM)
+    exited = True
     try:
         wait_for_exit_without_reaping(process, _PROCESS_GROUP_GRACE_SECONDS)
     except subprocess.TimeoutExpired:
         _signal_unreaped_process_group(process, signal.SIGKILL)
-        wait_for_exit_without_reaping(process, None)
+        try:
+            wait_for_exit_without_reaping(process, _POST_SIGKILL_WAIT_SECONDS)
+        except subprocess.TimeoutExpired:
+            exited = False
     _cleanup_unreaped_process_group(process, workers)
-    process.wait()
+    if exited:
+        with suppress(subprocess.TimeoutExpired):
+            process.wait(timeout=_POST_SIGKILL_WAIT_SECONDS)
+    else:
+        process.poll()
 
 
 def _cleanup_unreaped_process_group(
@@ -447,6 +457,8 @@ def _terminate_process_group(
     extra_groups = _extra_session_groups(process)
     try:
         os.killpg(process.pid, signal.SIGTERM)
+    except PermissionError:
+        pass
     except ProcessLookupError:
         _signal_groups(extra_groups, signal.SIGTERM)
         return
@@ -460,23 +472,29 @@ def _terminate_process_group(
         more_groups = _extra_session_groups(process) | extra_groups
         try:
             os.killpg(process.pid, signal.SIGKILL)
+        except PermissionError:
+            pass
         except ProcessLookupError:
             _signal_groups(more_groups, signal.SIGKILL)
             return
         _signal_groups(more_groups, signal.SIGKILL)
-        if drain_output:
-            process.communicate()
-        else:
-            process.wait()
+        with suppress(subprocess.TimeoutExpired):
+            if drain_output:
+                process.communicate(timeout=_POST_SIGKILL_WAIT_SECONDS)
+            else:
+                process.wait(timeout=_POST_SIGKILL_WAIT_SECONDS)
 
 
 def _terminate_attached_process(
     process: subprocess.Popen[str] | subprocess.Popen[bytes],
 ) -> None:
     """Terminate an interactive child without signaling the caller's group."""
-    process.terminate()
+    with suppress(PermissionError, ProcessLookupError):
+        process.terminate()
     try:
         process.wait(timeout=_PROCESS_GROUP_GRACE_SECONDS)
     except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait()
+        with suppress(PermissionError, ProcessLookupError):
+            process.kill()
+        with suppress(subprocess.TimeoutExpired):
+            process.wait(timeout=_POST_SIGKILL_WAIT_SECONDS)

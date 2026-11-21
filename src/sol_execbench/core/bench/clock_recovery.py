@@ -40,6 +40,8 @@ from sol_execbench.tools.docker_process import (
     CONTAINER_CLEANUP_BLOCKER_PREFIX,
     CONTAINER_ID_SUFFIX,
     confirm_container_absent,
+    confirm_container_name_absent,
+    owned_container_name,
 )
 
 RECOVERY_TIMEOUT_SECONDS = 10
@@ -64,6 +66,35 @@ def _read_device(command: str, bdf: str, *arguments: str) -> str:
     return result.stdout
 
 
+def _verify_container_recovery(
+    path: Path, record: ClockOwnerRecord, token: str
+) -> None:
+    cid_path = path.with_suffix(CONTAINER_ID_SUFFIX)
+    cid = cid_path.read_text().strip() if cid_path.is_file() else ""
+    checked_name = False
+    if record.container_supervised:
+        if cid:
+            confirm_container_absent("docker", cid)
+        else:
+            confirm_container_name_absent("docker", owned_container_name(token))
+            checked_name = True
+    if record.release_blocker is None or (
+        record.release_blocker == EXECUTION_CLEANUP_BLOCKER
+    ):
+        return
+    if not record.release_blocker.startswith(CONTAINER_CLEANUP_BLOCKER_PREFIX):
+        raise ClockOwnershipError("clock_recovery_blocker_unresolved")
+    blocker_id = record.release_blocker.removeprefix(
+        CONTAINER_CLEANUP_BLOCKER_PREFIX
+    ).strip()
+    if blocker_id and blocker_id != "unknown":
+        confirm_container_absent("docker", blocker_id)
+    elif cid:
+        confirm_container_absent("docker", cid)
+    elif not checked_name:
+        confirm_container_name_absent("docker", owned_container_name(token))
+
+
 def confirm_clock_recovery(directory: Path, token: str) -> None:
     """Confirm recovery under GPU/owner exclusion, preserving the old receipt."""
     path = clock_owner_path(directory, token)
@@ -79,25 +110,7 @@ def confirm_clock_recovery(directory: Path, token: str) -> None:
         admission = configured_admission()
         if admission is not None:
             admission.require_owner(admission_device(record), token, path)
-        if record.container_supervised:
-            confirm_container_absent(
-                "docker",
-                path.with_suffix(CONTAINER_ID_SUFFIX).read_text().strip(),
-            )
-        if record.release_blocker is not None:
-            if record.release_blocker == EXECUTION_CLEANUP_BLOCKER:
-                pass  # The original owner still needs the live process/AUTO checks below.
-            elif not record.release_blocker.startswith(
-                CONTAINER_CLEANUP_BLOCKER_PREFIX
-            ):
-                raise ClockOwnershipError("clock_recovery_blocker_unresolved")
-            else:
-                confirm_container_absent(
-                    "docker",
-                    record.release_blocker.removeprefix(
-                        CONTAINER_CLEANUP_BLOCKER_PREFIX
-                    ),
-                )
+        _verify_container_recovery(path, record, token)
         if not set(record.devices).issubset(observe_clock_devices()):
             raise ClockOwnershipError("clock_recovery_device_mismatch")
         observations = []

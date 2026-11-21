@@ -123,7 +123,7 @@ class AMDIsa:
             [str(helper)],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
             text=True,
             bufsize=1,
             start_new_session=True,
@@ -182,7 +182,7 @@ class AMDIsa:
                 )
                 if not readable:
                     raise ISAProtocolError("AMD ISA helper response timed out")
-                raw = self._process.stdout.readline()
+                raw = self._process.stdout.readline(_MAX_MESSAGE_BYTES + 1)
             except OSError as exc:
                 raise ISAProtocolError(
                     "AMD ISA helper communication failed",
@@ -191,7 +191,9 @@ class AMDIsa:
                 raise ISAProtocolError(
                     "AMD ISA helper closed its response stream",
                 )
-            if len(raw.encode("utf-8")) > _MAX_MESSAGE_BYTES:
+            if len(raw) > _MAX_MESSAGE_BYTES or (
+                len(raw.encode("utf-8")) > _MAX_MESSAGE_BYTES
+            ):
                 raise ISAProtocolError(
                     "AMD ISA helper response exceeds protocol size limit",
                 )
@@ -228,7 +230,7 @@ class AMDIsa:
                     self._process.wait(timeout=2)
 
     def _terminate_process_group(self, signal_number: int) -> None:
-        with contextlib.suppress(ProcessLookupError):
+        with contextlib.suppress(PermissionError, ProcessLookupError):
             os.killpg(self._process.pid, signal_number)
 
     def __enter__(self) -> Self:

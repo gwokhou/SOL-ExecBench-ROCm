@@ -1,4 +1,6 @@
 # Managed by SOL ExecBench ROCm: sol-execbench-amd-smi
 # Allows only device-scoped STABLE_PEAK and AUTO setters.
+Defaults!/usr/bin/amd-smi env_reset, always_set_home, secure_path="/usr/sbin:/usr/bin:/sbin:/bin"
+Defaults!/usr/bin/amd-smi env_delete+="PYTHONPATH PYTHONHOME PYTHONSTARTUP PYTHONUSERBASE"
 runner ALL=(root) NOPASSWD: /usr/bin/amd-smi set -l STABLE_PEAK -g 00000000-0000-1000-8000-000000000001, \
     /usr/bin/amd-smi set -l AUTO -g 00000000-0000-1000-8000-000000000001

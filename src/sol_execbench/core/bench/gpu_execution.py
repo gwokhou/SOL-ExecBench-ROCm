@@ -7,7 +7,6 @@ import sys
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager, nullcontext
-from pathlib import Path
 
 from sol_execbench.core.bench.clock_lock import (
     ClockLockLease,
@@ -29,12 +28,18 @@ from sol_execbench.core.bench.gpu_lock import (
     require_supervised_gpu_execution,
 )
 from sol_execbench.core.bench.gpu_lock_paths import configured_gpu_locks
+from sol_execbench.core.platform.kfd_topology import (
+    DEFAULT_KFD_TOPOLOGY_NODES_ROOT,
+    DEFAULT_PCI_DEVICES_ROOT,
+    resolve_bdf_partition_unique_ids,
+)
 from sol_execbench.core.process.termination import (
     cleanup_on_termination,
     defer_termination,
 )
 
-PCI_DEVICES_ROOT = Path("/sys/bus/pci/devices")
+PCI_DEVICES_ROOT = DEFAULT_PCI_DEVICES_ROOT
+KFD_TOPOLOGY_NODES_ROOT = DEFAULT_KFD_TOPOLOGY_NODES_ROOT
 
 
 def resolve_gpu_device() -> ClockDevice:
@@ -43,24 +48,41 @@ def resolve_gpu_device() -> ClockDevice:
     requested = os.environ.get("SOL_EXECBENCH_HOST_CLOCK_GPU_UUID", paths.uuid)
     if requested.strip().lower() != paths.uuid:
         raise ClockOwnershipError("GPU target and GPU_LOCK_UUID disagree")
+    all_devices = observe_clock_devices()
     selected = [
-        device
-        for device in observe_clock_devices()
-        if device.uuid.lower() == paths.uuid
+        device for device in all_devices if device.uuid.lower() == paths.uuid
     ]
     if len(selected) != 1:
         raise ClockOwnershipError("GPU_LOCK_UUID has no unique native device")
     device = ClockDevice(
         bdf=selected[0].bdf.lower(), uuid=selected[0].uuid.lower()
     )
-    # Read the actual ROCr identity from this BDF; never derive a lock UUID
-    # from a visible ordinal or convert a truncated ROCr UUID into an SMI UUID.
-    unique = (
-        (PCI_DEVICES_ROOT / device.bdf / "unique_id")
-        .read_text()
-        .strip()
-        .lower()
+    same_bdf = [
+        candidate
+        for candidate in all_devices
+        if candidate.bdf.lower() == device.bdf
+    ]
+    partition_index = same_bdf.index(selected[0])
+    partition_uids = resolve_bdf_partition_unique_ids(
+        device.bdf,
+        len(same_bdf),
+        pci_root=PCI_DEVICES_ROOT,
+        kfd_root=KFD_TOPOLOGY_NODES_ROOT,
     )
+    if len(partition_uids) != len(same_bdf):
+        if len(same_bdf) == 1:
+            unique = (
+                (PCI_DEVICES_ROOT / device.bdf / "unique_id")
+                .read_text()
+                .strip()
+                .lower()
+            )
+        else:
+            raise ClockOwnershipError(
+                "partitioned GPU BDF lacks unique KFD topology identity"
+            )
+    else:
+        unique = partition_uids[partition_index]
     visible = os.environ.get("ROCR_VISIBLE_DEVICES", "").strip().lower()
     if not unique or visible != f"gpu-{unique}":
         raise ClockOwnershipError(
@@ -69,6 +91,14 @@ def resolve_gpu_device() -> ClockDevice:
     if os.environ.get("HIP_VISIBLE_DEVICES") not in (None, "0"):
         raise ClockOwnershipError(
             "HIP_VISIBLE_DEVICES must preserve the single resolved GPU"
+        )
+    if os.environ.get("CUDA_VISIBLE_DEVICES") not in (None, "", "0"):
+        raise ClockOwnershipError(
+            "CUDA_VISIBLE_DEVICES must preserve the single resolved GPU"
+        )
+    if os.environ.get("GPU_DEVICE_ORDINAL", "").strip():
+        raise ClockOwnershipError(
+            "GPU_DEVICE_ORDINAL must not remap the resolved GPU"
         )
     return device
 

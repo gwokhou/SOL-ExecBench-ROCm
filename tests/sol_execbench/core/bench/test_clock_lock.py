@@ -38,7 +38,7 @@ class TestLockClocks:
         from sol_execbench.core.bench.gpu_lock import GPULockVerificationError
 
         with (
-            patch(f"{_MODULE}.subprocess.run") as run,
+            patch(f"{_MODULE}.run_in_process_group_bounded") as run,
             pytest.raises((FileNotFoundError, GPULockVerificationError)),
         ):
             acquire_clock_lock()
@@ -53,7 +53,7 @@ class TestLockClocks:
             patch.object(
                 gpu_execution, "verify_clocks", return_value=locked
             ) as verify,
-            patch(f"{_MODULE}.subprocess.run") as run,
+            patch(f"{_MODULE}.run_in_process_group_bounded") as run,
             gpu_execution.native_gpu_execution(),
         ):
             with acquire_clock_lock() as lease:
@@ -189,21 +189,23 @@ class TestVerifyClocks:
             '{"gpu_data": [{"gpu": 0, "perf_level": '
             '"AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK"}]}',
         )
-        with patch(f"{_MODULE}.subprocess.run", return_value=result) as run:
+        with patch(
+            f"{_MODULE}.run_in_process_group_bounded", return_value=result
+        ) as run:
             assert verify_clocks() is True
         run.assert_called_once_with(
             ["amd-smi", "metric", "-l", "--json"],
-            capture_output=True,
-            check=True,
-            text=True,
             timeout=10,
+            max_capture_bytes=clock_lock_module.CLOCK_COMMAND_OUTPUT_BYTES,
         )
 
     def test_auto_detected_as_not_locked(self):
         result = self._make_smi_result(
             '{"gpu_data": [{"gpu": 0, "perf_level": "AMDSMI_DEV_PERF_LEVEL_AUTO"}]}',
         )
-        with patch(f"{_MODULE}.subprocess.run", return_value=result):
+        with patch(
+            f"{_MODULE}.run_in_process_group_bounded", return_value=result
+        ):
             assert verify_clocks() is False
 
     def test_mixed_gpu_levels_are_not_locked(self):
@@ -212,7 +214,9 @@ class TestVerifyClocks:
             '{"gpu": 0, "perf_level": "AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK"},'
             '{"gpu": 1, "perf_level": "AMDSMI_DEV_PERF_LEVEL_AUTO"}]}',
         )
-        with patch(f"{_MODULE}.subprocess.run", return_value=result):
+        with patch(
+            f"{_MODULE}.run_in_process_group_bounded", return_value=result
+        ):
             assert verify_clocks() is False
 
     def test_all_gpu_levels_must_be_stable_peak(self):
@@ -221,30 +225,38 @@ class TestVerifyClocks:
             '{"gpu": 0, "perf_level": "AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK"},'
             '{"gpu": 1, "perf_level": "AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK"}]}',
         )
-        with patch(f"{_MODULE}.subprocess.run", return_value=result):
+        with patch(
+            f"{_MODULE}.run_in_process_group_bounded", return_value=result
+        ):
             assert verify_clocks() is True
 
     def test_amd_smi_not_found(self):
-        with patch(f"{_MODULE}.subprocess.run", side_effect=FileNotFoundError):
+        with patch(
+            f"{_MODULE}.run_in_process_group_bounded",
+            side_effect=FileNotFoundError,
+        ):
             assert verify_clocks() is False
 
     def test_amd_smi_nonzero_exit(self):
-        import subprocess as sp
-
+        result = self._make_smi_result("", returncode=1)
         with patch(
-            f"{_MODULE}.subprocess.run",
-            side_effect=sp.CalledProcessError(1, "amd-smi"),
+            f"{_MODULE}.run_in_process_group_bounded",
+            return_value=result,
         ):
             assert verify_clocks() is False
 
     def test_empty_gpu_data(self):
         result = self._make_smi_result('{"gpu_data": []}')
-        with patch(f"{_MODULE}.subprocess.run", return_value=result):
+        with patch(
+            f"{_MODULE}.run_in_process_group_bounded", return_value=result
+        ):
             assert verify_clocks() is False
 
     def test_invalid_json(self):
         result = self._make_smi_result("not-json")
-        with patch(f"{_MODULE}.subprocess.run", return_value=result):
+        with patch(
+            f"{_MODULE}.run_in_process_group_bounded", return_value=result
+        ):
             assert verify_clocks() is False
 
 
@@ -261,7 +273,7 @@ class TestUnlockClocks:
             stderr="",
         )
         with patch(
-            f"{_MODULE}.subprocess.run",
+            f"{_MODULE}.run_in_process_group_bounded",
             side_effect=[reset, verify],
         ) as mock_run:
             assert unlock_clocks() is True
@@ -285,12 +297,15 @@ class TestUnlockClocks:
             ),
             stderr="",
         )
-        with patch(f"{_MODULE}.subprocess.run", side_effect=[reset, verify]):
+        with patch(
+            f"{_MODULE}.run_in_process_group_bounded",
+            side_effect=[reset, verify],
+        ):
             assert unlock_clocks() is False
 
     def test_does_not_raise_on_failure(self):
         with patch(
-            f"{_MODULE}.subprocess.run",
+            f"{_MODULE}.run_in_process_group_bounded",
             side_effect=Exception("no sudo"),
         ):
             assert unlock_clocks() is False

@@ -19,6 +19,7 @@ def test_preserves_explicit_rocm_and_thread_runtime_configuration(
         "MIOPEN_USER_DB_PATH": "/var/cache/miopen",
         "DEVICE_LIB_PATH": "/opt/rocm/amdgcn/bitcode",
         "SOL_EXECBENCH_DEVICE": "cuda:1",
+        "GPU_DEVICE_ORDINAL": "2",
         "OPENAI_API_KEY": "secret",
     }
 
@@ -30,7 +31,13 @@ def test_preserves_explicit_rocm_and_thread_runtime_configuration(
     assert result["DEVICE_LIB_PATH"] == "/opt/rocm/amdgcn/bitcode"
     assert result["SOL_EXECBENCH_DEVICE"] == "cuda:1"
     assert result["ROCPROF_TMPDIR"] == str(tmp_path / ".tmp")
+    assert result["PYTHONSAFEPATH"] == "1"
+    assert "GPU_DEVICE_ORDINAL" not in result
     assert "OPENAI_API_KEY" not in result
+    overridden = sanitized_subprocess_env(
+        base, staging_dir=tmp_path, extra_env={"PYTHONSAFEPATH": "0"}
+    )
+    assert overridden["PYTHONSAFEPATH"] == "0"
 
 
 @pytest.mark.parametrize(

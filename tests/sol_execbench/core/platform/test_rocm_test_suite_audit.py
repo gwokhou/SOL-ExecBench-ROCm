@@ -159,7 +159,7 @@ def test_rdna4_hardware_workflow_is_exact_and_publishes_evidence():
     required = [
         "runs-on: [self-hosted, linux, x64, rocm, gfx1200]",
         'HIP_VISIBLE_DEVICES: "0"',
-        'ROCR_VISIBLE_DEVICES: "0"',
+        "sol_execbench.core.bench.single_gpu_defaults --prepare-locks",
         "workflow_dispatch:",
         "scripts/internal/rdna4/run_rdna4_validation.py",
         "--output-dir out/rdna4-ci",
@@ -170,6 +170,7 @@ def test_rdna4_hardware_workflow_is_exact_and_publishes_evidence():
     ]
     for phrase in required:
         assert phrase in workflow
+    assert 'ROCR_VISIBLE_DEVICES: "0"' not in workflow
     assert "pull_request:" not in workflow
     assert "schedule:" not in workflow
     assert "push:" not in workflow

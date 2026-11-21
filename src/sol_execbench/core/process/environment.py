@@ -35,7 +35,6 @@ _PASSTHROUGH_NAMES = frozenset(
     {
         "DEVICE_LIB_PATH",
         "FLASHINFER_TRACE_DIR",
-        "GPU_DEVICE_ORDINAL",
         "HIP_CLANG_PATH",
         "HIP_PATH",
         "HIP_PLATFORM",
@@ -72,6 +71,7 @@ def sanitized_subprocess_env(
     base: Mapping[str, str],
     *,
     staging_dir: Path,
+    extra_env: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     """Return the minimum runtime environment, excluding credentials and proxies."""
     result = {name: base[name] for name in _PASSTHROUGH_NAMES if name in base}
@@ -81,8 +81,11 @@ def sanitized_subprocess_env(
             "TMPDIR": str(staging_dir / ".tmp"),
             ENV_ROCPROF_TMPDIR: str(staging_dir / ".tmp"),
             ENV_PYTORCH_ALLOC_CONF: EVALUATION_ALLOCATOR_CONFIG,
+            "PYTHONSAFEPATH": "1",
         },
     )
+    if extra_env is not None:
+        result.update(extra_env)
     return result
 
 

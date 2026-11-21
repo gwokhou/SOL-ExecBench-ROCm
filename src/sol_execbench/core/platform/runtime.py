@@ -13,6 +13,7 @@ import shutil
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from importlib import import_module
+from importlib.util import find_spec
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -296,16 +297,23 @@ def detect_rocm_version(
         which=which,
         is_dir=is_dir,
     )
-    if rocm_root is None:
-        return None
-    for relative_path in ROCM_VERSION_RELATIVE_PATHS:
-        path = rocm_root / relative_path
-        try:
-            version = path.read_text(encoding="utf-8").strip()
-        except OSError:
-            continue
-        if version:
-            return version
+    candidate_roots: list[Path] = [rocm_root] if rocm_root is not None else []
+    if root is None and environ is None:
+        for sdk_pkg in ("_rocm_sdk_devel", "_rocm_sdk_core"):
+            spec = find_spec(sdk_pkg)
+            if spec is not None and spec.submodule_search_locations:
+                candidate_roots.append(
+                    Path(next(iter(spec.submodule_search_locations)))
+                )
+    for current_root in candidate_roots:
+        for relative_path in ROCM_VERSION_RELATIVE_PATHS:
+            path = current_root / relative_path
+            try:
+                version = path.read_text(encoding="utf-8").strip()
+            except OSError:
+                continue
+            if version:
+                return version
     return None
 
 

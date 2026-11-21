@@ -132,15 +132,28 @@ def _assert_root_controlled(
         raise PermissionError(f"path is not root-controlled: {path}")
 
 
+def _assert_tree_chain_root_controlled(path: Path) -> None:
+    for candidate in (path, *path.parents):
+        _assert_root_controlled(candidate, follow_symlinks=False)
+    if path.exists():
+        resolved = path.resolve()
+        for candidate in (resolved, *resolved.parents):
+            _assert_root_controlled(candidate)
+
+
 def validate_amd_smi_executable(amd_smi: str) -> None:
-    """Require an executable whose path and target are controlled by root."""
+    """Require an executable and its sibling CLI module tree controlled by root."""
     path = Path(amd_smi)
     if not path.is_file() or not os.access(path, os.X_OK):
         raise FileNotFoundError(f"amd-smi is not executable: {path}")
-    for candidate in (path, *path.parents):
-        _assert_root_controlled(candidate, follow_symlinks=False)
-    for candidate in (path.resolve(), *path.resolve().parents):
-        _assert_root_controlled(candidate)
+    _assert_tree_chain_root_controlled(path)
+    for base in (Path(os.path.abspath(amd_smi)), path.resolve()):
+        cli_dir = base.parent.parent / "libexec" / "amdsmi_cli"
+        if cli_dir.exists() or cli_dir.is_symlink():
+            _assert_tree_chain_root_controlled(cli_dir)
+            if cli_dir.is_dir():
+                for entry in sorted(cli_dir.rglob("*")):
+                    _assert_tree_chain_root_controlled(entry)
 
 
 def amd_smi_command_patterns(
@@ -165,6 +178,14 @@ def render_sudoers(
     lines = [
         f"# Managed by SOL ExecBench ROCm: {label}",
         "# Allows only device-scoped STABLE_PEAK and AUTO setters.",
+        (
+            f"Defaults!{amd_smi} env_reset, always_set_home, "
+            'secure_path="/usr/sbin:/usr/bin:/sbin:/bin"'
+        ),
+        (
+            f"Defaults!{amd_smi} "
+            'env_delete+="PYTHONPATH PYTHONHOME PYTHONSTARTUP PYTHONUSERBASE"'
+        ),
         f"{user} ALL=(root) NOPASSWD: {patterns}",
     ]
     return "\n".join(lines) + "\n"

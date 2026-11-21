@@ -7,6 +7,7 @@ from sol_execbench.core.platform.amd_smi import (
     parse_gpu_count,
     parse_gpu_identity,
     parse_gpu_metrics,
+    parse_gpu_performance_level,
     parse_performance_levels,
     parse_processes,
 )
@@ -78,3 +79,35 @@ def test_parse_gpu_metrics_normalizes_nested_units() -> None:
     assert metrics.power_draw_w == 101.0
     assert metrics.power_cap_w == 182.0
     assert metrics.power_profile == "COMPUTE"
+
+
+def test_multi_gpu_uuid_resolution_and_process_filtering() -> None:
+    list_raw = (
+        '[{"gpu":0,"bdf":"0000:01:00.0","uuid":"uuid-0"},'
+        '{"gpu":2,"bdf":"0000:05:00.0","uuid":"UUID-2"}]'
+    )
+    identity = parse_gpu_identity(list_raw, 0, gpu_uuid="uuid-2")
+    assert (identity.gpu, identity.bdf, identity.uuid) == (
+        2,
+        "0000:05:00.0",
+        "UUID-2",
+    )
+
+    process_raw = (
+        '[{"gpu":0,"process_list":[{"pid":999,"name":"other_gpu_job"}]},'
+        '{"gpu":2,"process_list":[{"pid":123,"name":"target_job"}]}]'
+    )
+    assert parse_processes(process_raw, gpu_index=identity.gpu) == [
+        {"pid": 123, "device": "2", "name": "target_job"}
+    ]
+
+    perf_raw = (
+        '{"gpu_data":['
+        '{"gpu":0,"perf_level":"AMDSMI_DEV_PERF_LEVEL_AUTO"},'
+        '{"gpu":2,"perf_level":"AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK"}'
+        "]}"
+    )
+    assert (
+        parse_gpu_performance_level(perf_raw, identity.gpu)
+        == "AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK"
+    )

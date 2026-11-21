@@ -20,7 +20,7 @@ LEGACY_GPU_LOCK_ENV = (
     "SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST",
 )
 UUID_PATTERN = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}")
-LEGACY_CLOCK_STATE_DIRECTORY = Path("/tmp/sol-execbench-locks")
+LEGACY_CLOCK_STATE_DIRECTORY: Path | None = None
 
 
 def normalize_gpu_uuid(value: str) -> str:

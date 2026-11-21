@@ -93,18 +93,12 @@ def test_dockerfile_preserves_official_gpu_stack_and_runtime_setup() -> None:
     assert 'ENTRYPOINT ["/entrypoint.sh"]' in dockerfile
 
 
-def test_dockerfile_installs_exact_validated_amd_smi_sudoers_rule() -> None:
+def test_dockerfile_omits_container_sudoers_rule() -> None:
     dockerfile = DOCKERFILE_PATH.read_text()
 
-    assert 'AMD_SMI="$(command -v amd-smi)"' in dockerfile
-    assert "NOPASSWD: ${AMD_SMI}" in dockerfile
-    assert "${AMD_SMI} version" in dockerfile
-    assert "${AMD_SMI} set -l STABLE_PEAK" in dockerfile
-    assert "${AMD_SMI} set -l AUTO" in dockerfile
-    assert "visudo -cf" in dockerfile
-    assert "install -o root -g root -m 0440" in dockerfile
+    assert "/etc/sudoers.d/sol-execbench-amd-smi" not in dockerfile
+    assert "NOPASSWD" not in dockerfile
     assert "command -v rocm-smi" not in dockerfile
-    assert "${AMD_SMI} set -l *" not in dockerfile
 
 
 def test_entrypoint_requires_native_host_owner_without_container_setters():
@@ -723,3 +717,43 @@ def test_run_docker_invalid_preflight_boolean_has_no_traceback() -> None:
     assert "expected boolean value" in completed.stderr
     assert "Traceback" not in completed.stderr
     assert "docker run" not in completed.stdout
+
+
+@pytest.mark.requires_linux
+@pytest.mark.subprocess_uv
+def test_run_docker_isolates_bdf_dri_nodes_when_by_path_exists(
+    tmp_path: Path,
+) -> None:
+    dri = tmp_path / "dri"
+    by_path = dri / "by-path"
+    by_path.mkdir(parents=True)
+    render_0 = dri / "renderD128"
+    card_0 = dri / "card0"
+    render_1 = dri / "renderD129"
+    for node in (render_0, card_0, render_1):
+        node.write_text("", encoding="utf-8")
+    (by_path / "pci-0000:05:00.0-render").symlink_to(render_0)
+    (by_path / "pci-0000:05:00.0-card").symlink_to(card_0)
+    (by_path / "pci-0000:14:00.0-render").symlink_to(render_1)
+
+    completed = _run_docker_preflight(
+        "--allow-untested-target-smoke",
+        "--",
+        "true",
+        SOL_EXECBENCH_DOCKER_CONTEXT="default",
+        SOL_EXECBENCH_DOCKER_HOST="unix:///var/run/docker.sock",
+        SOL_EXECBENCH_DEV_KFD_PRESENT="true",
+        SOL_EXECBENCH_DEV_KFD_ACCESSIBLE="true",
+        SOL_EXECBENCH_DEV_DRI_PRESENT="true",
+        SOL_EXECBENCH_DEV_DRI_ACCESSIBLE="true",
+        SOL_EXECBENCH_GPU_ACCESSIBLE="true",
+        SOL_EXECBENCH_DEV_DRI_BY_PATH_DIR=str(by_path),
+        SOL_EXECBENCH_GPU_BDF_OVERRIDE="0000:05:00.0",
+        GPU_DEVICE_ORDINAL="3",
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert f"--device={render_0}" in completed.stdout
+    assert f"--device={card_0}" in completed.stdout
+    assert f"--device={render_1}" not in completed.stdout
+    assert "--device=/dev/dri " not in completed.stdout

@@ -12,6 +12,7 @@ from __future__ import annotations
 import fcntl
 import os
 import re
+import stat
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from enum import StrEnum
@@ -26,6 +27,7 @@ from sol_execbench.core.bench.clock_lock import (
     ClockRestoreError,
 )
 from sol_execbench.core.bench.gpu_admission import (
+    Admission,
     AdmissionDevice,
     AdmissionError,
     clock_state_directory,
@@ -45,6 +47,7 @@ from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.platform.amd_smi import AMDSMIListPayload
 from sol_execbench.core.platform.runtime import resolve_rocm_tool_command
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
+from sol_execbench.core.process.termination import defer_termination
 from sol_execbench.core.timestamps import utc_timestamp
 
 ENV_CLOCK_OWNER = "SOL_EXECBENCH_CLOCK_OWNER"
@@ -53,6 +56,7 @@ EXECUTION_CLEANUP_BLOCKER = "execution_cleanup_unverified"
 OWNER_TOKEN_PATTERN = re.compile(r"[0-9a-f]{32}")
 IDENTITY_TIMEOUT_SECONDS = 10
 IDENTITY_OUTPUT_BYTES = 16384
+MAX_LEASE_RECORD_BYTES = 65536
 
 
 class ClockOwnership(StrEnum):
@@ -174,12 +178,46 @@ def verify_clock_owner(
     return record
 
 
+def _read_lease_record_text(path: Path) -> str | None:
+    """Safely read a regular same-UID lease JSON file without blocking or OOM."""
+    try:
+        link_stat = os.lstat(path)
+    except FileNotFoundError:
+        return None
+    if link_stat.st_uid != os.geteuid():
+        return None
+    descriptor = os.open(
+        path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC
+    )
+    try:
+        opened = os.fstat(descriptor)
+        if opened.st_uid != os.geteuid():
+            return None
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_size > MAX_LEASE_RECORD_BYTES
+        ):
+            raise OSError("clock lease record must be a bounded regular file")
+        chunks: list[bytes] = []
+        total = 0
+        while total <= MAX_LEASE_RECORD_BYTES:
+            chunk = os.read(descriptor, MAX_LEASE_RECORD_BYTES + 1 - total)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+        if total > MAX_LEASE_RECORD_BYTES:
+            raise OSError("clock lease record exceeds size bound")
+        return b"".join(chunks).decode("utf-8")
+    finally:
+        os.close(descriptor)
+
+
 def require_no_clock_recovery(directory: Path, *, gpu_uuid: str) -> None:
     """Require no unresolved lease covering the held canonical GPU UUID."""
-    directories = {
-        clock_state_directory(directory),
-        LEGACY_CLOCK_STATE_DIRECTORY,
-    }
+    directories = {clock_state_directory(directory)}
+    if LEGACY_CLOCK_STATE_DIRECTORY is not None:
+        directories.add(LEGACY_CLOCK_STATE_DIRECTORY)
     paths = {
         path
         for root in directories
@@ -187,13 +225,16 @@ def require_no_clock_recovery(directory: Path, *, gpu_uuid: str) -> None:
     }
     for path in sorted(paths):
         try:
-            record = ClockOwnerRecord.model_validate_json(path.read_text())
+            raw_text = _read_lease_record_text(path)
+            if raw_text is None:
+                continue
+            record = ClockOwnerRecord.model_validate_json(raw_text)
             if record.state is ClockOwnerState.RESTORED:
                 continue
             devices = {
                 normalize_gpu_uuid(device.uuid) for device in record.devices
             }
-        except (OSError, ValueError) as error:
+        except (OSError, UnicodeDecodeError, ValueError) as error:
             raise ClockOwnershipError(
                 f"clock_recovery_record_invalid: {path}"
             ) from error
@@ -201,6 +242,32 @@ def require_no_clock_recovery(directory: Path, *, gpu_uuid: str) -> None:
             raise ClockOwnershipError(
                 f"clock_recovery_required: inspect {path}"
             )
+
+
+def _finalize_clock_owner_record(
+    path: Path,
+    record: ClockOwnerRecord,
+    lease: ClockLockLease,
+    admission: Admission | None,
+    *,
+    container_supervised: bool,
+) -> None:
+    if container_supervised:
+        raw_text = _read_lease_record_text(path)
+        if raw_text is not None:
+            record = ClockOwnerRecord.model_validate_json(raw_text)
+    record = record.model_copy(
+        update={
+            "state": ClockOwnerState.RESTORED
+            if lease.released
+            else ClockOwnerState.RESTORE_FAILED,
+            "ended_at": utc_timestamp(),
+            "release_blocker": lease.release_blocker,
+        }
+    )
+    write_clock_record(path, record)
+    if admission is not None and record.state == ClockOwnerState.RESTORED:
+        admission.release(admission_device(record), record.lease_id, path)
 
 
 @contextmanager
@@ -230,9 +297,9 @@ def published_clock_owner(
             admission.hold(admission_device(record), record.lease_id, path)
             ensure_durable_directory(path.parent)
         else:
-            path.parent.mkdir(parents=True, exist_ok=True)
+            path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         descriptor = os.open(
-            path.with_suffix(".lock"), os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o644
+            path.with_suffix(".lock"), os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600
         )
         fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
         write_clock_record(path, record)
@@ -247,34 +314,21 @@ def published_clock_owner(
         with lease:
             yield record.lease_id
     finally:
-        if previous is None:
-            os.environ.pop(ENV_CLOCK_OWNER, None)
-        else:
-            os.environ[ENV_CLOCK_OWNER] = previous
-        try:
-            # Activation may have persisted container supervision even when
-            # natural clocks require no setter. Preserve that recovery duty.
-            if container_supervised:
-                record = ClockOwnerRecord.model_validate_json(path.read_text())
-            record = record.model_copy(
-                update={
-                    "state": ClockOwnerState.RESTORED
-                    if lease.released
-                    else ClockOwnerState.RESTORE_FAILED,
-                    "ended_at": utc_timestamp(),
-                    "release_blocker": lease.release_blocker,
-                }
-            )
-            write_clock_record(path, record)
-            if (
-                admission is not None
-                and record.state == ClockOwnerState.RESTORED
-            ):
-                admission.release(
-                    admission_device(record), record.lease_id, path
+        with defer_termination():
+            if previous is None:
+                os.environ.pop(ENV_CLOCK_OWNER, None)
+            else:
+                os.environ[ENV_CLOCK_OWNER] = previous
+            try:
+                _finalize_clock_owner_record(
+                    path,
+                    record,
+                    lease,
+                    admission,
+                    container_supervised=container_supervised,
                 )
-        finally:
-            os.close(descriptor)
+            finally:
+                os.close(descriptor)
 
 
 def _record_container_supervision(directory: Path, token: str) -> None:

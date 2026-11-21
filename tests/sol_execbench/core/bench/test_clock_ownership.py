@@ -179,3 +179,87 @@ def test_recovery_cannot_clear_live_owner(tmp_path):
         assert token is not None
         with pytest.raises(RuntimeError, match="already held"):
             confirm_clock_recovery(tmp_path, token)
+
+
+def test_recovery_handles_missing_cidfile_and_unknown_container_blocker(
+    tmp_path, monkeypatch
+) -> None:
+    from sol_execbench.core.bench import clock_recovery
+    from sol_execbench.core.bench.clock_ownership import (
+        clock_owner_path,
+        require_no_clock_recovery,
+        write_clock_record,
+    )
+
+    token = "d" * 32
+    path = clock_owner_path(tmp_path, token)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    record = ClockOwnerRecord(
+        lease_id=token,
+        devices=(DEVICE,),
+        owner_pid=os.getpid(),
+        state=ClockOwnerState.RESTORE_FAILED,
+        container_supervised=True,
+        release_blocker="container_cleanup_unverified:unknown",
+    )
+    write_clock_record(path, record)
+
+    checked_names: list[str] = []
+    monkeypatch.setattr(
+        clock_recovery,
+        "confirm_container_name_absent",
+        lambda _exe, name: checked_names.append(name),
+    )
+    monkeypatch.setattr(
+        clock_recovery, "observe_clock_devices", lambda: (DEVICE,)
+    )
+    monkeypatch.setattr(
+        clock_recovery,
+        "_read_device",
+        lambda cmd, *_args: (
+            '[{"gpu":0,"process_list":[]}]'
+            if cmd == "process"
+            else '{"gpu_data":[{"gpu":0,"perf_level":"AMDSMI_DEV_PERF_LEVEL_AUTO"}]}'
+        ),
+    )
+
+    clock_recovery.confirm_clock_recovery(tmp_path, token)
+    assert checked_names == [f"sol-execbench-{token}"]
+    require_no_clock_recovery(tmp_path, gpu_uuid=DEVICE.uuid)
+
+
+def test_default_clock_state_dir_and_safe_lease_reads(
+    tmp_path, monkeypatch
+) -> None:
+    from sol_execbench.core.bench.clock_ownership import (
+        require_no_clock_recovery,
+    )
+    from sol_execbench.core.bench.gpu_admission import clock_state_directory
+
+    lock_dir = tmp_path / "shared-locks"
+    monkeypatch.setenv("GPU_LOCK_DIR", str(lock_dir))
+    monkeypatch.delenv("SOL_EXECBENCH_CLOCK_STATE_DIR", raising=False)
+
+    private_dir = clock_state_directory(lock_dir)
+    assert private_dir == lock_dir / "gpu-leases" / "sol"
+    assert (private_dir.stat().st_mode & 0o777) == 0o700
+
+    leases_dir = private_dir / LEASE_DIRECTORY
+    leases_dir.mkdir(parents=True, exist_ok=True)
+    fifo_path = leases_dir / "fifo.json"
+    os.mkfifo(fifo_path)
+    with pytest.raises(
+        ClockOwnershipError, match="clock_recovery_record_invalid"
+    ):
+        require_no_clock_recovery(lock_dir, gpu_uuid=DEVICE.uuid)
+    fifo_path.unlink()
+
+    zero_link = leases_dir / "symlink.json"
+    zero_link.symlink_to("/dev/zero")
+    with pytest.raises(
+        ClockOwnershipError, match="clock_recovery_record_invalid"
+    ):
+        require_no_clock_recovery(lock_dir, gpu_uuid=DEVICE.uuid)
+    zero_link.unlink()
+
+    require_no_clock_recovery(lock_dir, gpu_uuid=DEVICE.uuid)

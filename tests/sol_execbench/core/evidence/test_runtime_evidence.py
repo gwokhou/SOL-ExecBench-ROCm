@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -279,3 +280,71 @@ def test_runtime_evidence_module_entrypoint_exposes_cli_help() -> None:
     assert result.returncode == 0, result.stderr
     assert "collect-target" in result.stdout
     assert "aggregate" in result.stdout
+
+
+def test_collect_runtime_gpu_telemetry_scopes_to_gpu_lock_uuid(
+    monkeypatch,
+) -> None:
+    from sol_execbench.core.evidence.runtime_evidence import collectors
+
+    target_uuid = "22222222-3333-4444-5555-666666666666"
+    monkeypatch.setenv("GPU_LOCK_UUID", target_uuid)
+    responses = {
+        "list": json.dumps(
+            [
+                {
+                    "gpu": 0,
+                    "bdf": "0000:01:00.0",
+                    "uuid": "00000000-0000-1000-8000-000000000000",
+                },
+                {"gpu": 2, "bdf": "0000:05:00.0", "uuid": target_uuid},
+            ]
+        ),
+        "metric": json.dumps(
+            {
+                "gpu_data": [
+                    {
+                        "gpu": 0,
+                        "perf_level": "AMDSMI_DEV_PERF_LEVEL_AUTO",
+                        "clock": {"gfx_clock": "900 MHz"},
+                    },
+                    {
+                        "gpu": 2,
+                        "perf_level": "AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK",
+                        "clock": {"gfx_clock": "2750 MHz"},
+                    },
+                ]
+            }
+        ),
+        "process": json.dumps(
+            [
+                {"gpu": 0, "process_list": [{"pid": 999999, "name": "other"}]},
+                {
+                    "gpu": 2,
+                    "process_list": [
+                        {"pid": os.getpid(), "name": "self"},
+                    ],
+                },
+            ]
+        ),
+    }
+    monkeypatch.setattr(
+        collectors, "resolve_rocm_tool", lambda _: Path("/usr/bin/amd-smi")
+    )
+    monkeypatch.setattr(
+        collectors, "_amd_smi_json", lambda _exe, cmd: responses[cmd]
+    )
+    monkeypatch.setattr(
+        collectors,
+        "collect_pcie_topology",
+        lambda _bdf: (_ for _ in ()).throw(OSError("no sysfs")),
+    )
+
+    snapshot = collectors.collect_runtime_gpu_telemetry(
+        phase="pre", device_index=0
+    )
+    assert snapshot.gpu_id == target_uuid
+    assert snapshot.gpu_bdf == "0000:05:00.0"
+    assert snapshot.performance_level == "AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK"
+    assert snapshot.sclk_mhz == 2750.0
+    assert snapshot.foreign_process_count == 0

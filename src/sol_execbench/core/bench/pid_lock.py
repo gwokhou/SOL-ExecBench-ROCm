@@ -63,25 +63,26 @@ def acquire_pid_lock(output_dir: Path) -> Iterator[None]:
     # Create parent directory if missing (mitigates T-175-01)
     lock_file.parent.mkdir(parents=True, exist_ok=True)
 
-    # Open lock file (created if missing)
-    fd = lock_file.open("w")
+    # Open lock file without truncating an already-held lock inode
+    fd = lock_file.open("a+", encoding="utf-8")
 
     try:
-        # Try to acquire exclusive non-blocking lock
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            # Try to acquire exclusive non-blocking lock
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print(
+                f"ERROR: Another instance holds lock: {lock_file}",
+                file=sys.stderr,
+            )
+            print(
+                "Wait for the other process to finish, or if confident no other instance is running, "
+                "remove the lock file manually.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
         logger.debug("Acquired PID lock: %s", lock_file)
         yield
-    except BlockingIOError:
-        print(
-            f"ERROR: Another instance holds lock: {lock_file}",
-            file=sys.stderr,
-        )
-        print(
-            "Wait for the other process to finish, or if confident no other instance is running, "
-            "remove the lock file manually.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
     finally:
         # Auto-release lock on context exit (normal or exception)
         fd.close()

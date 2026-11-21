@@ -52,7 +52,7 @@ def test_only_two_lock_files_are_mounted_and_private_history_is_readonly(
             f"type=bind,src={path},dst=/run/lock/{path.name}" in result.stdout
         )
     assert f"src={paths.directory}," not in result.stdout
-    history = private or Path("/tmp/sol-execbench-locks")
+    history = private or (paths.directory / "gpu-leases" / "sol")
     assert f"type=bind,src={history},dst={history},readonly" in result.stdout
     assert "--entrypoint /sol-execbench/docker/entrypoint.sh" in result.stdout
     assert "PYTHONPATH=/sol-execbench/src" in result.stdout

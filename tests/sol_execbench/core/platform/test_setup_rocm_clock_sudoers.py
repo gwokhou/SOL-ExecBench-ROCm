@@ -39,6 +39,15 @@ def test_render_sudoers_covers_only_exact_amd_smi_clock_commands():
         gpu_uuid=UUID,
     )
 
+    assert (
+        "Defaults!/usr/bin/amd-smi env_reset, always_set_home, "
+        'secure_path="/usr/sbin:/usr/bin:/sbin:/bin"' in content
+    )
+    assert (
+        "Defaults!/usr/bin/amd-smi "
+        'env_delete+="PYTHONPATH PYTHONHOME PYTHONSTARTUP PYTHONUSERBASE"'
+        in content
+    )
     assert "runner ALL=(root) NOPASSWD:" in content
     for expected in (
         f"/usr/bin/amd-smi set -l STABLE_PEAK -g {UUID}",
@@ -47,6 +56,10 @@ def test_render_sudoers_covers_only_exact_amd_smi_clock_commands():
         assert expected in content
     assert "rocm-smi" not in content
     assert " *" not in content
+    checked_in = (
+        SCRIPT_PATH.parent / "sudoers/sol-execbench-amd-smi"
+    ).read_text(encoding="utf-8")
+    assert checked_in == content
 
 
 @pytest.mark.parametrize(
@@ -350,7 +363,8 @@ def test_host_setters_and_default_rule_ignore_path_order(
             "",
         )
 
-    monkeypatch.setattr(clock_lock.subprocess, "run", run)
+    monkeypatch.setattr(clock_lock, "run_in_process_group_bounded", run)
+    monkeypatch.setattr(sudoers.subprocess, "run", run)
     clock_lock.set_peak_clocks(UUID)
     assert clock_lock.unlock_clocks(UUID)
     tool = sudoers.resolve_amd_smi()
@@ -435,3 +449,46 @@ def test_legacy_tool_discovery_is_independent_of_host_override(monkeypatch):
     monkeypatch.setenv(ENV_HOST_AMD_SMI, "/host/amd-smi")
     assert clock_executable() == "/legacy/amd-smi"
     assert clock_executable("/explicit/amd-smi") == "/explicit/amd-smi"
+
+
+def test_validate_amd_smi_executable_checks_sibling_amdsmi_cli_tree(
+    tmp_path, monkeypatch
+):
+    import os as os_mod
+
+    sdk = tmp_path / "rocm"
+    bin_dir = sdk / "bin"
+    cli_dir = sdk / "libexec" / "amdsmi_cli"
+    bin_dir.mkdir(parents=True)
+    cli_dir.mkdir(parents=True)
+    tool = bin_dir / "amd-smi"
+    tool.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    tool.chmod(0o755)
+    helper_py = cli_dir / "amdsmi_init.py"
+    helper_py.write_text("VERSION = '1'\n", encoding="utf-8")
+    helper_py.chmod(0o644)
+
+    real_stat = Path.stat
+
+    def fake_root_stat(self: Path, *, follow_symlinks: bool = True):
+        info = real_stat(self, follow_symlinks=follow_symlinks)
+        mode = info.st_mode
+        uid = 1000 if self == helper_py else 0
+        return os_mod.stat_result(
+            (
+                mode & ~0o022 if self != cli_dir else mode,
+                info.st_ino,
+                info.st_dev,
+                info.st_nlink,
+                uid,
+                0,
+                info.st_size,
+                info.st_atime,
+                info.st_mtime,
+                info.st_ctime,
+            )
+        )
+
+    monkeypatch.setattr(Path, "stat", fake_root_stat)
+    with pytest.raises(PermissionError, match="not root-controlled"):
+        sudoers.validate_amd_smi_executable(str(tool))

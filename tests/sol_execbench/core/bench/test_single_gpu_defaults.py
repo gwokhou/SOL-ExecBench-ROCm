@@ -246,3 +246,52 @@ def test_ignores_igpu_without_pci_unique_id_when_single_dgpu_present(
         "GPU_LOCK_UUID": SMI_UUID,
         "ROCR_VISIBLE_DEVICES": ROCR_UUID,
     }
+
+
+def test_derives_partitioned_kfd_topology_pair(tmp_path):
+    pci_root = _make_pci_root(
+        tmp_path, entries=(("0000:05:00.0", "aaaa000000000001"),)
+    )
+    kfd_root = tmp_path / "kfd-nodes"
+    for idx, uid_int in ((1, 0xAAAA000000000001), (2, 0xAAAA000000000002)):
+        node = kfd_root / str(idx)
+        node.mkdir(parents=True)
+        (node / "properties").write_text(
+            f"simd_count 64\ndomain 0\nlocation_id 1280\nunique_id {uid_int}\n",
+            encoding="utf-8",
+        )
+    devices = (
+        ClockDevice(
+            bdf="0000:05:00.0",
+            uuid="11111111-0000-1000-8000-000000000001",
+        ),
+        ClockDevice(
+            bdf="0000:05:00.0",
+            uuid="11111111-0000-1000-8000-000000000002",
+        ),
+    )
+    base_env = {
+        "GPU_LOCK_DIR": str(tmp_path / "locks"),
+        "SOL_EXECBENCH_CLOCK_STATE_DIR": str(tmp_path / "private"),
+    }
+
+    from_uuid = single_gpu_defaults.derive_single_gpu_host_defaults(
+        {
+            **base_env,
+            "GPU_LOCK_UUID": "11111111-0000-1000-8000-000000000002",
+        },
+        pci_root=pci_root,
+        kfd_root=kfd_root,
+        device_observer=lambda: devices,
+    )
+    assert from_uuid == {"ROCR_VISIBLE_DEVICES": "GPU-aaaa000000000002"}
+
+    from_rocr = single_gpu_defaults.derive_single_gpu_host_defaults(
+        {**base_env, "ROCR_VISIBLE_DEVICES": "GPU-aaaa000000000002"},
+        pci_root=pci_root,
+        kfd_root=kfd_root,
+        device_observer=lambda: devices,
+    )
+    assert from_rocr == {
+        "GPU_LOCK_UUID": "11111111-0000-1000-8000-000000000002"
+    }

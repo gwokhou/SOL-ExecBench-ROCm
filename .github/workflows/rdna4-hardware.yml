@@ -13,7 +13,6 @@ concurrency:
 env:
   UV_NO_PROGRESS: "1"
   HIP_VISIBLE_DEVICES: "0"
-  ROCR_VISIBLE_DEVICES: "0"
 
 jobs:
   gfx1200-validation:
@@ -31,6 +30,12 @@ jobs:
             uv.lock
       - name: Install locked environment
         run: uv sync --locked --all-groups
+      - name: Derive single-GPU lock defaults
+        run: |
+          DEFAULTS="$(uv run --no-sync python -m sol_execbench.core.bench.single_gpu_defaults --prepare-locks)"
+          printf '%s\n' "${DEFAULTS}" | grep -q '^GPU_LOCK_UUID='
+          printf '%s\n' "${DEFAULTS}" | grep -q '^ROCR_VISIBLE_DEVICES=GPU-'
+          printf '%s\n' "${DEFAULTS}" >> "${GITHUB_ENV}"
       - name: Run content-addressed RDNA4 validation
         run: |
           uv run --no-sync python \
@@ -43,10 +48,16 @@ jobs:
             --verify out/rdna4-ci \
             --expected-source-revision "${GITHUB_SHA}" \
             --receipt-output out/rdna4-ci/receipt.json
-      - name: Audit all scored SOLAR workloads
+      - name: Qualify all scored SOLAR workloads statically
         run: |
-          uv run --no-sync sol-execbench solar corpus-audit \
-            "${RUNNER_TEMP}/solar-corpus-readiness-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+          WORKSPACE="${RUNNER_TEMP}/solar-release-workspace-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          uv run --no-sync sol-execbench baseline release-build \
+            "${WORKSPACE}" \
+            --baseline-id "rx9060xt-gfx1200-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --source-revision "${GITHUB_SHA}"
+          uv run --no-sync sol-execbench solar qualify-static \
+            "${WORKSPACE}" \
+            --qualification-root "${RUNNER_TEMP}/solar-corpus-readiness-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
             --device cuda:0 \
             --timeout 14400
       - name: Upload RDNA4 evidence

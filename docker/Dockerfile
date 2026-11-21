@@ -78,20 +78,7 @@ RUN if [ "${HOST_UID}" = "0" ]; then \
         fi; \
     fi && \
     mkdir -p /sol-execbench /venv /home/${HOST_USER}/.cache/uv && \
-    chown -R ${HOST_UID}:${HOST_GID} /sol-execbench /venv /home/${HOST_USER} && \
-    AMD_SMI="$(command -v amd-smi)" && \
-    SUDOERS_TMP="$(mktemp)" && \
-    { \
-        echo "# SOL ExecBench ROCm clock commands"; \
-        echo "${RUN_USER} ALL=(root) NOPASSWD: ${AMD_SMI} version, \\"; \
-        echo "    ${AMD_SMI} set -l STABLE_PEAK, \\"; \
-        echo "    ${AMD_SMI} set -l AUTO"; \
-    } > "${SUDOERS_TMP}" && \
-    visudo -cf "${SUDOERS_TMP}" && \
-    install -o root -g root -m 0440 "${SUDOERS_TMP}" \
-        /etc/sudoers.d/sol-execbench-amd-smi && \
-    visudo -cf /etc/sudoers.d/sol-execbench-amd-smi && \
-    rm -f "${SUDOERS_TMP}"
+    chown -R ${HOST_UID}:${HOST_GID} /sol-execbench /venv /home/${HOST_USER}
 
 # Copy and set up entrypoint while still root (avoid switching back)
 COPY docker/entrypoint.sh /entrypoint.sh
@@ -127,7 +114,6 @@ RUN --mount=type=cache,target=/home/${HOST_USER}/.cache/uv,uid=${HOST_UID},gid=$
 # Copy source code (changes frequently - do this last)
 COPY --chown=${HOST_UID}:${HOST_GID} src/ ./src/
 COPY --chown=${HOST_UID}:${HOST_GID} problems/ ./problems/
-COPY --chown=${HOST_UID}:${HOST_GID} docker/rocm-targets.json ./docker/
 COPY --chown=${HOST_UID}:${HOST_GID} docker/check_gpu_stack.py ./docker/
 
 # Install the project itself (creates the sol-execbench console script).

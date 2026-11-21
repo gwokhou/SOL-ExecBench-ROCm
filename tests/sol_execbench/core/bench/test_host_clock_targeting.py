@@ -96,7 +96,7 @@ def hardware(monkeypatch, tmp_path):
             command, 0, json.dumps({"gpu_data": rows}), ""
         )
 
-    monkeypatch.setattr(clock_lock.subprocess, "run", run)
+    monkeypatch.setattr(clock_lock, "run_in_process_group_bounded", run)
     return state
 
 

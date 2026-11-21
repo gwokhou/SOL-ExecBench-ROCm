@@ -97,11 +97,38 @@ def parse_performance_levels(raw: str) -> tuple[str, ...]:
     return levels
 
 
-def parse_processes(raw: str) -> list[dict[str, int | str]]:
+def parse_gpu_performance_level(raw: str, gpu_index: int | str) -> str | None:
+    """Return the normalized performance level for one target GPU identifier."""
+    payload = AMDSMIPerformancePayload.model_validate_json(raw)
+    if not payload.gpu_data:
+        raise ValueError("amd-smi returned no GPU performance-level data")
+    for entry in payload.gpu_data:
+        if str(entry.gpu) == str(gpu_index):
+            level = entry.perf_level.strip().upper()
+            if not level:
+                raise ValueError(
+                    "amd-smi returned an empty GPU performance level"
+                )
+            return level
+    if len(payload.gpu_data) == 1:
+        level = payload.gpu_data[0].perf_level.strip().upper()
+        if not level:
+            raise ValueError("amd-smi returned an empty GPU performance level")
+        return level
+    return None
+
+
+def parse_processes(
+    raw: str,
+    *,
+    gpu_index: int | str | None = None,
+) -> list[dict[str, int | str]]:
     """Return the stable process fields used by isolation snapshots."""
     payload = AMDSMIProcessPayload.model_validate_json(raw)
     processes: list[dict[str, int | str]] = []
     for gpu_entry in payload.root:
+        if gpu_index is not None and str(gpu_entry.gpu) != str(gpu_index):
+            continue
         for process in gpu_entry.process_list:
             if process.pid is None:
                 continue
@@ -121,14 +148,34 @@ def parse_gpu_count(raw: str) -> int:
     return len({str(entry.gpu) for entry in payload.root})
 
 
-def parse_gpu_identity(raw: str, gpu_index: int) -> AMDSMIGPUIdentity:
+def parse_gpu_identity(
+    raw: str,
+    gpu_index: int = 0,
+    *,
+    gpu_uuid: str | None = None,
+    fallback_to_index: bool = False,
+) -> AMDSMIGPUIdentity:
     """Return one exact GPU list identity with required UUID and BDF."""
     payload = AMDSMIListPayload.model_validate_json(raw)
-    matches = [
-        identity
-        for identity in payload.root
-        if str(identity.gpu) == str(gpu_index)
-    ]
+    matches: list[AMDSMIGPUIdentity] = []
+    if gpu_uuid is not None and gpu_uuid.strip():
+        want = gpu_uuid.strip().lower()
+        matches = [
+            identity
+            for identity in payload.root
+            if (identity.uuid or "").strip().lower() == want
+            or (identity.bdf or "").strip().lower() == want
+        ]
+        if len(matches) != 1 and not fallback_to_index:
+            raise ValueError(
+                f"amd-smi returned no unique identity for GPU {gpu_uuid}"
+            )
+    if not matches:
+        matches = [
+            identity
+            for identity in payload.root
+            if str(identity.gpu) == str(gpu_index)
+        ]
     if len(matches) != 1:
         raise ValueError(
             f"amd-smi returned no unique identity for GPU {gpu_index}"
@@ -139,7 +186,9 @@ def parse_gpu_identity(raw: str, gpu_index: int) -> AMDSMIGPUIdentity:
     return identity
 
 
-def parse_gpu_metrics(raw: str, gpu_index: int) -> AMDSMIMetricObservation:
+def parse_gpu_metrics(
+    raw: str, gpu_index: int | str
+) -> AMDSMIMetricObservation:
     """Extract stable telemetry across AMD SMI JSON naming variations."""
     payload = AMDSMIMetricPayload.model_validate_json(raw).root
     selected = _select_gpu_metric_payload(payload, gpu_index)
@@ -190,7 +239,7 @@ def parse_gpu_metrics(raw: str, gpu_index: int) -> AMDSMIMetricObservation:
 
 def _select_gpu_metric_payload(
     value: MetricJSON,
-    gpu_index: int,
+    gpu_index: int | str,
 ) -> MetricJSON:
     if isinstance(value, dict):
         gpu_data = value.get("gpu_data")

@@ -43,11 +43,13 @@ from sol_execbench.core.platform.clock_commands import (
 from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_CLOCKS_LOCKED,
 )
+from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 from sol_execbench.core.process.termination import defer_termination
 
 logger = logging.getLogger(__name__)
 
 VERIFY_DELAY_S = 3
+CLOCK_COMMAND_OUTPUT_BYTES = 65536
 AMD_SMI_FAILURE_MARKERS = (
     "unable to set performance level",
     "failed to set",
@@ -227,13 +229,18 @@ def _run_checked_amd_smi(
     command: list[str],
 ) -> subprocess.CompletedProcess[str]:
     try:
-        result = subprocess.run(
+        result = run_in_process_group_bounded(
             command,
-            check=True,
-            capture_output=True,
-            text=True,
             timeout=30,
+            max_capture_bytes=CLOCK_COMMAND_OUTPUT_BYTES,
         )
+        if result.returncode != 0:
+            raise subprocess.CalledProcessError(
+                result.returncode,
+                command,
+                output=result.stdout,
+                stderr=result.stderr,
+            )
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
         log_clock_command(
             command,
@@ -271,13 +278,18 @@ def _query_performance_levels(gpu_uuid: str | None = None) -> tuple[str, ...]:
     command = [_amd_smi_executable(gpu_uuid), "metric", "-l", "--json"]
     if gpu_uuid is not None:
         command.extend(("--gpu", gpu_uuid))
-    result = subprocess.run(
+    result = run_in_process_group_bounded(
         command,
-        capture_output=True,
-        check=True,
-        text=True,
         timeout=10,
+        max_capture_bytes=CLOCK_COMMAND_OUTPUT_BYTES,
     )
+    if result.returncode != 0:
+        raise subprocess.CalledProcessError(
+            result.returncode,
+            command,
+            output=result.stdout,
+            stderr=result.stderr,
+        )
     return parse_performance_levels(result.stdout)
 
 

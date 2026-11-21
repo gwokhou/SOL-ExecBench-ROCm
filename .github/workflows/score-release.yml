@@ -30,20 +30,28 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: "${{ inputs.tag }}"
+          fetch-depth: 0
+          ref: "refs/tags/${{ inputs.tag }}"
       - name: Validate the release tag
         env:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           case "$RELEASE_TAG" in
-            *[!A-Za-z0-9._/-]*)
+            ""|-*|*[!A-Za-z0-9._/-]*|*..*|*/|/*|*//*)
               echo "release tag contains disallowed characters" >&2
               exit 1
               ;;
           esac
-          TAG_SHA="$(git rev-parse HEAD)"
+          git check-ref-format "refs/tags/$RELEASE_TAG"
+          TAG_SHA="$(git rev-parse --verify "refs/tags/${RELEASE_TAG}^{commit}")"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          if [ "$TAG_SHA" != "$HEAD_SHA" ]; then
+            echo "checked-out HEAD $HEAD_SHA does not match refs/tags/$RELEASE_TAG ($TAG_SHA)" >&2
+            exit 1
+          fi
           echo "TAG_SHA=$TAG_SHA" >> "$GITHUB_ENV"
-          echo "release tag validated: $RELEASE_TAG"
+          echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
+          echo "release tag validated: $RELEASE_TAG ($TAG_SHA)"
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           version: "0.11.31"
@@ -152,5 +160,5 @@ jobs:
         env:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          gh release edit "$RELEASE_TAG" --draft=false \
+          gh release edit "$RELEASE_TAG" --verify-tag --draft=false \
             --notes-file "$RUNNER_TEMP/release/attestation.json"

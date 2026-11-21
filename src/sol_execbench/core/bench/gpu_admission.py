@@ -15,10 +15,7 @@ from typing import Literal, Self
 
 from pydantic import Field, model_validator
 
-from sol_execbench.core.bench.gpu_lock_paths import (
-    LEGACY_CLOCK_STATE_DIRECTORY,
-    configured_gpu_locks,
-)
+from sol_execbench.core.bench.gpu_lock_paths import configured_gpu_locks
 from sol_execbench.core.control_plane_schema_versions import (
     ExecutionControlSchema,
 )
@@ -130,7 +127,8 @@ def ensure_durable_directory(path: Path) -> None:
         missing.append(current)
         current = current.parent
     for directory in reversed(missing):
-        directory.mkdir(exist_ok=True)
+        directory.mkdir(mode=0o700, exist_ok=True)
+        directory.chmod(0o700)
         _sync_directory(directory.parent)
 
 
@@ -226,9 +224,13 @@ def clock_state_directory(fallback: Path) -> Path:
         configured = os.environ.get("GPU_LOCK_DIR")
         if (
             configured is not None
+            and Path(configured).is_absolute()
             and fallback.resolve() == Path(configured).resolve()
         ):
-            return LEGACY_CLOCK_STATE_DIRECTORY
+            private_dir = Path(configured) / "gpu-leases" / PROJECT
+            private_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+            private_dir.chmod(0o700)
+            return private_dir
         return fallback
     path = Path(value)
     if not value or not path.is_absolute():

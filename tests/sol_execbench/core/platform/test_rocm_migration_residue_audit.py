@@ -82,6 +82,11 @@ def _classification(relative_path: str, line: str) -> str | None:
             "CPU judge worker hides GPUs through the compatibility environment"
         )
     if (
+        relative_path == "src/sol_execbench/core/bench/gpu_execution.py"
+        and "CUDA_VISIBLE_DEVICES" in line
+    ):
+        return "native GPU entry rejects legacy CUDA_VISIBLE_DEVICES remapping"
+    if (
         relative_path == "scripts/internal/upgrade/torch_scope_workload.py"
         and line.strip() == "a, b = a_cpu.cuda(), b_cpu.cuda()"
     ):
@@ -99,7 +104,7 @@ def _classification(relative_path: str, line: str) -> str | None:
         or "at::cuda" in line
         or "c10/cuda" in line
         or "c10::cuda::CUDAGuard" in line
-        or ".is_cuda()" in line
+        or ".is_cuda" in line
     ):
         return "PyTorch ROCm compatibility namespace"
     if "pin_cuda_device" in line:
@@ -434,7 +439,7 @@ def _classification(relative_path: str, line: str) -> str | None:
         return "reward-hack test fixture covers CUDA concurrency abuse spelling"
     if relative_path.startswith(
         "tests/sol_execbench/core/bench/test_timing.py",
-    ) and ("cuda" in line):
+    ) and ("cuda" in line or "_CUDA_" in line):
         return "timing tests use PyTorch ROCm CUDA device namespace"
     if relative_path.startswith(
         "tests/sol_execbench/driver/test_eval_driver.py",
@@ -493,6 +498,46 @@ def _classification(relative_path: str, line: str) -> str | None:
         "src/sol_execbench/driver/templates/eval_driver.py",
     ) and ("caching allocator" in line or "CuTe DSL" in line):
         return "legacy explanatory comment for benchmark behavior"
+    if (
+        relative_path == "src/sol_execbench/core/bench/timing.py"
+        and "_CUDA_" in line
+    ):
+        return (
+            "pinned PyTorch ROCm CUDA compatibility callables in timing harness"
+        )
+    if (
+        relative_path == "src/sol_execbench/core/bench/eval_timing.py"
+        and "is_cuda" in line
+    ):
+        return "PyTorch ROCm CUDA device predicate in evaluation timing"
+    if (
+        relative_path == "src/sol_execbench/core/bench/reward_hack/runtime.py"
+        and "_cuda_event_" in line
+    ):
+        return "pinned PyTorch ROCm CUDA event wrappers in reward-hack guard"
+    if relative_path == "src/sol_execbench/driver/candidate_loader.py" and (
+        "cudaStreamCreate" in line or "cudaGraph" in line
+    ):
+        return (
+            "candidate loader rejects CUDA/HIP stream and graph abuse spellings"
+        )
+    if relative_path.startswith("scripts/mvp_v1/") and (
+        "ROCm or CUDA" in line or "cutlass_scaled_mm" in line
+    ):
+        return (
+            "MVP v1 PyTorch ROCm device docstring and scaled_mm operator probe"
+        )
+    if relative_path.startswith("tests/scripts/test_mvp_v1") and (
+        "NVIDIA H20" in line
+        or "cutlass_scaled_mm" in line
+        or "_mock_cuda_device" in line
+    ):
+        return "MVP v1 test fixtures for rejected NVIDIA SKUs and PyTorch ROCm mocks"
+    if (
+        relative_path == "tests/sol_execbench/cli/commands/test_diagnostics.py"
+        and "test_replay_snapshot_accepts_cuda_and_hip_device_aliases" in line
+    ):
+        return "diagnostics test verifies PyTorch ROCm cuda/hip device alias handling"
     return None
 
 

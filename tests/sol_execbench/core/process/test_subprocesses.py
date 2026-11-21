@@ -11,6 +11,7 @@ import tempfile
 import time
 from functools import partial
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -428,3 +429,39 @@ def test_file_runner_timeout_reaps_nested_process_group_and_stops_writes(
     finally:
         if not _wait_for_process_exit(child_pid):
             os.kill(child_pid, signal.SIGKILL)
+
+
+def test_terminate_unreaped_process_group_bounds_post_sigkill_wait(
+    monkeypatch,
+) -> None:
+    waits: list[float | None] = []
+
+    class _StuckProcess:
+        pid = 999999
+        returncode = None
+        args = ("sudo", "-n", "/usr/bin/amd-smi")
+
+        def poll(self) -> None:
+            return None
+
+        def wait(self, timeout: float | None = None) -> int:
+            raise subprocess.TimeoutExpired(self.args, timeout or 0)
+
+    def fake_wait(_proc: object, timeout: float | None) -> None:
+        waits.append(timeout)
+        raise subprocess.TimeoutExpired(["sudo"], timeout or 0)
+
+    monkeypatch.setattr(subprocesses, "_POST_SIGKILL_WAIT_SECONDS", 0.05)
+    monkeypatch.setattr(subprocesses, "_PROCESS_GROUP_GRACE_SECONDS", 0.01)
+    monkeypatch.setattr(
+        subprocesses, "wait_for_exit_without_reaping", fake_wait
+    )
+    monkeypatch.setattr(
+        subprocesses, "process_group_has_live_members", lambda _pgid: False
+    )
+
+    subprocesses._terminate_unreaped_process_group(
+        cast(subprocess.Popen[str], _StuckProcess())
+    )
+    assert None not in waits
+    assert waits == [0.01, 0.05]
