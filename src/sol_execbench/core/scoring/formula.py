@@ -20,15 +20,21 @@ def sol_score(
     correct: bool = True,
 ) -> float:
     """Return the workload score without clipping or silent substitution."""
-    if not correct:
-        return 0.0
-    values = (candidate_runtime, baseline_runtime, sol_runtime)
-    if not all(math.isfinite(value) and value > 0 for value in values):
+    if not (
+        math.isfinite(baseline_runtime)
+        and baseline_runtime > 0
+        and math.isfinite(sol_runtime)
+        and sol_runtime > 0
+    ):
         raise SOLScoreAuditError("all runtimes must be finite and positive")
     if baseline_runtime <= sol_runtime:
         raise SOLScoreAuditError(
             "scoring baseline must be strictly slower than the SOL bound",
         )
+    if not correct:
+        return 0.0
+    if not math.isfinite(candidate_runtime) or candidate_runtime <= 0:
+        raise SOLScoreAuditError("all runtimes must be finite and positive")
     if candidate_runtime < sol_runtime:
         raise SOLScoreAuditError(
             "candidate faster than SOL requires bound and reward-hacking review",

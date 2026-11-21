@@ -126,6 +126,10 @@ class TestLanguageValidation:
                 entry_point="kernel.hip::run",
             )
 
+    def test_empty_languages_rejected(self):
+        with pytest.raises(ValidationError, match="at least 1 item"):
+            _make_spec(languages=[])
+
     @pytest.mark.parametrize("lang", [lg.value for lg in SupportedLanguages])
     def test_every_remaining_language_accepted_alone(self, lang):
         ext = ".hip" if lang in NATIVE_LANGUAGES else ".py"
@@ -350,3 +354,33 @@ class TestSolutionHashCoversBehaviorFields:
         # Cache sharing must still work for genuinely identical solutions.
         assert self._solution() == self._solution()
         assert hash(self._solution()) == hash(self._solution())
+        assert len(self._solution().hash()) == 64
+
+    def test_concatenation_boundary_does_not_collide(self):
+        first = Solution(
+            name="ab",
+            definition="c",
+            author="agent",
+            spec=BuildSpec(
+                languages=[SupportedLanguages.PYTORCH],
+                target_hardware=[SupportedHardware.GFX1200],
+                entry_point="kernel.py::run",
+            ),
+            sources=[SourceFile(path="kernel.py", content="def run(): pass")],
+        )
+        second = Solution(
+            name="a",
+            definition="bc",
+            author="agent",
+            spec=BuildSpec(
+                languages=[SupportedLanguages.PYTORCH],
+                target_hardware=[SupportedHardware.GFX1200],
+                entry_point="kernel.py::run",
+            ),
+            sources=[SourceFile(path="kernel.py", content="def run(): pass")],
+        )
+        assert first.hash() != second.hash()
+        assert first != second
+        # Author is structural even when runtime behavior fields match.
+        different_author = first.model_copy(update={"author": "other-agent"})
+        assert first != different_author

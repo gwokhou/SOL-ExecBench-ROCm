@@ -16,7 +16,6 @@
 
 """Strong-typed data definitions for solution implementations."""
 
-import hashlib
 from functools import cached_property
 from pathlib import Path
 from typing import Literal
@@ -33,6 +32,7 @@ from sol_execbench.core.data.base_model import (
 )
 from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
 from sol_execbench.core.data.solution_models import BuildSpec, SourceFile
+from sol_execbench.core.integrity import stable_json_checksum
 
 
 class Solution(CurrentSchemaModel):
@@ -122,25 +122,33 @@ class Solution(CurrentSchemaModel):
 
     @cached_property
     def _content_hash(self) -> str:
-        """Return the lazily memoized deterministic content hash."""
-        h = hashlib.sha1()
-        for s in (
-            self.name,
-            self.definition,
-            *self.spec.languages,
-            *self.spec.target_hardware,
-            self.spec.entry_point,
-            self.spec.binding or "",
-            str(self.spec.destination_passing_style),
-            self.spec.compile_options.model_dump_json()
-            if self.spec.compile_options
-            else "",
-            *self.spec.dependencies,
-            *(part for src in self.sources for part in (src.path, src.content)),
-        ):
-            h.update(s.encode())
-
-        return h.hexdigest()
+        """Return the lazily memoized deterministic SHA-256 content hash."""
+        payload = {
+            "name": self.name,
+            "definition": self.definition,
+            "languages": [str(item) for item in self.spec.languages],
+            "target_hardware": [
+                str(item) for item in self.spec.target_hardware
+            ],
+            "entry_point": self.spec.entry_point,
+            "binding": (
+                str(self.spec.binding)
+                if self.spec.binding is not None
+                else None
+            ),
+            "destination_passing_style": self.spec.destination_passing_style,
+            "compile_options": (
+                self.spec.compile_options.model_dump(mode="json")
+                if self.spec.compile_options is not None
+                else None
+            ),
+            "dependencies": list(self.spec.dependencies),
+            "sources": [
+                {"path": src.path, "content": src.content}
+                for src in self.sources
+            ],
+        }
+        return stable_json_checksum(payload)
 
     def hash(self) -> str:
         """Return the memoized deterministic hash of the solution content.
@@ -157,7 +165,7 @@ class Solution(CurrentSchemaModel):
         Returns:
         -------
         str
-            A SHA1 hash (40 hex characters) uniquely identifying this solution's content.
+            A SHA-256 hash (64 hex characters) uniquely identifying this solution's content.
 
         """
         return self._content_hash
@@ -170,7 +178,9 @@ class Solution(CurrentSchemaModel):
     def __eq__(
         self, other: object
     ) -> bool:  # pragma: no cover - trivial wrapper
-        """Compare solutions by their deterministic content digest."""
+        """Compare solutions structurally after fast content-hash precheck."""
         if not isinstance(other, Solution):
             return NotImplemented
-        return self._content_hash == other._content_hash
+        return self._content_hash == other._content_hash and super().__eq__(
+            other
+        )

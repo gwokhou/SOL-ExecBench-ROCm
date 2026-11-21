@@ -11,9 +11,37 @@ from typing import Any
 
 from sol_execbench.core.bench.custom_inputs import isolated_torch_rng
 from sol_execbench.core.bench.input_generation import gen_inputs
-from sol_execbench.core.bench.safetensors_io import load_safetensors
+from sol_execbench.core.bench.safetensors_io import (
+    FLASHINFER_TRACE_ENV,
+    flashinfer_safetensors_env,
+    load_safetensors,
+)
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
+
+
+def _safetensors_blob_roots(problem_dir: Path) -> list[Path]:
+    resolved_problem = problem_dir.resolve()
+    roots: list[Path] = [resolved_problem]
+    problems_ancestor = next(
+        (
+            parent
+            for parent in resolved_problem.parents
+            if parent.name == "problems"
+        ),
+        None,
+    )
+    if problems_ancestor is not None:
+        for parent in resolved_problem.parents:
+            roots.append(parent)
+            if parent == problems_ancestor:
+                break
+    trace_env = flashinfer_safetensors_env().get(FLASHINFER_TRACE_ENV)
+    if trace_env:
+        trace_root = Path(trace_env).resolve()
+        if trace_root not in roots:
+            roots.append(trace_root)
+    return roots
 
 
 def build_input_factory(
@@ -33,7 +61,7 @@ def build_input_factory(
     safetensors = load_safetensors(
         definition,
         workload,
-        blob_roots=[problem_dir, *problem_dir.parents],
+        blob_roots=_safetensors_blob_roots(problem_dir),
     )
 
     def factory(seed: int) -> tuple[Any, ...]:

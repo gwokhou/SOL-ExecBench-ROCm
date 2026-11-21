@@ -12,6 +12,7 @@ from rich.console import Console
 
 from sol_execbench.cli.evaluation import reporting as cli_reporting
 from sol_execbench.cli.protocol import CliExitCode, CliResult, artifact
+from sol_execbench.core.data.json_utils import atomic_write_jsonl_values
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
 from sol_execbench.core.integrity.checksums import sha256_file
 
@@ -24,11 +25,7 @@ def write_trace_output(
 ) -> str | None:
     """Write traces to JSONL and return the output digest."""
     if output_file:
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(output_file, "w") as f:
-            for trace in traces:
-                payload = trace.model_dump(mode="json")
-                f.write(json.dumps(payload) + "\n")
+        atomic_write_jsonl_values(output_file, traces)
         console.print(
             f"[green]Saved {len(traces)} traces to {output_file}[/green]",
         )
@@ -44,7 +41,7 @@ def emit_trace_output(*, traces: list[Trace], json_output: bool) -> None:
     """Render traces to standard output in text or JSON form."""
     if json_output:
         for trace in traces:
-            print(json.dumps(trace.model_dump(mode="json")))
+            print(json.dumps(trace.model_dump(mode="json"), allow_nan=False))
     else:
         cli_reporting.print_traces_table(traces)
 

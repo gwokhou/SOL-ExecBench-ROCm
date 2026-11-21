@@ -23,12 +23,15 @@ from pydantic import ValidationError
 from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
 from sol_execbench.core.data.workload import (
     CodeDistanceCheck,
+    ExactCheck,
     GeneratedInput,
     NumericCheck,
     RandomInput,
+    SafetensorsInput,
     ScalarInput,
     TopKRoutingCheck,
     Workload,
+    conservative_numeric_tolerance,
 )
 
 
@@ -146,3 +149,34 @@ class TestOutputChecks:
         )
 
         assert workload.inputs["offsets"].type == "custom"
+
+    @pytest.mark.parametrize(
+        "bad_path",
+        ["/abs/file.safetensors", "../file.safetensors", "a\\b.safetensors"],
+    )
+    def test_safetensors_input_rejects_non_relative_paths(
+        self, bad_path: str
+    ) -> None:
+        with pytest.raises(ValidationError, match="safetensors path"):
+            SafetensorsInput(path=bad_path, tensor_key="t")
+
+    def test_conservative_numeric_tolerance_non_numeric_checks(self) -> None:
+        exact_tol = conservative_numeric_tolerance([ExactCheck(output="out")])
+        assert exact_tol.max_atol == 0.0
+        assert exact_tol.max_rtol == 0.0
+        assert exact_tol.allow_negative_inf is False
+
+        topk_tol = conservative_numeric_tolerance(
+            [
+                TopKRoutingCheck(
+                    ids_output="ids",
+                    weights_output="weights",
+                    gating_input="gating",
+                    topk=2,
+                    weight_atol=0.025,
+                ),
+            ],
+        )
+        assert topk_tol.max_atol == pytest.approx(0.025)
+        assert topk_tol.max_rtol == 0.0
+        assert topk_tol.allow_negative_inf is False

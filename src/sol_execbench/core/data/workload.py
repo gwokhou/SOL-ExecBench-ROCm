@@ -31,6 +31,7 @@ from sol_execbench.core.data.base_model import (
     NonNegativeInt,
 )
 from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
+from sol_execbench.core.integrity import validate_relative_artifact_path
 
 
 class RandomInput(BaseModelWithDocstrings):
@@ -165,6 +166,15 @@ class SafetensorsInput(BaseModelWithDocstrings):
     tensor_key: NonEmptyString
     """Key identifier for the specific tensor within the safetensors file."""
 
+    @field_validator("path")
+    @classmethod
+    def _validate_relative_path(cls, value: str) -> str:
+        if "\\" in value or "\x00" in value:
+            raise ValueError(
+                "safetensors path must be a normalized relative artifact path"
+            )
+        return validate_relative_artifact_path(value, "safetensors path")
+
 
 class CustomInput(BaseModelWithDocstrings):
     """Custom input specification.
@@ -272,20 +282,33 @@ def conservative_numeric_tolerance(
 ) -> ToleranceSpec:
     """Collapse typed numeric checks into one conservative replay policy."""
     numeric = [check for check in checks if isinstance(check, NumericCheck)]
+    topk = [check for check in checks if isinstance(check, TopKRoutingCheck)]
+    exact = [
+        check
+        for check in checks
+        if isinstance(check, (ExactCheck, CodeDistanceCheck))
+    ]
     caps = [
         check.max_error_cap
         for check in numeric
         if check.max_error_cap is not None
     ]
+    if numeric:
+        max_atol = min(check.max_atol for check in numeric)
+    elif topk and not exact:
+        max_atol = min(check.weight_atol for check in topk)
+    else:
+        max_atol = 0.0
     return ToleranceSpec(
-        max_atol=min((check.max_atol for check in numeric), default=0.0),
+        max_atol=max_atol,
         max_rtol=min((check.max_rtol for check in numeric), default=0.0),
         required_matched_ratio=max(
             (check.required_matched_ratio for check in numeric),
             default=1.0,
         ),
         max_error_cap=min(caps) if caps else None,
-        allow_negative_inf=all(check.allow_negative_inf for check in numeric),
+        allow_negative_inf=bool(numeric)
+        and all(check.allow_negative_inf for check in numeric),
     )
 
 

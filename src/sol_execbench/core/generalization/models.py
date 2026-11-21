@@ -272,7 +272,7 @@ class CellWorkloadResult(FrozenArtifactModel):
     status: CellResultStatus
     compiled: bool
     correct: bool
-    speedup: float | None = Field(default=None, gt=0.0)
+    speedup: float | None = Field(default=None, gt=0.0, allow_inf_nan=False)
 
 
 class HardwareGeneralizationCell(CurrentFrozenSchemaModel):

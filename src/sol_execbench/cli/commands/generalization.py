@@ -6,6 +6,9 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import tempfile
 from pathlib import Path
 
 import click
@@ -18,6 +21,13 @@ from sol_execbench.cli.error_translation import (
     translate_cli_errors,
 )
 from sol_execbench.cli.protocol import CliExitCode, CliResult, artifact
+from sol_execbench.core.bench.clock_ownership import ClockOwnershipError
+from sol_execbench.core.bench.gpu_admission import AdmissionError
+from sol_execbench.core.bench.gpu_execution import native_gpu_execution
+from sol_execbench.core.bench.gpu_lock import GPULockVerificationError
+from sol_execbench.core.bench.single_gpu_defaults import (
+    host_single_gpu_defaults,
+)
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.data.solution_instance import Solution
 from sol_execbench.core.data.trace import Trace
@@ -25,6 +35,7 @@ from sol_execbench.core.dataset.corpus import load_corpus_manifest
 from sol_execbench.core.dataset.corpus_models import CorpusTargetViewManifest
 from sol_execbench.core.dataset.workload_generation import capacity_class_bytes
 from sol_execbench.core.generalization.models import (
+    CorpusAgentView,
     HardwareGeneralizationCell,
     HardwareGeneralizationPlan,
     TrainingExposureDeclaration,
@@ -46,13 +57,19 @@ from sol_execbench.core.platform.memory_quota import (
 console = Console(stderr=True)
 _GENERALIZATION_ERRORS = (
     CliErrorRule(
-        exception_type=(OSError, ValueError),
-        code="generalization_protocol_invalid",
-    ),
-    CliErrorRule(
-        exception_type=RuntimeError,
+        exception_type=(
+            RuntimeError,
+            ClockOwnershipError,
+            AdmissionError,
+            GPULockVerificationError,
+            TimeoutError,
+        ),
         code="generalization_target_unavailable",
         exit_code=CliExitCode.UNAVAILABLE,
+    ),
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="generalization_protocol_invalid",
     ),
 )
 
@@ -203,14 +220,22 @@ def run_cell_cli(
         plan = _load_model(HardwareGeneralizationPlan, plan_path)
         manifest = load_corpus_manifest(manifest_path)
         target = _load_model(CorpusTargetViewManifest, target_view)
-        capacity = collect_gpu_memory_quota_isolated(
-            device,
-            environment_quota_bytes=(
-                target.capacity_evidence.environment_quota_bytes
+        with (
+            host_single_gpu_defaults(),
+            native_gpu_execution(
+                device,
+                timeout_seconds=min(capacity_probe_timeout, 60.0),
+                manage_clocks=False,
             ),
-            safety_percent=target.capacity_evidence.safety_percent,
-            timeout_seconds=capacity_probe_timeout,
-        )
+        ):
+            capacity = collect_gpu_memory_quota_isolated(
+                device,
+                environment_quota_bytes=(
+                    target.capacity_evidence.environment_quota_bytes
+                ),
+                safety_percent=target.capacity_evidence.safety_percent,
+                timeout_seconds=capacity_probe_timeout,
+            )
         observed_capacity_class = capacity_class_bytes(
             capacity.usable_budget_bytes,
             manifest.generation_policy.capacity_classes_gib,
@@ -339,11 +364,14 @@ def _parse_seen_hardware(value: str) -> TrainingHardwareExposure:
 
 def _load_model[T: BaseModel](model: type[T], path: Path) -> T:
     text = path.read_text(encoding="utf-8")
-    raw = (
-        yaml.safe_load(text)
-        if path.suffix in {".yaml", ".yml"}
-        else json.loads(text)
-    )
+    try:
+        raw = (
+            yaml.safe_load(text)
+            if path.suffix in {".yaml", ".yml"}
+            else json.loads(text)
+        )
+    except yaml.YAMLError as exc:
+        raise ValueError(f"invalid YAML artifact: {path}") from exc
     return model.model_validate(raw)
 
 
@@ -366,13 +394,29 @@ def _write_planned_study(
     output: Path,
     planned: PlannedStudy,
 ) -> tuple[Path, ...]:
-    output.mkdir(parents=True, exist_ok=False)
+    if output.exists() or output.is_symlink():
+        raise FileExistsError(f"study output already exists: {output}")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(
+        tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent),
+    )
+    try:
+        staged_plan = staging / "plan.json"
+        _write_model(staged_plan, planned.plan)
+        _load_model(HardwareGeneralizationPlan, staged_plan)
+        for key, view in sorted(planned.agent_views.items()):
+            staged_view = staging / f"{key}.agent-view.json"
+            _write_model(staged_view, view)
+            _load_model(CorpusAgentView, staged_view)
+        if output.exists() or output.is_symlink():
+            raise FileExistsError(f"study output already exists: {output}")
+        os.replace(staging, output)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
     paths = [output / "plan.json"]
-    _write_model(paths[0], planned.plan)
-    for key, view in sorted(planned.agent_views.items()):
-        path = output / f"{key}.agent-view.json"
-        _write_model(path, view)
-        paths.append(path)
+    for key in sorted(planned.agent_views):
+        paths.append(output / f"{key}.agent-view.json")
     return tuple(paths)
 
 

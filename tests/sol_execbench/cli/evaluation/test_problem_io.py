@@ -67,6 +67,59 @@ def test_load_solution_resolves_source_content_relative_to_solution_json(
     assert solution.sources[0].content == "def run(x, y):\n    return x + y\n"
 
 
+@pytest.mark.parametrize(
+    "raw_json",
+    [
+        "[]",
+        '"not-an-object"',
+        '{"sources": "not-a-list"}',
+        '{"sources": [123]}',
+        '{"sources": [{}]}',
+        '{"sources": [{"path": 42}]}',
+        '{"sources": [{"path": "../outside.py"}]}',
+        '{"sources": [{"path": "/etc/passwd"}]}',
+    ],
+)
+def test_load_solution_rejects_malformed_or_traversal_json_as_value_error(
+    tmp_path: Path,
+    raw_json: str,
+) -> None:
+    solution_path = tmp_path / "solution.json"
+    solution_path.write_text(raw_json, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="solution"):
+        problem_io._load_solution(solution_path)
+
+
+def test_load_solution_rejects_leaf_and_directory_symlinks(
+    tmp_path: Path,
+) -> None:
+    outside = tmp_path / "outside.py"
+    outside.write_text("SECRET = 1\n", encoding="utf-8")
+
+    sol_dir = tmp_path / "sol"
+    sol_dir.mkdir()
+    (sol_dir / "solution.py").symlink_to(outside)
+    solution_path = sol_dir / "solution.json"
+    _write_json(solution_path, _solution_payload())
+
+    with pytest.raises(ValueError, match="symlink"):
+        problem_io._load_solution(solution_path)
+
+    (sol_dir / "solution.py").unlink()
+    ext_dir = tmp_path / "ext"
+    ext_dir.mkdir()
+    (ext_dir / "solution.py").write_text("SECRET = 2\n", encoding="utf-8")
+    (sol_dir / "sub").symlink_to(ext_dir)
+    nested = _solution_payload()
+    nested["spec"]["entry_point"] = "sub/solution.py::run"
+    nested["sources"] = [{"path": "sub/solution.py"}]
+    _write_json(solution_path, nested)
+
+    with pytest.raises(ValueError, match="symlink"):
+        problem_io._load_solution(solution_path)
+
+
 def test_load_workloads_skips_blank_lines(tmp_path: Path) -> None:
     workload_path = tmp_path / "workload.jsonl"
     workload_path.write_text(

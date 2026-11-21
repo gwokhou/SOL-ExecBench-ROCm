@@ -27,6 +27,13 @@ from sol_execbench.cli.protocol import (
     CliResult,
     artifact,
 )
+from sol_execbench.core.bench.clock_ownership import ClockOwnershipError
+from sol_execbench.core.bench.gpu_admission import AdmissionError
+from sol_execbench.core.bench.gpu_execution import native_gpu_execution
+from sol_execbench.core.bench.gpu_lock import GPULockVerificationError
+from sol_execbench.core.bench.single_gpu_defaults import (
+    host_single_gpu_defaults,
+)
 from sol_execbench.core.dataset.aka_compatibility import (
     DEFAULT_PROBE_TIMEOUT_SECONDS,
     SUPPORTED_AKA_GFX_TARGETS,
@@ -53,6 +60,10 @@ from sol_execbench.core.platform.memory_quota import (
     collect_gpu_memory_quota_isolated,
 )
 from sol_execbench.core.platform.runtime import detect_rocm_device
+from sol_execbench.core.process.logs import redacted_text_tail
+from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
+
+_AKA_FETCH_TIMEOUT_SECONDS = 300.0
 
 _INVALID_CORPUS_MANIFEST_ERRORS = (
     CliErrorRule(
@@ -67,7 +78,13 @@ _CORPUS_GENERATION_OUTPUT_EXISTS_ERRORS = (
         code="corpus_generation_output_exists",
     ),
     CliErrorRule(
-        exception_type=RuntimeError,
+        exception_type=(
+            RuntimeError,
+            ClockOwnershipError,
+            AdmissionError,
+            GPULockVerificationError,
+            TimeoutError,
+        ),
         code="corpus_capacity_probe_unavailable",
         exit_code=CliExitCode.UNAVAILABLE,
         hint="Use a visible ROCm device or adjust the probe quota and timeout.",
@@ -80,7 +97,7 @@ _CORPUS_GENERATION_OUTPUT_EXISTS_ERRORS = (
 
 _AKA_TARGET_UNAVAILABLE_ERRORS = (
     CliErrorRule(
-        exception_type=(RuntimeError, ValueError),
+        exception_type=(RuntimeError, ValueError, TimeoutError),
         code="aka_target_unavailable",
         exit_code=CliExitCode.UNAVAILABLE,
         hint="Use a ROCm device whose exact target is gfx942, gfx1150, or gfx1200.",
@@ -269,11 +286,19 @@ def generate_corpus_cli(
             if target_template is None:
                 raise ValueError("bundled target template is required")
             target = _load_bundled_target_template(target_template)
-        capacity = collect_gpu_memory_quota_isolated(
-            device,
-            environment_quota_bytes=environment_quota,
-            timeout_seconds=capacity_probe_timeout,
-        )
+        with (
+            host_single_gpu_defaults(),
+            native_gpu_execution(
+                device,
+                timeout_seconds=min(capacity_probe_timeout, 60.0),
+                manage_clocks=False,
+            ),
+        ):
+            capacity = collect_gpu_memory_quota_isolated(
+                device,
+                environment_quota_bytes=environment_quota,
+                timeout_seconds=capacity_probe_timeout,
+            )
         result = generate_corpus(
             manifest_path,
             output,
@@ -355,25 +380,36 @@ def materialize_cli(
 ) -> CliResult:
     """Select executable AKA workloads for one exact AMD GPU target."""
     manifest = _load_manifest(manifest_path)
-    with translate_cli_errors(*_AKA_TARGET_UNAVAILABLE_ERRORS):
-        device_info = detect_rocm_device(device)
-        target = materialization_target(device_info)
-    if target_arch is not None and device_info.gfx_target != target_arch:
-        raise CliFailure(
-            f"detected {device_info.gfx_target} on {device}, expected {target_arch}",
-            code="aka_target_mismatch",
-            hint="Remove --target-arch or select the matching GPU with --device.",
-        )
     if not skip_aka_fetch:
         _ensure_aka_clone(aka_root)
-    output = output or DEFAULT_OUTPUT_ROOT / device_info.gfx_target
-    with translate_cli_errors(*_AKA_PROBE_INFRASTRUCTURE_ERROR_ERRORS):
-        result_path = manifest.materialize(
-            output,
-            target=target,
-            probe_timeout_seconds=probe_timeout_seconds,
-        )
-    report = manifest.audit(result_path)
+    with host_single_gpu_defaults():
+        with translate_cli_errors(*_AKA_TARGET_UNAVAILABLE_ERRORS):
+            gpu_scope = native_gpu_execution(
+                device,
+                timeout_seconds=min(probe_timeout_seconds, 60.0),
+                manage_clocks=False,
+            )
+        with translate_cli_errors(*_AKA_TARGET_UNAVAILABLE_ERRORS), gpu_scope:
+            device_info = detect_rocm_device(device)
+            target = materialization_target(device_info)
+            if (
+                target_arch is not None
+                and device_info.gfx_target != target_arch
+            ):
+                raise CliFailure(
+                    f"detected {device_info.gfx_target} on {device}, expected {target_arch}",
+                    code="aka_target_mismatch",
+                    hint="Remove --target-arch or select the matching GPU with --device.",
+                )
+            output = output or DEFAULT_OUTPUT_ROOT / device_info.gfx_target
+            with translate_cli_errors(*_AKA_PROBE_INFRASTRUCTURE_ERROR_ERRORS):
+                result_path = manifest.materialize(
+                    output,
+                    target=target,
+                    probe_timeout_seconds=probe_timeout_seconds,
+                )
+    with translate_cli_errors(*_AKA_AUDIT_FAILED_ERRORS):
+        report = manifest.audit(result_path)
     console.print(
         f"[green]Materialized {report['problems']} problems / "
         f"{report['workloads']} workloads for {report['gfx_target']} in {result_path} "
@@ -417,8 +453,9 @@ def audit_cli(
     manifest = _load_manifest(manifest_path)
     with translate_cli_errors(*_AKA_AUDIT_FAILED_ERRORS):
         report = manifest.audit(problem_root)
-    if aka_root.is_dir():
-        report["aka_provenance"] = manifest.audit_aka_provenance(aka_root)
+        if aka_root.is_dir():
+            report["aka_provenance"] = manifest.audit_aka_provenance(aka_root)
+    if "aka_provenance" in report:
         console.print(
             f"[green]AKA provenance bound to {report['aka_provenance']['revision'][:12]} "
             f"({report['aka_provenance']['checksums_verified']} checksums verified)[/green]",
@@ -440,7 +477,7 @@ def _ensure_aka_clone(aka_root: Path) -> None:
     head_file = aka_root / ".aka-head"
     if head_file.is_file():
         try:
-            if head_file.read_text().strip() == AKA_REVISION:
+            if head_file.read_text(encoding="utf-8").strip() == AKA_REVISION:
                 return
         except OSError:
             pass
@@ -451,10 +488,22 @@ def _ensure_aka_clone(aka_root: Path) -> None:
         )
         return
     try:
-        subprocess.run(["bash", str(DEFAULT_FETCH_SCRIPT)], check=True)
-    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        completed = run_in_process_group_bounded(
+            ["bash", str(DEFAULT_FETCH_SCRIPT), str(aka_root)],
+            timeout=_AKA_FETCH_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
         console.print(
-            f"[yellow]Could not fetch/verify AKA clone ({exc}); "
+            f"[yellow]Could not fetch/verify AKA clone ({redacted_text_tail(str(exc))}); "
+            f"continuing with authored problems only.[/yellow]",
+        )
+        return
+    if completed.returncode != 0:
+        detail = redacted_text_tail(
+            (completed.stderr or completed.stdout or "").strip()
+        )
+        console.print(
+            f"[yellow]Could not fetch/verify AKA clone ({detail}); "
             f"continuing with authored problems only.[/yellow]",
         )
 

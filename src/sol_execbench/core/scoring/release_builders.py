@@ -141,14 +141,24 @@ def load_execution_plan(
 
 def artifact_reference(root: Path, path: Path) -> ArtifactReference:
     """Build a strict root-relative reference for one regular file."""
+    if root.is_symlink() or path.is_symlink():
+        raise ValueError(f"artifact path must not be a symlink: {path}")
     base = root.resolve()
     resolved = path.resolve()
-    if not resolved.is_file() or (
-        resolved.parent != base and base not in resolved.parents
+    if (
+        not resolved.is_file()
+        or not resolved.is_relative_to(base)
+        or resolved == base
     ):
         raise ValueError(
             f"artifact is not a regular file below release root: {path}",
         )
+    relative_parts = resolved.relative_to(base).parts
+    current = root
+    for part in relative_parts:
+        current = current / part
+        if current.is_symlink():
+            raise ValueError(f"artifact path traverses a symlink: {path}")
     relative = resolved.relative_to(base).as_posix()
     return ArtifactReference(
         path=relative,

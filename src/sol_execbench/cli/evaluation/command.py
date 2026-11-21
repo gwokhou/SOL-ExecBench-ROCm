@@ -29,7 +29,12 @@ from sol_execbench.core.bench.clock_lock import (
     ClockLockAcquirer,
     ClockLockLease,
 )
+from sol_execbench.core.bench.clock_ownership import observe_clock_devices
 from sol_execbench.core.bench.gpu_execution import acquire_clock_lock
+from sol_execbench.core.bench.gpu_lock_paths import (
+    GPU_LOCK_UUID_ENV,
+    normalize_gpu_uuid,
+)
 from sol_execbench.core.bench.io import flashinfer_safetensors_env
 from sol_execbench.core.bench.rocm_profiler import (
     ROCPROFV3_EXECUTABLE,
@@ -304,8 +309,31 @@ def _replay_snapshot(
 
 
 def _replay_device_index() -> int:
-    selected = os.environ.get(ENV_SOL_EXECBENCH_DEVICE, "cuda:0")
-    namespace, separator, index = selected.partition(":")
-    if namespace != "cuda" or separator != ":" or not index.isdecimal():
-        raise ValueError(f"unsupported replay device: {selected!r}")
-    return int(index)
+    selected = os.environ.get(ENV_SOL_EXECBENCH_DEVICE, "cuda:0").strip()
+    if selected in {"cuda", "hip"}:
+        ordinal = 0
+    else:
+        namespace, separator, index = selected.partition(":")
+        if (
+            namespace not in {"cuda", "hip"}
+            or separator != ":"
+            or not index.isascii()
+            or not index.isdecimal()
+        ):
+            raise ValueError(f"unsupported replay device: {selected!r}")
+        ordinal = int(index)
+    raw_uuid = os.environ.get(GPU_LOCK_UUID_ENV, "").strip()
+    if ordinal == 0 and raw_uuid:
+        try:
+            target_uuid = normalize_gpu_uuid(raw_uuid)
+            devices = observe_clock_devices()
+            matches = [
+                idx
+                for idx, item in enumerate(devices)
+                if item.uuid.lower() == target_uuid
+            ]
+            if len(matches) == 1:
+                return matches[0]
+        except Exception:
+            logger.debug("Unable to resolve GPU_LOCK_UUID index", exc_info=True)
+    return ordinal

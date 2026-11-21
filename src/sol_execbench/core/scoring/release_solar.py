@@ -186,6 +186,7 @@ def _verify_manifest_artifacts(
     *,
     ir_path: IRPath,
 ) -> None:
+    resolved_root = root.resolve()
     observed: set[str] = set()
     for raw in value:
         relative = validate_relative_artifact_path(
@@ -198,10 +199,16 @@ def _verify_manifest_artifacts(
                 "formal SOLAR manifest contains duplicate artifacts",
             )
         observed.add(relative)
-        path = root / relative
+        current = root
+        for part in Path(relative).parts:
+            current = current / part
+            if current.is_symlink():
+                raise ValueError("formal SOLAR artifact identity mismatch")
+        path = current
         if (
             path.is_symlink()
             or not path.is_file()
+            or not path.resolve().is_relative_to(resolved_root)
             or sha256_file(path) != digest
         ):
             raise ValueError("formal SOLAR artifact identity mismatch")

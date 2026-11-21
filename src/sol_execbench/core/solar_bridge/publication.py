@@ -53,18 +53,41 @@ def project_solar_manifest(
         ir_path
     )
     selected = [item for item in manifest.artifacts if item.path in admitted]
-    destination.mkdir(parents=True, exist_ok=False)
-    for artifact in selected:
-        _copy_regular_file(verified[artifact.path], destination / artifact.path)
-    output = destination / MANIFEST_FILENAME
-    projected = manifest.model_copy(update={"artifacts": selected})
-    _write_yaml(output, projected.model_dump(mode="json"))
-    load_manifest_semantic_characterization(
-        output,
-        workload_uuid=expected_workload_uuid,
-        definition=expected_definition,
+    if destination.exists() or destination.is_symlink():
+        raise FileExistsError(
+            f"publication destination already exists: {destination}"
+        )
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(
+        tempfile.mkdtemp(
+            prefix=f".{destination.name}.",
+            dir=destination.parent,
+        )
     )
-    return output
+    try:
+        for artifact in selected:
+            _copy_regular_file(
+                verified[artifact.path],
+                staging / artifact.path,
+            )
+        staged_output = staging / MANIFEST_FILENAME
+        projected = manifest.model_copy(update={"artifacts": selected})
+        _write_yaml(staged_output, projected.model_dump(mode="json"))
+        verify_projected_solar_manifest(staged_output)
+        load_manifest_semantic_characterization(
+            staged_output,
+            workload_uuid=expected_workload_uuid,
+            definition=expected_definition,
+        )
+        if destination.exists() or destination.is_symlink():
+            raise FileExistsError(
+                f"publication destination already exists: {destination}"
+            )
+        os.replace(staging, destination)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    return destination / MANIFEST_FILENAME
 
 
 def verify_projected_solar_manifest(path: Path) -> None:

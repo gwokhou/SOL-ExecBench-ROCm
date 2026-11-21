@@ -72,8 +72,12 @@ def verify_and_score_release(
     corpus_manifest_path: Path,
 ) -> OfficialScoreResult:
     """Verify every content boundary and compute the official suite score."""
+    if bundle_path.is_symlink() or bundle_path.parent.is_symlink():
+        raise ValueError("release bundle must not be a symlink")
     bundle_file = bundle_path.resolve()
     bundle_root = bundle_file.parent
+    if not bundle_file.is_relative_to(bundle_root):
+        raise ValueError("release bundle escapes its root")
     bundle = _load_model(bundle_file, ReleaseBundle)
     corpus = AKACorpusManifest.load(corpus_manifest_path)
     if sha256_file(corpus.path) != OFFICIAL_CORPUS_MANIFEST_SHA256:
@@ -233,13 +237,14 @@ def _score_workload(
 ) -> WorkloadScore:
     if baseline_latency is None:
         raise ValueError(f"baseline has no latency for {identity}")
-    if not candidate_passed:
-        return WorkloadScore(
-            problem=identity[0], workload_uuid=identity[1], score=0.0
-        )
-    if candidate_latency is None:
+    if candidate_passed and candidate_latency is None:
         raise ValueError(f"passing candidate has no latency for {identity}")
-    score = sol_score(candidate_latency, baseline_latency, sol_latency)
+    score = sol_score(
+        candidate_latency if candidate_latency is not None else 0.0,
+        baseline_latency,
+        sol_latency,
+        correct=candidate_passed,
+    )
     return WorkloadScore(
         problem=identity[0], workload_uuid=identity[1], score=score
     )
@@ -248,7 +253,11 @@ def _score_workload(
 def _load_model[Statement: ReleaseModel](
     path: Path, model: type[Statement]
 ) -> Statement:
-    if not path.is_file() or path.stat().st_size > MAX_RELEASE_STATEMENT_BYTES:
+    if (
+        path.is_symlink()
+        or not path.is_file()
+        or path.stat().st_size > MAX_RELEASE_STATEMENT_BYTES
+    ):
         raise ValueError(
             "release statement is missing or exceeds the size limit",
         )

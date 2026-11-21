@@ -12,9 +12,9 @@ set -euo pipefail
 REPO="https://github.com/AMD-AGI/AgentKernelArena"
 REV="869228138e07e773b61dd7fc1d8cdc0435c7b405"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DEST="${ROOT}/data/AgentKernelArena"
+DEST="${1:-${ROOT}/data/AgentKernelArena}"
 
-mkdir -p "${ROOT}/data"
+mkdir -p "$(dirname "${DEST}")"
 
 if [ ! -d "${DEST}/.git" ]; then
   echo "==> cloning ${REPO} into ${DEST}"

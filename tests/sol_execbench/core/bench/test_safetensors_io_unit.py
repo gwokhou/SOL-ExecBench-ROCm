@@ -104,14 +104,14 @@ def test_load_safetensors_validates_key_shape_and_dtype(
         {
             "a": {
                 "type": "safetensors",
-                "path": str(blob),
+                "path": "tensor.safetensors",
                 "tensor_key": "data",
             },
         },
     )
 
     with pytest.raises(ValueError, match=message):
-        load_safetensors(_definition(), workload)
+        load_safetensors(_definition(), workload, blob_roots=[tmp_path])
 
 
 def test_load_safetensors_skips_non_safetensors_inputs(monkeypatch) -> None:
@@ -148,3 +148,57 @@ def test_resolve_blob_path_returns_none_when_no_suffix_exists(
     assert (
         _resolve_blob_path(Path("a/b/tensor.safetensors"), [tmp_path]) is None
     )
+
+
+@pytest.mark.parametrize(
+    "bad_path",
+    [
+        "/etc/passwd",
+        "../secret.safetensors",
+        "sub/../../secret.safetensors",
+        "sub\\tensor.safetensors",
+    ],
+)
+def test_safetensors_rejects_unsafe_paths(
+    tmp_path: Path,
+    bad_path: str,
+) -> None:
+    with pytest.raises(ValueError, match="safetensors path"):
+        _workload(
+            {
+                "a": {
+                    "type": "safetensors",
+                    "path": bad_path,
+                    "tensor_key": "data",
+                },
+            },
+        )
+    with pytest.raises(ValueError, match="safetensors path"):
+        _resolve_blob_path(Path(bad_path), [tmp_path])
+
+
+def test_load_safetensors_rejects_symlink_escape(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    outside = tmp_path / "outside.safetensors"
+    outside.write_bytes(b"secret")
+    blob_root = tmp_path / "root"
+    blob_root.mkdir()
+    (blob_root / "tensor.safetensors").symlink_to(outside)
+    _install_fake_safetensors(
+        monkeypatch,
+        lambda _path: {"data": torch.ones(4)},
+    )
+    workload = _workload(
+        {
+            "a": {
+                "type": "safetensors",
+                "path": "tensor.safetensors",
+                "tensor_key": "data",
+            },
+        },
+    )
+
+    with pytest.raises(ValueError, match="symlink"):
+        load_safetensors(_definition(), workload, blob_roots=[blob_root])

@@ -163,7 +163,14 @@ class AKACorpusManifest:
     def load(cls, path: str | Path) -> AKACorpusManifest:
         """Load and validate a corpus manifest."""
         manifest_path = Path(path).resolve()
-        raw = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+        try:
+            raw = (
+                yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+            )
+        except yaml.YAMLError as exc:
+            raise ValueError(
+                f"invalid AKA corpus manifest YAML: {manifest_path}"
+            ) from exc
         data = AKACorpusManifestSchema.model_validate(raw).model_dump(
             mode="json",
         )
@@ -263,9 +270,14 @@ class AKACorpusManifest:
         """Validate local files against manifest checksums and the schema."""
         output = Path(output_root).resolve()
         record_path = output / "materialization-manifest.yaml"
-        raw_record = (
-            yaml.safe_load(record_path.read_text(encoding="utf-8")) or {}
-        )
+        try:
+            raw_record = (
+                yaml.safe_load(record_path.read_text(encoding="utf-8")) or {}
+            )
+        except yaml.YAMLError as exc:
+            raise ValueError(
+                f"invalid materialization manifest YAML: {record_path}"
+            ) from exc
         record = AKAMaterializationManifestSchema.model_validate(
             raw_record,
         ).model_dump(mode="json")
@@ -299,10 +311,12 @@ class AKACorpusManifest:
             for entry in self.entries
             if entry.relative_problem_dir.as_posix() in selected_paths
         )
-        workload_count = sum(
-            len(item.get("workload_uuids") or ()) for item in problems
-        )
-        coverage = _coverage_report(self, selected_entries, workload_count)
+        workload_counts = {
+            str(item["path"]): len(item.get("workload_uuids") or ())
+            for item in problems
+        }
+        workload_count = sum(workload_counts.values())
+        coverage = _coverage_report(self, selected_entries, workload_counts)
         if record.get("coverage") != coverage:
             raise ValueError("materialized coverage report is inconsistent")
         return {
@@ -842,18 +856,29 @@ def _selection_coverage(
     selection: AKACorpusSelection,
 ) -> dict[str, Any]:
     selected_entries = tuple(problem.entry for problem in selection.problems)
+    workload_counts = {
+        problem.entry.relative_problem_dir.as_posix(): len(problem.workloads)
+        for problem in selection.problems
+    }
     return _coverage_report(
         manifest,
         selected_entries,
-        sum(len(problem.workloads) for problem in selection.problems),
+        workload_counts,
     )
 
 
 def _coverage_report(
     manifest: AKACorpusManifest,
     selected_entries: tuple[AKACorpusEntry, ...],
-    workload_count: int,
+    materialized_workload_counts: Mapping[str, int],
 ) -> dict[str, Any]:
+    workload_count = sum(
+        materialized_workload_counts.get(
+            entry.relative_problem_dir.as_posix(),
+            0,
+        )
+        for entry in selected_entries
+    )
     axes: dict[str, dict[str, int]] = {}
     for axis in (
         "operation",
@@ -891,7 +916,11 @@ def _coverage_report(
             if _entry_matches_combo(entry, combo)
         ]
         matched_workloads = sum(
-            len(entry.workload_uuids) for entry in matched_entries
+            materialized_workload_counts.get(
+                entry.relative_problem_dir.as_posix(),
+                0,
+            )
+            for entry in matched_entries
         )
         if (
             len(matched_entries) < min_problems

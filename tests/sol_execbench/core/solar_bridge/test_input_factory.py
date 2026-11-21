@@ -28,10 +28,16 @@ def test_input_factory_binds_seed_safetensors_and_optional_custom_generator(
     observed: dict[str, object] = {}
     entered_seeds: list[int] = []
 
+    observed_blob_roots: list[list[Path] | None] = []
+
+    def fake_load_safetensors(*_args, **kwargs):
+        observed_blob_roots.append(kwargs.get("blob_roots"))
+        return {"blob": "loaded"}
+
     monkeypatch.setattr(
         input_factory,
         "load_safetensors",
-        lambda *args, **kwargs: {"blob": "loaded"},
+        fake_load_safetensors,
     )
 
     @contextmanager
@@ -63,6 +69,10 @@ def test_input_factory_binds_seed_safetensors_and_optional_custom_generator(
 
     assert factory(19) == ("first", "second")
     assert entered_seeds == [19]
+    assert observed_blob_roots[0] is not None
+    assert Path("/") not in observed_blob_roots[0]
+    assert tmp_path not in observed_blob_roots[0]
+    assert (tmp_path / "problem").resolve() in observed_blob_roots[0]
     assert observed == {
         "definition": definition,
         "workload": workload,

@@ -57,6 +57,13 @@ def scoped_artifact(root: Path, relative: str) -> Path:
     return path
 
 
+def _safe_yaml_load(path: Path) -> object:
+    try:
+        return yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise ValueError(f"invalid YAML artifact: {path}") from exc
+
+
 def load_materialized_target_view(
     source_path: Path,
     view_path: Path,
@@ -69,9 +76,7 @@ def load_materialized_target_view(
     ):
         raise ValueError("target/source metadata byte budget exceeded")
     source = load_corpus_manifest(source_path)
-    view = CorpusTargetViewManifest.model_validate(
-        yaml.safe_load(view_path.read_text(encoding="utf-8")),
-    )
+    view = CorpusTargetViewManifest.model_validate(_safe_yaml_load(view_path))
     _validate_identity(source_path, source, view)
     _validate_inventory(source, view)
     definitions: dict[str, Definition] = {}
@@ -95,10 +100,8 @@ def load_materialized_target_view(
                 "materialized definition differs from frozen source"
             )
         rule = WorkloadGenerationRule.model_validate(
-            yaml.safe_load(
-                scoped_artifact(
-                    source_path.parent, entry.generation_rule_path
-                ).read_text(),
+            _safe_yaml_load(
+                scoped_artifact(source_path.parent, entry.generation_rule_path)
             )
         )
         records = tuple(

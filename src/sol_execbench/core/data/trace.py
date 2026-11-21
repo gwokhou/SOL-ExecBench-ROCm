@@ -141,11 +141,13 @@ class Performance(BaseModelWithDocstrings):
     benchmarking the solution against reference implementations.
     """
 
-    latency_ms: float = Field(default=0.0, ge=0.0)
+    latency_ms: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
     """Solution execution latency in milliseconds."""
-    reference_latency_ms: float = Field(default=0.0, ge=0.0)
+    reference_latency_ms: float = Field(
+        default=0.0, ge=0.0, allow_inf_nan=False
+    )
     """Reference implementation latency in milliseconds for comparison."""
-    speedup_factor: float = Field(default=0.0, ge=0.0)
+    speedup_factor: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
     """Performance speedup factor compared to reference (reference_time / solution_time)."""
     warmup_runs: int = Field(default=0, ge=0)
     """Warmup invocations performed before each trial."""

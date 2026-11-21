@@ -28,6 +28,7 @@ import torch
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype
 from sol_execbench.core.data.workload import SafetensorsInput, Workload
+from sol_execbench.core.integrity import validate_relative_artifact_path
 
 FLASHINFER_TRACE_ENV = "FLASHINFER_TRACE_DIR"
 
@@ -63,20 +64,74 @@ def flashinfer_safetensors_env(
     return env
 
 
-def _resolve_blob_path(rel: Path, blob_roots: list[Path]) -> Path | None:
-    """Resolve a relative path against blob roots, handling partial overlap.
+def _candidate_within_blob_root(
+    root: Path,
+    relative_parts: tuple[str, ...],
+) -> Path | None:
+    if root.is_symlink():
+        raise ValueError(f"Safetensors blob root must not be a symlink: {root}")
+    resolved_root = root.resolve()
+    current = root
+    for part in relative_parts:
+        current = current / part
+        if current.is_symlink():
+            raise ValueError(f"Safetensors path traverses a symlink: {current}")
+    if not current.exists():
+        return None
+    if current.is_symlink() or not current.is_file():
+        raise ValueError(f"Safetensors blob is not a regular file: {current}")
+    resolved_candidate = current.resolve()
+    if (
+        not resolved_candidate.is_relative_to(resolved_root)
+        or resolved_candidate == resolved_root
+    ):
+        raise ValueError(f"Safetensors blob escapes blob root: {current}")
+    return current
 
-    Tries ``root / rel`` first, then progressively strips leading components
-    from *rel* so that paths like ``foo/bar/data.safetensors`` can match a
-    blob root that already contains the ``foo/`` prefix.
-    """
-    parts = rel.parts
+
+def _resolve_blob_path(rel: Path, blob_roots: list[Path]) -> Path | None:
+    """Resolve a validated relative path against blob roots."""
+    raw = str(rel)
+    if "\\" in raw:
+        raise ValueError(f"safetensors path must not use backslashes: {raw}")
+    safe_rel = validate_relative_artifact_path(
+        rel.as_posix(),
+        "safetensors path",
+    )
+    parts = Path(safe_rel).parts
     for root in blob_roots:
         for start in range(len(parts)):
-            candidate = root / Path(*parts[start:])
-            if candidate.exists():
-                return candidate
+            matched = _candidate_within_blob_root(root, parts[start:])
+            if matched is not None:
+                return matched
     return None
+
+
+def _resolve_safetensors_input_path(
+    raw_path: str,
+    blob_roots: list[Path] | None,
+) -> str:
+    if "\\" in raw_path or "\x00" in raw_path:
+        raise ValueError(
+            "safetensors path must be a normalized relative artifact path"
+        )
+    safe_rel = validate_relative_artifact_path(raw_path, "safetensors path")
+    if blob_roots is not None:
+        resolved = _resolve_blob_path(Path(safe_rel), blob_roots)
+        if resolved is None:
+            raise FileNotFoundError(
+                f"Safetensors file not found under blob roots: {safe_rel}",
+            )
+        return str(resolved.resolve())
+    candidate = Path(safe_rel)
+    current = Path()
+    for part in candidate.parts:
+        current = current / part
+        if current.is_symlink():
+            raise ValueError(
+                f"Safetensors path traverses a symlink: {raw_path}"
+            )
+    return str(candidate.resolve())
 
 
 def load_safetensors(
@@ -84,13 +139,7 @@ def load_safetensors(
     workload: Workload,
     blob_roots: list[Path] | None = None,
 ) -> dict[str, torch.Tensor]:
-    """Load safetensors inputs for a workload.
-
-    Safetensors blobs are resolved from the staging directory (passed via
-    ``blob_roots``).  The first root whose ``root / path`` exists is used.
-    If none match, the path is passed as-is to safetensors (which will raise
-    a FileNotFoundError with a clear message).
-    """
+    """Load safetensors inputs for a workload."""
     expected = definition.get_input_shapes(workload.axes)
 
     safe_tensors: dict[str, torch.Tensor] = {}
@@ -99,15 +148,7 @@ def load_safetensors(
         if not isinstance(input_spec, SafetensorsInput):
             continue
 
-        path = input_spec.path
-        if not Path(path).is_absolute() and blob_roots:
-            resolved = _resolve_blob_path(Path(path), blob_roots)
-            if resolved is not None:
-                path = str(resolved)
-
-        # Resolve to canonical absolute path so different representations
-        # of the same file (symlinks, ".." components) share a cache entry.
-        path = str(Path(path).resolve())
+        path = _resolve_safetensors_input_path(input_spec.path, blob_roots)
 
         if path not in loaded_files:
             loaded_files[path] = _load_safetensors_file(path)

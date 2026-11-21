@@ -685,6 +685,7 @@ def test_seal_rejects_manifest_and_runtime_capacity_drift(
         )
 
 
+@pytest.mark.usefixtures("native_gpu_cpu_observation")
 def test_run_cell_cli_reprobes_runtime_capacity_class(
     tmp_path: Path,
     monkeypatch,

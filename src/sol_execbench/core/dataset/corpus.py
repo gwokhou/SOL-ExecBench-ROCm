@@ -119,10 +119,17 @@ def semantic_fingerprint(
     return stable_json_checksum(payload)
 
 
+def _load_yaml_mapping(path: Path) -> object:
+    try:
+        return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        raise ValueError(f"invalid YAML artifact: {path}") from exc
+
+
 def load_corpus_manifest(path: str | Path) -> CorpusManifest:
     """Load a manifest and validate every Definition and generation rule."""
     manifest_path = Path(path).resolve()
-    raw = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+    raw = _load_yaml_mapping(manifest_path)
     manifest = CorpusManifest.model_validate(raw)
     _validate_artifacts(manifest_path.parent, manifest)
     return manifest
@@ -130,7 +137,7 @@ def load_corpus_manifest(path: str | Path) -> CorpusManifest:
 
 def load_target_descriptor(path: str | Path) -> StaticTargetDescriptor:
     """Load one declared target descriptor."""
-    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    raw = _load_yaml_mapping(Path(path))
     descriptor = StaticTargetDescriptor.model_validate(raw)
     if (
         descriptor.qualification_status
@@ -273,7 +280,7 @@ def _artifact_path(root: Path, relative: str) -> Path:
 
 
 def _load_rule(path: Path) -> WorkloadGenerationRule:
-    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    raw = _load_yaml_mapping(path)
     return WorkloadGenerationRule.model_validate(raw)
 
 

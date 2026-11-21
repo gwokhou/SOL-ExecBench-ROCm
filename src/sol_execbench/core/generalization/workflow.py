@@ -462,11 +462,12 @@ def _trace_outcome(
     if status is EvaluationStatus.PASSED:
         if evaluation.performance is None:
             raise ValueError("passed Trace must contain performance evidence")
+        raw_speedup = evaluation.performance.speedup_factor
         return (
             CellResultStatus.PASSED,
             True,
             True,
-            evaluation.performance.speedup_factor,
+            raw_speedup if raw_speedup > 0.0 else None,
         )
     if status is EvaluationStatus.INVALID_REFERENCE:
         return CellResultStatus.EVALUATOR_FAILURE, False, False, None

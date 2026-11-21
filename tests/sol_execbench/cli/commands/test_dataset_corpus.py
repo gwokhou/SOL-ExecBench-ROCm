@@ -77,6 +77,7 @@ def test_corpus_validate_cli_reports_frozen_release() -> None:
     assert response["data"]["concrete_workloads"] == 0
 
 
+@pytest.mark.usefixtures("native_gpu_cpu_observation")
 def test_corpus_generate_cli_uses_isolated_measured_quota(
     tmp_path: Path,
     monkeypatch,
@@ -191,6 +192,7 @@ def test_bundled_target_template_rejects_directory_kind_mismatch(
         cli_dataset._load_bundled_target_template("isa/gfx1200")
 
 
+@pytest.mark.usefixtures("native_gpu_cpu_observation")
 def test_corpus_generate_cli_reports_capacity_probe_failure(
     tmp_path: Path,
     monkeypatch,

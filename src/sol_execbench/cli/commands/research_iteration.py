@@ -8,6 +8,9 @@ import click
 from sol_execbench.core.bench.judge.contracts import development_cases
 from sol_execbench.core.bench.judge.executor import execute_development
 from sol_execbench.core.bench.judge.staging import stage_development_case
+from sol_execbench.core.bench.single_gpu_defaults import (
+    host_single_gpu_defaults,
+)
 from sol_execbench.core.solar_bridge.coverage_models import CoverageOptions
 from sol_execbench.core.solar_bridge.coverage_plan import (
     coverage_rows,
@@ -112,15 +115,16 @@ def target_coverage_cli(
             raise ValueError(
                 "execution requires --output and --orojenesis-home"
             )
-        report = audit_target_coverage(
-            target,
-            output,
-            CoverageOptions(
-                device=device,
-                orojenesis_home=orojenesis_home,
-            ),
-            resume=resume,
-        )
+        with host_single_gpu_defaults():
+            report = audit_target_coverage(
+                target,
+                output,
+                CoverageOptions(
+                    device=device,
+                    orojenesis_home=orojenesis_home,
+                ),
+                resume=resume,
+            )
     except (OSError, ValueError, RuntimeError) as exc:
         raise click.ClickException(str(exc)) from exc
     click.echo(f"rows={len(report.rows)} complete={report.complete}; {output}")

@@ -245,7 +245,7 @@ class BuildSpec(BaseModelWithDocstrings):
     language, hardware targets, dependencies, entry point, and build commands.
     """
 
-    languages: list[SupportedLanguages]
+    languages: list[SupportedLanguages] = Field(min_length=1)
     """The list of programming languages used to implement the solution. C++ languages and Python languages cannot be mixed."""
     target_hardware: list[SupportedHardware] = Field(min_length=1)
     """List of hardware this solution is compatible with (e.g., gfx1200, gfx942, LOCAL)."""

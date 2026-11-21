@@ -22,7 +22,10 @@ from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.data.workload_validation import (
     validate_problem_contract,
 )
+from sol_execbench.core.integrity import validate_relative_artifact_path
 from sol_execbench.core.platform.runtime import detect_rocm_device
+
+_MAX_SOLUTION_SOURCE_BYTES = 16 * 1024 * 1024
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -53,21 +56,83 @@ def _load_workloads(path: Path) -> list[Workload]:
     return load_jsonl_file(Workload, path)
 
 
+def _validate_raw_solution_sources(sol_dict: dict[str, object]) -> None:
+    if "sources" not in sol_dict:
+        return
+    sources = sol_dict["sources"]
+    if not isinstance(sources, list):
+        raise ValueError("solution 'sources' must be a list")
+    for src in sources:
+        if not isinstance(src, dict):
+            raise ValueError("solution source entry must be an object")
+        raw_path = src.get("path")
+        if (
+            not isinstance(raw_path, str)
+            or "\\" in raw_path
+            or "\x00" in raw_path
+        ):
+            raise ValueError(
+                "solution source entry requires a valid relative string 'path'"
+            )
+        validate_relative_artifact_path(raw_path, "solution source path")
+        content = src.get("content")
+        if content is not None and not isinstance(content, str):
+            raise ValueError("solution source 'content' must be a string")
+
+
+def _read_solution_source_file(sol_dir: Path, rel_path: str) -> str | None:
+    sol_root = sol_dir.resolve()
+    current = sol_dir
+    for part in Path(rel_path).parts:
+        current = current / part
+        if current.is_symlink():
+            raise ValueError(
+                f"solution source path must not traverse symlinks: {rel_path}",
+            )
+    if not current.exists():
+        return None
+    resolved = current.resolve()
+    if not resolved.is_relative_to(sol_root) or resolved == sol_root:
+        raise ValueError(
+            f"solution source escapes solution directory: {rel_path}",
+        )
+    if not current.is_file():
+        raise ValueError(
+            f"solution source is not a regular file: {rel_path}",
+        )
+    if current.stat().st_size > _MAX_SOLUTION_SOURCE_BYTES:
+        raise ValueError(f"solution source exceeds size limit: {rel_path}")
+    return current.read_text(encoding="utf-8")
+
+
 def _load_solution(path: Path) -> Solution:
-    sol_dict = json.loads(path.read_text())
+    if not path.is_file() or path.stat().st_size > _MAX_SOLUTION_SOURCE_BYTES:
+        raise ValueError("solution JSON is missing or exceeds size limit")
+    sol_dict = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(sol_dict, dict):
+        raise ValueError("solution JSON must be an object")
+    _validate_raw_solution_sources(sol_dict)
     sol_dir = path.parent
-    for src in sol_dict.get("sources", []):
-        if not src.get("content"):
-            src_path = sol_dir / src["path"]
-            if src_path.exists():
-                src["content"] = src_path.read_text()
+    sources = sol_dict.get("sources")
+    if isinstance(sources, list):
+        for src in sources:
+            if not src.get("content"):
+                rel_path = validate_relative_artifact_path(
+                    src["path"],
+                    "solution source path",
+                )
+                loaded_text = _read_solution_source_file(sol_dir, rel_path)
+                if loaded_text is not None:
+                    src["content"] = loaded_text
     return Solution.model_validate(sol_dict)
 
 
 def _load_config(path: Path | None) -> BenchmarkConfig:
     if path is None:
         return BenchmarkConfig()
-    return BenchmarkConfig.model_validate_json(path.read_text())
+    return BenchmarkConfig.model_validate_json(
+        path.read_text(encoding="utf-8"),
+    )
 
 
 def load_problem_inputs(inputs: ResolvedProblemInputs) -> LoadedProblemInputs:

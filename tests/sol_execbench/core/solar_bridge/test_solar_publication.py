@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import yaml
 
 from sol_execbench.core.integrity import sha256_file
@@ -134,3 +135,26 @@ def test_solar_projection_omits_verified_nested_orojenesis(
     }
     assert not (output.parent / "orojenesis").exists()
     verify_projected_solar_manifest(output)
+
+
+def test_solar_projection_cleans_up_staging_on_characterization_failure(
+    tmp_path: Path,
+) -> None:
+    source_root = tmp_path / "process" / "solar"
+    source_root.mkdir(parents=True)
+    source = _solar_manifest(source_root)
+    destination = tmp_path / "publication" / "solar"
+
+    with pytest.raises(
+        ValueError,
+        match="solar_manifest_workload_identity_mismatch",
+    ):
+        project_solar_manifest(
+            source,
+            destination,
+            expected_definition="wrong_definition",
+            expected_workload_uuid="case-0",
+        )
+
+    assert not destination.exists()
+    assert list(destination.parent.iterdir()) == []

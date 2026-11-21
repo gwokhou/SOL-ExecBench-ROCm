@@ -30,6 +30,8 @@ from sol_execbench.cli.evaluation.scope_replay import collect_scope_replays
 from sol_execbench.cli.protocol import CliExitCode, CliFailure
 from sol_execbench.cli.sidecars import static_evidence as cli_static_evidence
 from sol_execbench.cli.sidecars.mode import SidecarMode
+from sol_execbench.core.bench.clock_ownership import ClockOwnershipError
+from sol_execbench.core.bench.gpu_admission import AdmissionError
 from sol_execbench.core.bench.gpu_execution import native_gpu_execution
 from sol_execbench.core.bench.gpu_lock import (
     GPULockVerificationError,
@@ -97,13 +99,39 @@ def require_execution_isolation(request: EvaluationRequest) -> None:
 
 
 @contextmanager
+def _evaluation_environment_scope(request: EvaluationRequest) -> Iterator[None]:
+    unsafe_name = ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION
+    device_name = ENV_SOL_EXECBENCH_DEVICE
+    nonce_name = ENV_SOL_EXECBENCH_INPUT_NONCE
+    previous_unsafe = os.environ.get(unsafe_name)
+    previous_device = os.environ.get(device_name)
+    previous_nonce = os.environ.get(nonce_name)
+    os.environ[device_name] = request.device
+    os.environ[nonce_name] = secrets.token_hex(EVALUATION_INPUT_NONCE_BYTES)
+    if (
+        request.unsafe_local_execution
+        and os.environ.get(ENV_SOL_EXECBENCH_SANDBOXED) != "1"
+    ):
+        os.environ[unsafe_name] = "1"
+    try:
+        yield
+    finally:
+        for key, prev in (
+            (unsafe_name, previous_unsafe),
+            (device_name, previous_device),
+            (nonce_name, previous_nonce),
+        ):
+            if prev is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = prev
+
+
+@contextmanager
 def evaluation_execution_boundary(
     request: EvaluationRequest,
 ) -> Iterator[Path | None]:
     """Mark unsafe runs and serialize access to the selected GPU."""
-    unsafe_name = ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION
-    device_name = ENV_SOL_EXECBENCH_DEVICE
-    nonce_name = ENV_SOL_EXECBENCH_INPUT_NONCE
     try:
         with (
             host_single_gpu_defaults(),
@@ -124,35 +152,10 @@ def evaluation_execution_boundary(
                 ),
             ),
             _EXECUTION_ENV_LOCK,
+            _evaluation_environment_scope(request),
+            scope_clock_window(request) as archive,
         ):
-            previous_unsafe = os.environ.get(unsafe_name)
-            previous_device = os.environ.get(device_name)
-            previous_nonce = os.environ.get(nonce_name)
-            os.environ[device_name] = request.device
-            os.environ[nonce_name] = secrets.token_hex(
-                EVALUATION_INPUT_NONCE_BYTES
-            )
-            if (
-                request.unsafe_local_execution
-                and os.environ.get(ENV_SOL_EXECBENCH_SANDBOXED) != "1"
-            ):
-                os.environ[unsafe_name] = "1"
-            try:
-                with scope_clock_window(request) as archive:
-                    yield archive
-            finally:
-                if previous_unsafe is None:
-                    os.environ.pop(unsafe_name, None)
-                else:
-                    os.environ[unsafe_name] = previous_unsafe
-                if previous_device is None:
-                    os.environ.pop(device_name, None)
-                else:
-                    os.environ[device_name] = previous_device
-                if previous_nonce is None:
-                    os.environ.pop(nonce_name, None)
-                else:
-                    os.environ[nonce_name] = previous_nonce
+            yield archive
     except TimeoutError as exc:
         raise CliFailure(
             str(exc),
@@ -164,6 +167,19 @@ def evaluation_execution_boundary(
             str(exc),
             code="gpu_lock_unverified",
             hint="Launch evaluation through ./scripts/run_docker.sh.",
+        ) from exc
+    except (ClockOwnershipError, AdmissionError) as exc:
+        raise CliFailure(
+            str(exc),
+            code="gpu_execution_unavailable",
+            exit_code=CliExitCode.UNAVAILABLE,
+            hint="Verify GPU lock and clock state ownership before retrying.",
+        ) from exc
+    except ValueError as exc:
+        raise CliFailure(
+            str(exc),
+            code="invalid_gpu_execution_request",
+            exit_code=CliExitCode.INPUT,
         ) from exc
 
 

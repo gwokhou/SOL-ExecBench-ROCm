@@ -16,7 +16,28 @@ def test_sol_score_preserves_paper_anchors():
     assert sol_score(1.0, 2.0, 1.0) == 1.0
     assert sol_score(2.0, 2.0, 1.0) == 0.5
     assert sol_score(3.0, 2.0, 1.0) == pytest.approx(1 / 3)
-    assert sol_score(0.0, 0.0, 0.0, correct=False) == 0.0
+    assert sol_score(0.0, 2.0, 1.0, correct=False) == 0.0
+    assert sol_score(float("nan"), 2.0, 1.0, correct=False) == 0.0
+
+
+@pytest.mark.parametrize(
+    ("baseline", "bound"),
+    [
+        (0.0, 0.0),
+        (1.0, 1.0),
+        (0.5, 1.0),
+        (-1.0, 0.5),
+        (2.0, 0.0),
+        (float("nan"), 1.0),
+        (2.0, float("inf")),
+    ],
+)
+def test_sol_score_audits_baseline_and_bound_even_when_incorrect(
+    baseline: float,
+    bound: float,
+) -> None:
+    with pytest.raises(SOLScoreAuditError):
+        sol_score(0.0, baseline, bound, correct=False)
 
 
 @pytest.mark.parametrize(
@@ -50,6 +71,24 @@ def test_suite_aggregation_weights_problems_equally_and_excludes_sentinel():
     assert result.problem_scores == {"problem-a": 0.5, "problem-b": 1.0}
     assert result.score == 0.75
     assert result.scored_workloads == 3
+
+
+def test_suite_aggregation_rejects_empty_and_duplicate_identities() -> None:
+    with pytest.raises(ValueError, match="non-empty"):
+        aggregate_suite_scores(
+            [WorkloadScore(problem="", workload_uuid="a1", score=1.0)],
+        )
+    with pytest.raises(ValueError, match="non-empty"):
+        aggregate_suite_scores(
+            [WorkloadScore(problem="p", workload_uuid="", score=1.0)],
+        )
+    with pytest.raises(ValueError, match="duplicate workload score"):
+        aggregate_suite_scores(
+            [
+                WorkloadScore(problem="p", workload_uuid="w1", score=1.0),
+                WorkloadScore(problem="p", workload_uuid="w1", score=0.5),
+            ],
+        )
 
 
 def test_diagnostic_workload_score_wraps_formula_and_aggregates():

@@ -41,12 +41,23 @@ class SuiteScore:
 def aggregate_suite_scores(values: Iterable[WorkloadScore]) -> SuiteScore:
     """Average workloads within each problem, then problems equally."""
     grouped: dict[str, list[float]] = defaultdict(list)
+    seen_identities: set[tuple[str, str]] = set()
     for value in values:
+        if not value.problem or not value.workload_uuid:
+            raise ValueError(
+                "workload score requires non-empty problem and workload_uuid",
+            )
+        identity = (value.problem, value.workload_uuid)
+        if identity in seen_identities:
+            raise ValueError(
+                f"duplicate workload score for {value.problem}/{value.workload_uuid}",
+            )
+        seen_identities.add(identity)
         if value.role is AKACorpusRole.COMPATIBILITY_SENTINEL:
             continue
         if value.role is not AKACorpusRole.SCORED:
             raise ValueError(f"unknown corpus role: {value.role}")
-        if not 0 <= value.score <= 1:
+        if not (0 <= value.score <= 1):
             raise ValueError("workload SOL scores must lie in [0, 1]")
         grouped[value.problem].append(value.score)
     if not grouped:

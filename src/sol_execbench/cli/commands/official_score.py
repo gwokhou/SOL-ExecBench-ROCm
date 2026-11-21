@@ -37,6 +37,14 @@ from sol_execbench.core.scoring.release_packaging import (
 )
 from sol_execbench.core.scoring.release_verifier import verify_and_score_release
 
+_OFFICIAL_SCORE_STATUS_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="official_score_status_invalid",
+        hint="Provide a readable, valid AKA corpus manifest.",
+    ),
+)
+
 _RELEASE_STATEMENT_BUILD_FAILED_ERRORS = (
     CliErrorRule(
         exception_type=(OSError, ValueError),
@@ -99,7 +107,8 @@ def score_cli() -> None:
 )
 def official_score_status_cli(manifest_path: Path) -> CliResult:
     """Report official-score verifier, policy, producer, and release state."""
-    report = official_score_availability(manifest_path)
+    with translate_cli_errors(*_OFFICIAL_SCORE_STATUS_ERRORS):
+        report = official_score_availability(manifest_path)
     if not report["policy"]["authorized"]:
         console.print(
             "[yellow]Official-score policy is not authorized: "
@@ -162,12 +171,17 @@ def official_score_cli(bundle: Path, manifest_path: Path) -> CliResult:
 )
 def build_statement_cli(plan: Path, manifest_path: Path) -> CliResult:
     """Verify one completed release plan and write its statement."""
-    loaded = load_execution_plan(plan)
-    workspace = plan.resolve().parents[1]
-    output = workspace / "statements" / f"{loaded.role}.json"
     with translate_cli_errors(*_RELEASE_STATEMENT_BUILD_FAILED_ERRORS):
+        resolved_plan = plan.resolve()
+        if len(resolved_plan.parents) < 2:
+            raise ValueError(
+                "execution plan must reside in <workspace>/<role>/plan.json"
+            )
+        loaded = load_execution_plan(resolved_plan)
+        workspace = resolved_plan.parents[1]
+        output = workspace / "statements" / f"{loaded.role}.json"
         path = build_run_statement(
-            plan,
+            resolved_plan,
             corpus_manifest_path=manifest_path,
             output_path=output,
         )

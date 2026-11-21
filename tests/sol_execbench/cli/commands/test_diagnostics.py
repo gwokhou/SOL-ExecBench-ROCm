@@ -235,6 +235,64 @@ def test_replay_snapshot_collects_selected_device(monkeypatch) -> None:
     assert calls == [("pre", 2)]
 
 
+@pytest.mark.parametrize(
+    ("selected", "expected"),
+    [
+        ("cuda", 0),
+        ("cuda:0", 0),
+        ("hip", 0),
+        ("hip:0", 0),
+        ("hip:3", 3),
+    ],
+)
+def test_replay_snapshot_accepts_cuda_and_hip_device_aliases(
+    monkeypatch,
+    selected: str,
+    expected: int,
+) -> None:
+    calls: list[int] = []
+    monkeypatch.setenv("SOL_EXECBENCH_DEVICE", selected)
+    monkeypatch.delenv("GPU_LOCK_UUID", raising=False)
+    monkeypatch.setattr(
+        "sol_execbench.cli.evaluation.command.collect_runtime_gpu_telemetry",
+        lambda *, phase, device_index: (
+            calls.append(device_index) or RuntimeGPUTelemetry(phase=phase)
+        ),
+    )
+
+    assert _replay_snapshot("pre") is not None
+    assert calls == [expected]
+
+
+def test_no_trace_diagnostics_redacts_secrets_and_uses_private_mode(
+    tmp_path: Path,
+) -> None:
+    staging = tmp_path / "staging"
+    written = cli_evaluation._write_no_trace_diagnostics_sidecar(
+        output_file=None,
+        staging_dir=staging,
+        keep_staging=False,
+        diagnostics=cli_evaluation.NoTraceDiagnostics(
+            reason="no_parseable_traces",
+            returncode=1,
+            stdout="API_KEY=super-secret-value\n",
+            stderr="Authorization: Bearer top-secret-token\n",
+        ),
+    )
+    assert written is not None
+    try:
+        mode = written.stat().st_mode & 0o777
+        assert mode == 0o600
+        payload = json.loads(written.read_text(encoding="utf-8"))
+        assert "super-secret-value" not in payload["stdout_tail"]
+        assert "top-secret-token" not in payload["stderr_tail"]
+        assert "<redacted>" in payload["stdout_tail"]
+        assert "<redacted>" in payload["stderr_tail"]
+    finally:
+        written.unlink(missing_ok=True)
+        written.parent.rmdir()
+
+
 def test_no_trace_diagnostics_sidecar_uses_trace_output_path(tmp_path: Path):
     output = tmp_path / "traces.jsonl"
     staging = tmp_path / "staging"

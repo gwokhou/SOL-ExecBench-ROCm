@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextlib import nullcontext
 from pathlib import Path
 
 import click
@@ -29,6 +30,9 @@ from sol_execbench.cli.protocol import (
 )
 from sol_execbench.core.bench.batch_gpu_qualification import (
     BatchGPUQualificationStage,
+)
+from sol_execbench.core.bench.single_gpu_defaults import (
+    host_single_gpu_defaults,
 )
 from sol_execbench.core.scoring.release_solar_qualification import (
     run_solar_release_qualification,
@@ -224,7 +228,8 @@ def analyze_cli(
         device_stage_lock_timeout_seconds=device_stage_lock_timeout,
     )
     try:
-        outcome = run_solar_worker(request, timeout_seconds=timeout_seconds)
+        with host_single_gpu_defaults():
+            outcome = run_solar_worker(request, timeout_seconds=timeout_seconds)
     except Exception as exc:  # noqa: BLE001 -- isolated worker boundary
         outcome = SolarAnalysisOutcome(
             status=SolarAnalysisStatus.FAILED,
@@ -331,7 +336,10 @@ def release_build_cli(
     qualification_root: Path,
 ) -> CliResult:
     """Generate the exact content-addressed release SOLAR denominator."""
-    with translate_cli_errors(*_SOLAR_RELEASE_BUILD_FAILED_ERRORS):
+    with (
+        host_single_gpu_defaults(),
+        translate_cli_errors(*_SOLAR_RELEASE_BUILD_FAILED_ERRORS),
+    ):
         result = build_release_solar_manifests(
             workspace,
             corpus_manifest_path=manifest_path,
@@ -371,7 +379,15 @@ def _run_solar_qualification_cli(
     timeout_seconds: float,
     jobs: int,
 ) -> CliResult:
-    with translate_cli_errors(*_SOLAR_QUALIFICATION_FAILED_ERRORS):
+    gpu_defaults = (
+        nullcontext()
+        if stage is BatchGPUQualificationStage.STATIC
+        else host_single_gpu_defaults()
+    )
+    with (
+        gpu_defaults,
+        translate_cli_errors(*_SOLAR_QUALIFICATION_FAILED_ERRORS),
+    ):
         gate = run_solar_release_qualification(
             workspace,
             corpus_manifest_path=manifest_path,
