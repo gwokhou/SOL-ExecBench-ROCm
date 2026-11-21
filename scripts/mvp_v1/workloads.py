@@ -9,6 +9,7 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -754,6 +755,9 @@ def _build_gemm_case(
         w = w_bf.to(fp8_dt).t()
         sa = torch.ones((), dtype=torch.float32, device=device)
         sb = torch.ones((), dtype=torch.float32, device=device)
+        ref_fn: Callable[..., torch.Tensor] = partial(
+            ref_skinny_gemm, scale_a=sa, scale_b=sb
+        )
         prepared = make_skinny_gemm_runner(
             prototype_args=[x, w],
             fp8=True,
@@ -766,6 +770,7 @@ def _build_gemm_case(
     else:
         x = x_bf
         w = w_bf.t().contiguous()
+        ref_fn = ref_skinny_gemm
         prepared = make_skinny_gemm_runner(
             prototype_args=[x, w],
             fp8=False,
@@ -786,7 +791,7 @@ def _build_gemm_case(
         spec=spec,
         prototype_args=[x, w],
         candidate_args=prepared.candidate_args,
-        reference_fn=ref_skinny_gemm,
+        reference_fn=ref_fn,
         candidate_fn=prepared.fn,
         implementation_name=prepared.implementation_name,
         unavailable_reason=prepared.unavailable_reason,

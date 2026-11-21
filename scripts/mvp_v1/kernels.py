@@ -94,9 +94,26 @@ def _dispatch_vendor_tiers(
     return None
 
 
-def ref_skinny_gemm(x: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
+def ref_skinny_gemm(
+    x: torch.Tensor,
+    weight: torch.Tensor,
+    scale_a: torch.Tensor | None = None,
+    scale_b: torch.Tensor | None = None,
+) -> torch.Tensor:
     """Reference BF16 output for Skinny GEMM (also used for FP8 dequant ref)."""
-    return (x.float() @ weight.float()).to(torch.bfloat16)
+    out = x.float() @ weight.float()
+    if scale_a is not None:
+        out = out * scale_a.float()
+    if scale_b is not None:
+        sb_f = scale_b.float()
+        if (
+            sb_f.ndim == 2
+            and sb_f.shape == (out.shape[1], 1)
+            and out.shape[0] != out.shape[1]
+        ):
+            sb_f = sb_f.t()
+        out = out * sb_f
+    return out.to(torch.bfloat16)
 
 
 def _probe_fp8_candidate(
@@ -120,12 +137,13 @@ def _make_dequant_fp8_gemm(
     scale_a: torch.Tensor,
     scale_b: torch.Tensor,
 ) -> Callable[..., torch.Tensor]:
-    combined_scale = (scale_a.float() * scale_b.float()).to(torch.bfloat16)
+    combined_scale = scale_a.float() * scale_b.float()
 
     def _run_dequant(x: torch.Tensor, weight_t: torch.Tensor) -> torch.Tensor:
-        return (x.to(torch.bfloat16) @ weight_t.to(torch.bfloat16)) * (
-            combined_scale
-        )
+        return (
+            (x.to(torch.bfloat16) @ weight_t.to(torch.bfloat16)).float()
+            * combined_scale
+        ).to(torch.bfloat16)
 
     return _run_dequant
 
@@ -221,7 +239,9 @@ def make_skinny_gemm_runner(
         )
     if device == "cpu" or scale_a is None or scale_b is None:
         return PreparedRunner(
-            fn=lambda x, w_t: (x.float() @ w_t.float()).to(torch.bfloat16),
+            fn=lambda x, w_t: ref_skinny_gemm(
+                x, w_t, scale_a=scale_a, scale_b=scale_b
+            ),
             implementation_name="cpu_fp8_ref",
             candidate_args=prototype_args,
         )

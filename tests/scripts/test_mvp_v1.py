@@ -227,9 +227,18 @@ def test_anti_distortion_flush_ring_anti_dce_and_dvfs(monkeypatch) -> None:
     with pytest.raises(RewardHackError):
         validate_materialized_outputs(_ProxyTensor(), "cpu")
 
+    unlock_calls: list[object] = []
+    monkeypatch.setattr(
+        "scripts.mvp_v1.anti_distortion.observe_clock_devices",
+        lambda: (),
+    )
     monkeypatch.setattr(
         "scripts.mvp_v1.anti_distortion.set_peak_clocks",
-        lambda: (_ for _ in ()).throw(PermissionError("no sudo")),
+        lambda *_a: (_ for _ in ()).throw(PermissionError("no sudo")),
+    )
+    monkeypatch.setattr(
+        "scripts.mvp_v1.anti_distortion.unlock_clocks",
+        lambda *a: (unlock_calls.append(a), True)[-1],
     )
     monkeypatch.setattr(
         "scripts.mvp_v1.anti_distortion.sample_gpu_telemetry",
@@ -243,6 +252,7 @@ def test_anti_distortion_flush_ring_anti_dce_and_dvfs(monkeypatch) -> None:
         assert holder["receipt"].lock_requested is True
         assert holder["receipt"].lock_acquired is False
     assert "degraded" in holder["receipt"].lock_note
+    assert len(unlock_calls) == 1
 
 
 def test_counter_parser_rocm_and_cpu_skip(tmp_path: Path) -> None:
@@ -432,10 +442,15 @@ def test_execute_rocm_groups_splits_on_hardware_capability_limit(
                 "Request exceeds the capabilities of the hardware to collect",
             )
         pass_dir.mkdir(parents=True, exist_ok=True)
+        (pass_dir / "1_marker_api_trace.csv").write_text(
+            "Domain,Function,Start_Timestamp,End_Timestamp\n"
+            f"MARKER_CORE_RANGE_API,{PROFILE_RANGE_MARKER},100,200\n",
+            encoding="utf-8",
+        )
         out = pass_dir / "1_counter_collection.csv"
         out.write_text(
-            "Dispatch_Id,Kernel_Name,Grid_Size,Workgroup_Size,Counter_Name,Counter_Value\n"
-            f'1,k,"[1,1,1]","[64,1,1]",{group[0]},16\n',
+            "Dispatch_Id,Kernel_Name,Grid_Size,Workgroup_Size,Counter_Name,Counter_Value,Start_Timestamp\n"
+            f'1,k,"[1,1,1]","[64,1,1]",{group[0]},16,150\n',
             encoding="utf-8",
         )
         return subprocess.CompletedProcess(["rocprofv3"], 0, "", "")

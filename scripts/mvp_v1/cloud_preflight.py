@@ -584,6 +584,9 @@ def _validate_bundle_payload(
         raise ValueError("summary.json missing target.target_id")
     if not isinstance(rows, list) or not rows:
         raise ValueError("summary.json has empty or invalid rows")
+    if not all(isinstance(r, dict) for r in rows):
+        raise ValueError("summary.json rows must be objects")
+    row_dicts = [r for r in rows if isinstance(r, dict)]
     report_text = report_path.read_text(encoding="utf-8").strip()
     if not report_text.startswith("#"):
         raise ValueError("report.md does not start with a Markdown heading")
@@ -592,20 +595,20 @@ def _validate_bundle_payload(
         for line in traces_path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    if len(traces) != len(rows):
+    if len(traces) != len(row_dicts):
         raise ValueError(
-            f"traces.jsonl count ({len(traces)}) != summary rows ({len(rows)})"
+            f"traces.jsonl count ({len(traces)}) != summary rows ({len(row_dicts)})"
         )
     executed_rows = [
         (row, trace)
-        for row, trace in zip(rows, traces, strict=True)
+        for row, trace in zip(row_dicts, traces, strict=True)
         if not str(row.get("implementation", "")).startswith("unavailable:")
     ]
     all_passed = bool(executed_rows) and all(
         bool(row.get("correctness_passed")) and trace.is_successful()
         for row, trace in executed_rows
     )
-    return str(target["target_id"]), len(rows), all_passed
+    return str(target["target_id"]), len(row_dicts), all_passed
 
 
 def validate_downloaded_bundle(

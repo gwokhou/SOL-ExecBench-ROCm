@@ -341,7 +341,9 @@ def bound_fused_moe(
     )
     flops = 6.0 * m * top_k * hidden * inter + 4.0 * m * top_k * inter
     weight_bytes = eff_experts * 3.0 * hidden * inter * elem_bytes
-    activation_bytes = (2.0 * m * hidden + m * num_experts) * 2.0
+    activation_bytes = float(
+        m * hidden * elem_bytes + m * hidden * 2.0 + m * num_experts * 2.0
+    )
     return _finalize_bound(
         operator=MVPOperator.FUSED_MOE,
         precision=precision,

@@ -5,16 +5,18 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import math
+import os
 import statistics
 import sys
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import torch
 
@@ -28,6 +30,8 @@ from sol_execbench.core.bench.clock_lock import (
     set_peak_clocks,
     unlock_clocks,
 )
+from sol_execbench.core.bench.clock_ownership import observe_clock_devices
+from sol_execbench.core.bench.gpu_lock_paths import GPU_LOCK_UUID_ENV
 from sol_execbench.core.bench.reward_hack import (
     RewardHackError,
     check_lazy_outputs,
@@ -35,6 +39,7 @@ from sol_execbench.core.bench.reward_hack import (
 from sol_execbench.core.bench.timing_isolation import (
     detect_concurrent_gpu_processes,
 )
+from sol_execbench.core.platform.amd_smi import AMDSMIListPayload
 from sol_execbench.core.platform.runtime import resolve_rocm_tool_command
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 
@@ -241,8 +246,10 @@ class RotatingBufferPool:
 def _parse_float(value: object) -> float | None:
     if isinstance(value, (int, float)):
         return float(value)
-    if isinstance(value, dict) and "value" in value:
-        return _parse_float(value["value"])
+    if isinstance(value, Mapping):
+        mapped = cast(Mapping[str, object], value)
+        if "value" in mapped:
+            return _parse_float(mapped["value"])
     if isinstance(value, str):
         token = value.strip().split(" ", maxsplit=1)[0]
         try:
@@ -272,25 +279,93 @@ def _amd_smi_candidates() -> list[str]:
     return list(dict.fromkeys(candidates))
 
 
-def _sample_amd_telemetry(device: str) -> TelemetrySample:
-    idx = str(torch.device(device).index or 0) if device != "cpu" else "0"
-    perf_levels = observe_clock_levels()
-    perf_level = perf_levels[0] if perf_levels else None
-    concurrent = len(detect_concurrent_gpu_processes())
-    sclk = mclk = power = temp = None
+def _resolve_target_gpu_uuid(
+    *,
+    probe_single_device: bool = False,
+) -> str | None:
+    env_uuid = (os.environ.get(GPU_LOCK_UUID_ENV) or "").strip()
+    if env_uuid:
+        return env_uuid
+    if probe_single_device:
+        with contextlib.suppress(Exception):
+            devices = observe_clock_devices()
+            if len(devices) == 1:
+                return devices[0].uuid
+    return None
+
+
+def _gpu_index_for_uuid(gpu_uuid: str) -> str | None:
+    want = gpu_uuid.strip().lower()
     for tool in _amd_smi_candidates():
-        try:
+        with contextlib.suppress(Exception):
             res = run_in_process_group_bounded(
-                [tool, "metric", "--gpu", idx, "-c", "-p", "-t", "--json"],
-                timeout=10,
+                [tool, "list", "--json"],
+                timeout=5,
                 max_capture_bytes=16384,
             )
-        except OSError:
-            continue
-        if res.returncode == 0 and res.stdout.strip():
-            sclk, mclk, power, temp = _extract_amd_metrics(res.stdout)
-            if any(v is not None for v in (sclk, mclk, power, temp)):
-                break
+            if res.returncode != 0 or not res.stdout.strip():
+                continue
+            entries = AMDSMIListPayload.model_validate_json(res.stdout).root
+            for entry in entries:
+                if (entry.uuid or "").strip().lower() == want:
+                    return str(entry.gpu)
+    return None
+
+
+def _count_concurrent_processes(gpu_uuid: str | None) -> int:
+    processes = detect_concurrent_gpu_processes()
+    if not processes or gpu_uuid is None:
+        return len(processes)
+    target_ids = {gpu_uuid.strip().lower()}
+    matched_idx = _gpu_index_for_uuid(gpu_uuid)
+    if matched_idx is not None:
+        target_ids.add(matched_idx.strip().lower())
+    return sum(
+        1
+        for proc in processes
+        if str(proc.get("device", "")).strip().lower() in target_ids
+    )
+
+
+def _sample_amd_telemetry(device: str) -> TelemetrySample:
+    idx = str(torch.device(device).index or 0) if device != "cpu" else "0"
+    gpu_uuid = _resolve_target_gpu_uuid(probe_single_device=False)
+    perf_levels = (
+        observe_clock_levels()
+        if gpu_uuid is None
+        else observe_clock_levels(gpu_uuid)
+    )
+    perf_level = perf_levels[0] if perf_levels else None
+    concurrent = _count_concurrent_processes(gpu_uuid)
+    selectors = list(
+        dict.fromkeys([gpu_uuid, idx] if gpu_uuid is not None else [idx])
+    )
+    sclk = mclk = power = temp = None
+    for selector in selectors:
+        for tool in _amd_smi_candidates():
+            try:
+                res = run_in_process_group_bounded(
+                    [
+                        tool,
+                        "metric",
+                        "--gpu",
+                        selector,
+                        "-c",
+                        "-p",
+                        "-t",
+                        "--json",
+                    ],
+                    timeout=10,
+                    max_capture_bytes=16384,
+                )
+            except OSError:
+                continue
+            if res.returncode == 0 and res.stdout.strip():
+                sclk, mclk, power, temp = _extract_amd_metrics(res.stdout)
+                if any(v is not None for v in (sclk, mclk, power, temp)):
+                    break
+        if any(v is not None for v in (sclk, mclk, power, temp)):
+            break
     return TelemetrySample(
         vendor=VendorBackend.AMD_ROCM,
         perf_level=perf_level,
@@ -351,10 +426,17 @@ def acquire_dvfs_telemetry_window(
     """Attempt ROCm clock locking with graceful degradation and telemetry."""
     before = sample_gpu_telemetry(device, vendor)
     acquired = False
+    attempted_lock = False
+    gpu_uuid: str | None = None
     note = "telemetry_only"
     if lock_clocks and vendor is VendorBackend.AMD_ROCM:
+        gpu_uuid = _resolve_target_gpu_uuid(probe_single_device=True)
+        attempted_lock = True
         try:
-            set_peak_clocks()
+            if gpu_uuid is None:
+                set_peak_clocks()
+            else:
+                set_peak_clocks(gpu_uuid)
             acquired = True
             note = "amd_stable_peak_locked"
         except Exception as exc:  # noqa: BLE001 -- cloud containers may lack sudo
@@ -371,8 +453,12 @@ def acquire_dvfs_telemetry_window(
     try:
         yield holder
     finally:
-        if acquired and vendor is VendorBackend.AMD_ROCM:
-            unlock_clocks()
+        if attempted_lock and vendor is VendorBackend.AMD_ROCM:
+            with contextlib.suppress(Exception):
+                if gpu_uuid is None:
+                    unlock_clocks()
+                else:
+                    unlock_clocks(gpu_uuid)
         after = sample_gpu_telemetry(device, vendor)
         holder["receipt"] = DVFSWindowReceipt(
             lock_requested=lock_clocks,
@@ -441,37 +527,39 @@ def time_kernel_isolated(
     pool_budget = 64 * 1024 if device == "cpu" else flush_bytes
     pool = RotatingBufferPool(prototype_args, min_ring_bytes=pool_budget)
 
-    first_args = pool.next_args()
-    first_out = fn(*first_args)
-    validate_materialized_outputs(first_out, device)
-    if validate_first is not None:
-        validate_first(first_out, first_args)
-
-    for _ in range(warmup):
-        flusher.flush()
-        out = fn(*pool.next_args())
-        validate_materialized_outputs(out, device)
-
     is_gpu = device != "cpu" and torch.cuda.is_available()
-    samples: list[float] = []
-    for _ in range(rep):
-        args = pool.next_args()
-        flusher.flush()
-        if is_gpu:
-            torch.cuda.synchronize(device)
-            start_ev = torch.cuda.Event(enable_timing=True)
-            end_ev = torch.cuda.Event(enable_timing=True)
-            start_ev.record()
-            out = fn(*args)
-            end_ev.record()
-            end_ev.synchronize()
-            elapsed_ms = float(start_ev.elapsed_time(end_ev))
-        else:
-            t0 = time.perf_counter()
-            out = fn(*args)
-            elapsed_ms = (time.perf_counter() - t0) * 1e3
-        validate_materialized_outputs(out, device)
-        samples.append(elapsed_ms)
+    dev_ctx = torch.cuda.device(device) if is_gpu else contextlib.nullcontext()
+    with dev_ctx:
+        first_args = pool.next_args()
+        first_out = fn(*first_args)
+        validate_materialized_outputs(first_out, device)
+        if validate_first is not None:
+            validate_first(first_out, first_args)
+
+        for _ in range(warmup):
+            flusher.flush()
+            out = fn(*pool.next_args())
+            validate_materialized_outputs(out, device)
+
+        samples: list[float] = []
+        for _ in range(rep):
+            args = pool.next_args()
+            flusher.flush()
+            if is_gpu:
+                torch.cuda.synchronize(device)
+                start_ev = torch.cuda.Event(enable_timing=True)
+                end_ev = torch.cuda.Event(enable_timing=True)
+                start_ev.record()
+                out = fn(*args)
+                end_ev.record()
+                end_ev.synchronize()
+                elapsed_ms = float(start_ev.elapsed_time(end_ev))
+            else:
+                t0 = time.perf_counter()
+                out = fn(*args)
+                elapsed_ms = (time.perf_counter() - t0) * 1e3
+            validate_materialized_outputs(out, device)
+            samples.append(elapsed_ms)
 
     ordered = sorted(samples)
     p90_idx = min(len(ordered) - 1, math.ceil(0.9 * len(ordered)) - 1)

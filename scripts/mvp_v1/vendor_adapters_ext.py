@@ -244,19 +244,27 @@ def try_make_aiter_fp8_moe_runner(
         torch.ones((num_e, 1), dtype=torch.float32, device=tokens.device),
         torch.ones((1,), dtype=torch.float32, device=tokens.device),
     )
-    for w1_cand, w2_cand in weight_pairs:
-        cand_args: list[Any] = [tokens, w1_cand, w2_cand, logits, int(top_k)]
-        for moe_fn in candidates:
-            matched = _probe_aiter_fp8_moe_fn(
-                moe_fn,
-                cand_args,
-                prototype_args,
-                scales,
-                ref_fn=ref_fn,
-                max_atol=max_atol,
-            )
-            if matched is not None:
-                return matched
+    t_bf16 = tokens.to(torch.bfloat16)
+    for t_cand in (t_bf16, tokens):
+        for w1_cand, w2_cand in weight_pairs:
+            cand_args: list[Any] = [
+                t_cand,
+                w1_cand,
+                w2_cand,
+                logits,
+                int(top_k),
+            ]
+            for moe_fn in candidates:
+                matched = _probe_aiter_fp8_moe_fn(
+                    moe_fn,
+                    cand_args,
+                    prototype_args,
+                    scales,
+                    ref_fn=ref_fn,
+                    max_atol=max_atol,
+                )
+                if matched is not None:
+                    return matched
     return _unavailable(prototype_args, "aiter_fp8_moe_unsupported")
 
 
@@ -467,6 +475,48 @@ def try_make_aiter_mla_runner(
     return _unavailable(prototype_args, "aiter_mla_unsupported")
 
 
+def _cos_sin_candidates(
+    x: torch.Tensor,
+    cos_sin: torch.Tensor,
+) -> tuple[torch.Tensor, ...]:
+    cos_sin_cast = cos_sin.to(dtype=x.dtype).contiguous()
+    if cos_sin.dtype == x.dtype:
+        return (cos_sin_cast,)
+    return (cos_sin_cast, cos_sin.contiguous())
+
+
+def _probe_vllm_rmsnorm_fused(
+    fused_fn: Callable[..., Any],
+    cand_args_list: list[list[Any]],
+    prototype_args: list[Any],
+    *,
+    ref_fn: Callable[..., Any],
+    max_atol: float,
+) -> PreparedRunner | None:
+    def _run_fused(
+        x_in: torch.Tensor,
+        res_in: torch.Tensor,
+        w_in: torch.Tensor,
+        cs_in: torch.Tensor,
+        pos_in: torch.Tensor,
+    ) -> torch.Tensor:
+        x_clone = x_in.clone()
+        res_clone = res_in.clone()
+        out = fused_fn(pos_in, x_clone, res_clone, w_in, cs_in, True)
+        return x_clone if out is None else out
+
+    for cand_args in cand_args_list:
+        if _self_validate(
+            _run_fused, cand_args, ref_fn, prototype_args, max_atol
+        ):
+            return PreparedRunner(
+                fn=_run_fused,
+                implementation_name="vllm_fused_qk_norm_rope",
+                candidate_args=cand_args,
+            )
+    return None
+
+
 def try_make_vllm_rmsnorm_rope_runner(
     prototype_args: list[Any],
     *,
@@ -483,28 +533,22 @@ def try_make_vllm_rmsnorm_rope_runner(
     x, residual, weight, cos_sin = prototype_args
     m, heads, head_dim = x.shape
     positions = torch.arange(m, dtype=torch.int64, device=x.device)
-    cand_args: list[Any] = [x, residual, weight, cos_sin, positions]
+    cand_args_list: list[list[Any]] = [
+        [x, residual, weight, cs_cand, positions]
+        for cs_cand in _cos_sin_candidates(x, cos_sin)
+    ]
 
     fused_fn = getattr(ops_mod, "fused_qk_norm_rope", None)
     if callable(fused_fn):
-
-        def _run_fused(
-            x_in: torch.Tensor,
-            res_in: torch.Tensor,
-            w_in: torch.Tensor,
-            cs_in: torch.Tensor,
-            pos_in: torch.Tensor,
-        ) -> torch.Tensor:
-            return fused_fn(pos_in, x_in, res_in, w_in, cs_in, True)
-
-        if _self_validate(
-            _run_fused, cand_args, ref_fn, prototype_args, max_atol
-        ):
-            return PreparedRunner(
-                fn=_run_fused,
-                implementation_name="vllm_fused_qk_norm_rope",
-                candidate_args=cand_args,
-            )
+        matched = _probe_vllm_rmsnorm_fused(
+            fused_fn,
+            cand_args_list,
+            prototype_args,
+            ref_fn=ref_fn,
+            max_atol=max_atol,
+        )
+        if matched is not None:
+            return matched
 
     norm_fn = getattr(ops_mod, "fused_add_rms_norm", None)
     rope_fn = getattr(ops_mod, "rotary_embedding", None)
@@ -524,14 +568,15 @@ def try_make_vllm_rmsnorm_rope_runner(
             rope_fn(pos_in, h_flat, None, head_dim, cs_in, True)
             return h_flat.view(m, heads, head_dim)
 
-        if _self_validate(
-            _run_two_step, cand_args, ref_fn, prototype_args, max_atol
-        ):
-            return PreparedRunner(
-                fn=_run_two_step,
-                implementation_name="vllm_rmsnorm_rope",
-                candidate_args=cand_args,
-            )
+        for cand_args in cand_args_list:
+            if _self_validate(
+                _run_two_step, cand_args, ref_fn, prototype_args, max_atol
+            ):
+                return PreparedRunner(
+                    fn=_run_two_step,
+                    implementation_name="vllm_rmsnorm_rope",
+                    candidate_args=cand_args,
+                )
     return _unavailable(prototype_args, "vllm_rmsnorm_rope_unsupported")
 
 
@@ -555,7 +600,8 @@ def _probe_aiter_rmsnorm_two_step(
         out = torch.empty_like(x_in)
         res_out = torch.empty_like(res_in)
         norm_fn(out, x_in, res_in, res_out, w_in, 1e-6)
-        return rope_fn(out, cs_in, pos_in)
+        rope_out = rope_fn(out, cs_in, pos_in)
+        return out if rope_out is None else rope_out
 
     def _run_separate(
         x_in: torch.Tensor,
@@ -565,7 +611,8 @@ def _probe_aiter_rmsnorm_two_step(
         pos_in: torch.Tensor,
     ) -> torch.Tensor:
         out = norm_fn(x_in + res_in, w_in, 1e-6)
-        return rope_fn(out, cs_in, pos_in)
+        rope_out = rope_fn(out, cs_in, pos_in)
+        return out if rope_out is None else rope_out
 
     runner = _run_with_add if with_add else _run_separate
     if _self_validate(runner, cand_args, ref_fn, prototype_args, max_atol):
@@ -592,7 +639,10 @@ def try_make_aiter_rmsnorm_rope_runner(
         return _unavailable(prototype_args, "aiter_not_installed")
     x, residual, weight, cos_sin = prototype_args
     positions = torch.arange(x.shape[0], dtype=torch.int64, device=x.device)
-    cand_args: list[Any] = [x, residual, weight, cos_sin, positions]
+    cand_args_list: list[list[Any]] = [
+        [x, residual, weight, cs_cand, positions]
+        for cs_cand in _cos_sin_candidates(x, cos_sin)
+    ]
 
     fused_fn = getattr(aiter_mod, "fused_qk_norm_rope", None)
     if callable(fused_fn):
@@ -604,16 +654,20 @@ def try_make_aiter_rmsnorm_rope_runner(
             cs_in: torch.Tensor,
             pos_in: torch.Tensor,
         ) -> torch.Tensor:
-            return fused_fn(pos_in, x_in, res_in, w_in, cs_in)
+            x_clone = x_in.clone()
+            res_clone = res_in.clone()
+            out = fused_fn(pos_in, x_clone, res_clone, w_in, cs_in)
+            return x_clone if out is None else out
 
-        if _self_validate(
-            _run_fused, cand_args, ref_fn, prototype_args, max_atol
-        ):
-            return PreparedRunner(
-                fn=_run_fused,
-                implementation_name="aiter_fused_qk_norm_rope",
-                candidate_args=cand_args,
-            )
+        for cand_args in cand_args_list:
+            if _self_validate(
+                _run_fused, cand_args, ref_fn, prototype_args, max_atol
+            ):
+                return PreparedRunner(
+                    fn=_run_fused,
+                    implementation_name="aiter_fused_qk_norm_rope",
+                    candidate_args=cand_args,
+                )
 
     rope_fn = getattr(aiter_mod, "rope_cached_positions_2c_fwd", None) or (
         getattr(aiter_mod, "rope_fwd", None)
@@ -624,17 +678,18 @@ def try_make_aiter_rmsnorm_rope_runner(
         for norm_fn, with_add in ((add_norm, True), (rms_norm, False)):
             if not callable(norm_fn):
                 continue
-            matched = _probe_aiter_rmsnorm_two_step(
-                norm_fn,
-                rope_fn,
-                cand_args,
-                prototype_args,
-                with_add=with_add,
-                ref_fn=ref_fn,
-                max_atol=max_atol,
-            )
-            if matched is not None:
-                return matched
+            for cand_args in cand_args_list:
+                matched = _probe_aiter_rmsnorm_two_step(
+                    norm_fn,
+                    rope_fn,
+                    cand_args,
+                    prototype_args,
+                    with_add=with_add,
+                    ref_fn=ref_fn,
+                    max_atol=max_atol,
+                )
+                if matched is not None:
+                    return matched
     return _unavailable(prototype_args, "aiter_rmsnorm_rope_unsupported")
 
 

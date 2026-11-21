@@ -62,6 +62,7 @@ dev = [
 
 [tool.pytest.ini_options]
 minversion = "9.1.1"
+pythonpath = ["."]
 testpaths = ["tests"]
 norecursedirs = ["data", "out"]
 required_plugins = ["pytest-xdist>=3.5"]
@@ -240,7 +241,7 @@ ban-relative-imports = "all"
 "scripts/check_schema_versions.py" = ["TID251"]
 
 [tool.ty.src]
-include = ["src", "tests"]
+include = ["src", "scripts/mvp_v1", "tests"]
 exclude = ["src/solar/_vendor"]
 
 [tool.ty.analysis]
@@ -259,6 +260,17 @@ include = ["tests/**"]
 # Tests intentionally use lightweight JSON-shaped fixtures; production code
 # retains the stricter generic-argument requirement.
 missing-type-argument = "ignore"
+
+[[tool.ty.overrides]]
+include = [
+    "scripts/mvp_v1/kernels.py",
+    "scripts/mvp_v1/triton_kernels.py",
+    "scripts/mvp_v1/triton_ops_ext.py",
+]
+
+[tool.ty.overrides.rules]
+# ROCm Triton's @triton.jit / JITFunction[Callable[P, R]] is invariant in ty.
+invalid-argument-type = "ignore"
 
 [tool.ty.terminal]
 error-on-warning = true

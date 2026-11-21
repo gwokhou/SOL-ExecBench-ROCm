@@ -6,6 +6,7 @@
 from __future__ import annotations
 import __future__
 
+import ast
 import io
 import os
 import sys
@@ -127,21 +128,18 @@ class _PEP758CompatSourceLoader(SourceFileLoader):
 
     def source_to_code(  # type: ignore[override]
         self,
-        data: Buffer | str,
-        path: Buffer | str | os.PathLike[str] = "<string>",
+        data: Buffer | str | ast.Module | ast.Expression | ast.Interactive,
+        path: bytes | str | os.PathLike[str] = "<string>",
         *,
         _optimize: int = -1,
     ) -> CodeType:
+        if isinstance(data, ast.AST):
+            return super().source_to_code(data, path, _optimize=_optimize)
         text = data if isinstance(data, str) else decode_source(data)
         rewritten = rewrite_pep758_except_clauses(text)
-        filename = (
-            bytes(path).decode("utf-8", errors="surrogateescape")
-            if isinstance(path, Buffer)
-            else os.fspath(path)
-        )
         return compile(
             rewritten,
-            filename,
+            os.fsdecode(path),
             "exec",
             flags=__future__.annotations.compiler_flag,
             dont_inherit=True,

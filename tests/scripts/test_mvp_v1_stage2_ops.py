@@ -185,7 +185,7 @@ def test_stage2_vendor_adapters_prepack_zero_copy_and_reject_corrupt(
 
     def _mock_qk_norm_rope(pos, x_in, res_in, w_in, cs_in, *_opt):
         del pos
-        ptrs.append(x_in.data_ptr())
+        ptrs.append(cs_in.data_ptr())
         out = ref_fused_rmsnorm_rope(x_in, res_in, w_in, cs_in)
         return out + (5.0 if corrupt["flag"] else 0.0)
 
@@ -295,8 +295,9 @@ def test_stage2_vendor_adapters_prepack_zero_copy_and_reject_corrupt(
     )
     assert nr_v.implementation_name == "vllm_fused_qk_norm_rope"
     assert nr_a.implementation_name == "aiter_fused_qk_norm_rope"
-    _assert_pool_ptr(nr_v, 0, ptrs)
-    _assert_pool_ptr(nr_a, 0, ptrs)
+    assert nr_v.candidate_args[3].dtype is torch.bfloat16
+    _assert_pool_ptr(nr_v, 3, ptrs)
+    _assert_pool_ptr(nr_a, 3, ptrs)
 
     gu = torch.randn((4, 256), dtype=torch.bfloat16) * 0.5
     sq_v = try_make_vllm_swiglu_quant_runner(

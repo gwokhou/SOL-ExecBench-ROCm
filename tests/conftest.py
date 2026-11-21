@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import contextlib
+import subprocess
 import sys
 from collections.abc import Callable, Iterator
 from importlib.util import find_spec, module_from_spec, spec_from_file_location
@@ -27,6 +28,7 @@ import pytest
 PathExists = Callable[[Path], bool]
 ScriptLoader = Callable[[str], ModuleType]
 
+_ROOT_CONFTEST = sys.modules[__name__]
 _ROCM_DEVICE_NODES = (Path("/dev/kfd"), Path("/dev/dri"))
 _REAL_GPU_MARKERS = frozenset(
     {"requires_rocm", "requires_rocm_gpu", "requires_rdna4", "requires_cdna3"},
@@ -87,6 +89,36 @@ def _rocm_device_node_skip_reason(missing_nodes: tuple[str, ...]) -> str:
     )
 
 
+def _probe_gfx_arch_without_worker_init() -> str:
+    """Query PyTorch gcnArchName in a short child process if ROCm is uninitialized."""
+    import torch
+
+    if torch.cuda.is_initialized():
+        props = torch.cuda.get_device_properties(0)
+        return str(
+            getattr(props, "gcnArchName", "")
+            or getattr(props, "gfx_arch_name", "")
+        )
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-P",
+            "-c",
+            (
+                "import torch; p = torch.cuda.get_device_properties(0); "
+                "print(getattr(p, 'gcnArchName', '') or getattr(p, 'gfx_arch_name', ''))"
+            ),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(proc.stderr.strip() or f"exit={proc.returncode}")
+    return proc.stdout.strip()
+
+
 def _rocm_gpu_info(
     path_exists: PathExists | None = None,
 ) -> tuple[bool, str, str]:
@@ -103,16 +135,17 @@ def _rocm_gpu_info(
         with _real_gpu_execution_lock():
             if not torch.cuda.is_available():
                 return False, "", "ROCm GPU unavailable through PyTorch"
-            props = torch.cuda.get_device_properties(0)
-        arch = getattr(props, "gcnArchName", "") or getattr(
-            props,
-            "gfx_arch_name",
-            "",
-        )
+            arch = _probe_gfx_arch_without_worker_init()
         return True, str(arch).split(":", maxsplit=1)[0], ""
     except ImportError as exc:
         return False, "", f"PyTorch import failed: {exc}"
-    except (RuntimeError, AttributeError) as exc:
+    except (
+        OSError,
+        RuntimeError,
+        AttributeError,
+        ValueError,
+        subprocess.TimeoutExpired,
+    ) as exc:
         return False, "", f"PyTorch ROCm probe failed: {exc}"
 
 
@@ -152,6 +185,7 @@ def _is_cdna3(gfx_arch: str) -> bool:
 @pytest.hookimpl(tryfirst=True, specname="pytest_collection_modifyitems")
 def pytest_assign_gpu_groups(items: list[pytest.Item]) -> None:
     """Assign shared hardware groups before xdist reads their markers."""
+    sys.modules["conftest"] = _ROOT_CONFTEST
     for item in items:
         _assign_real_gpu_xdist_group(item)
 
@@ -166,6 +200,7 @@ def pytest_collection_modifyitems(
     Probe only after -m/-k deselection, so CPU runs need no GPU lease.
     Also skips serial-only native/timing tests unless explicitly selected with -m.
     """
+    sys.modules["conftest"] = _ROOT_CONFTEST
     rocm_available, gfx_arch, rocm_skip_reason = (
         _rocm_gpu_info()
         if any(_has_real_gpu_marker(item) for item in items)
@@ -334,8 +369,11 @@ def _has_real_gpu_marker(item: pytest.Item) -> bool:
 def _real_gpu_execution_lock() -> Iterator[None]:
     """Use the same native GPU exclusion as CLI and SOLAR device stages."""
     from sol_execbench.core.bench.gpu_execution import native_gpu_execution
+    from sol_execbench.core.bench.single_gpu_defaults import (
+        host_single_gpu_defaults,
+    )
 
-    with native_gpu_execution():
+    with host_single_gpu_defaults(), native_gpu_execution():
         yield
 
 

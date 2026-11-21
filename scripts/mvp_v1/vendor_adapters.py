@@ -10,6 +10,7 @@ import importlib
 import math
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from typing import Any
 
 import torch
@@ -52,6 +53,13 @@ def _is_rocm_torch() -> bool:
     return getattr(getattr(torch, "version", None), "hip", None) is not None
 
 
+def _clone_call_args(args: list[Any]) -> list[Any]:
+    return [
+        arg.detach().clone() if isinstance(arg, torch.Tensor) else arg
+        for arg in args
+    ]
+
+
 def _self_validate(
     cand_fn: Callable[..., Any],
     cand_args: list[Any],
@@ -59,11 +67,15 @@ def _self_validate(
     ref_args: list[Any],
     max_atol: float,
 ) -> bool:
-    """Dry-run vendor adapter on pre-packed args and verify finite error."""
+    """Dry-run vendor adapter on cloned pre-packed args and verify finite error."""
     try:
         with torch.no_grad():
-            cand_out = materialize_comparable_output(cand_fn(*cand_args))
-            ref_out = materialize_comparable_output(ref_fn(*ref_args))
+            ref_out = materialize_comparable_output(
+                ref_fn(*_clone_call_args(ref_args))
+            )
+            cand_out = materialize_comparable_output(
+                cand_fn(*_clone_call_args(cand_args))
+            )
         if cand_out is None or ref_out is None:
             return False
         if cand_out.shape != ref_out.shape:
@@ -97,10 +109,12 @@ def _try_vllm_bf16_gemm(
     ref_fn: Callable[..., torch.Tensor],
     max_atol: float,
 ) -> PreparedRunner:
+    if ops_mod is None:
+        return _unavailable(prototype_args, "vllm_ops_not_installed")
     x0, w_t0 = prototype_args
     w_nk = w_t0.t().contiguous()
     cand_args: list[Any] = [x0, w_nk]
-    wv_fn = getattr(ops_mod, "wvSplitK", None) if ops_mod is not None else None
+    wv_fn = getattr(ops_mod, "wvSplitK", None)
     if wv_fn is not None and int(x0.shape[0]) <= 4:
         cu_count = (
             int(
@@ -128,10 +142,32 @@ def _try_vllm_bf16_gemm(
     if _self_validate(_run_linear, cand_args, ref_fn, prototype_args, max_atol):
         return PreparedRunner(
             fn=_run_linear,
-            implementation_name="vllm_linear",
+            implementation_name="vllm_torch_linear_fallback",
             candidate_args=cand_args,
         )
     return _unavailable(prototype_args, "vllm_bf16_gemm_unsupported")
+
+
+def _build_fp8_ref_args(
+    x0: torch.Tensor,
+    w_t0: torch.Tensor,
+    scale_a: torch.Tensor,
+    scale_b: torch.Tensor,
+    ref_fn: Callable[..., Any],
+) -> list[Any]:
+    if isinstance(ref_fn, partial) and (
+        "scale_a" in ref_fn.keywords or "scale_b" in ref_fn.keywords
+    ):
+        return [x0.float(), w_t0.float()]
+    sa_f = scale_a.float()
+    sb_f = scale_b.float()
+    if (
+        sb_f.ndim == 2
+        and sb_f.shape == (w_t0.shape[1], 1)
+        and w_t0.shape[0] != w_t0.shape[1]
+    ):
+        sb_f = sb_f.t()
+    return [x0.float() * sa_f, w_t0.float() * sb_f]
 
 
 def _try_vllm_fp8_custom_op(
@@ -174,6 +210,42 @@ def _try_vllm_fp8_custom_op(
     return None
 
 
+def _try_vllm_fp8_pad16_fallback(
+    x0: torch.Tensor,
+    cand_args: list[Any],
+    ref_args: list[Any],
+    *,
+    scale_a: torch.Tensor,
+    scale_b: torch.Tensor,
+    ref_fn: Callable[..., torch.Tensor],
+    max_atol: float,
+) -> PreparedRunner | None:
+    m, k = int(x0.shape[0]), int(x0.shape[1])
+    if m % 16 == 0:
+        return None
+    m_pad = math.ceil(m / 16) * 16
+    pad_x = torch.zeros((m_pad, k), dtype=x0.dtype, device=x0.device)
+
+    def _run_pad16(x_in: torch.Tensor, w_c: torch.Tensor) -> torch.Tensor:
+        rows = x_in.shape[0]
+        pad_x[:rows].copy_(x_in)
+        return torch._scaled_mm(
+            pad_x,
+            w_c,
+            scale_a=scale_a,
+            scale_b=scale_b,
+            out_dtype=torch.bfloat16,
+        )[:rows]
+
+    if _self_validate(_run_pad16, cand_args, ref_fn, ref_args, max_atol):
+        return PreparedRunner(
+            fn=_run_pad16,
+            implementation_name="vllm_torch_scaled_mm_pad16_fallback",
+            candidate_args=cand_args,
+        )
+    return None
+
+
 def _try_vllm_fp8_gemm(
     prototype_args: list[Any],
     ops_mod: Any,
@@ -183,29 +255,30 @@ def _try_vllm_fp8_gemm(
     ref_fn: Callable[..., torch.Tensor],
     max_atol: float,
 ) -> PreparedRunner:
+    if ops_mod is None:
+        return _unavailable(prototype_args, "vllm_ops_not_installed")
     if scale_a is None or scale_b is None:
         return _unavailable(prototype_args, "fp8_scales_required")
     x0, w_t0 = prototype_args
     w_col = w_t0.t().contiguous().t()
     cand_args: list[Any] = [x0, w_col]
-    ref_args: list[Any] = [x0.float(), w_t0.float()]
+    ref_args = _build_fp8_ref_args(x0, w_t0, scale_a, scale_b, ref_fn)
 
-    if ops_mod is not None:
-        for attr in ("cutlass_scaled_mm", "scaled_mm"):
-            op_fn = getattr(ops_mod, attr, None)
-            if op_fn is None:
-                continue
-            matched = _try_vllm_fp8_custom_op(
-                op_fn,
-                cand_args,
-                ref_args,
-                scale_a=scale_a,
-                scale_b=scale_b,
-                ref_fn=ref_fn,
-                max_atol=max_atol,
-            )
-            if matched is not None:
-                return matched
+    for attr in ("cutlass_scaled_mm", "scaled_mm"):
+        op_fn = getattr(ops_mod, attr, None)
+        if op_fn is None:
+            continue
+        matched = _try_vllm_fp8_custom_op(
+            op_fn,
+            cand_args,
+            ref_args,
+            scale_a=scale_a,
+            scale_b=scale_b,
+            ref_fn=ref_fn,
+            max_atol=max_atol,
+        )
+        if matched is not None:
+            return matched
 
     def _run_scaled(x_in: torch.Tensor, w_c: torch.Tensor) -> torch.Tensor:
         return torch._scaled_mm(
@@ -219,32 +292,21 @@ def _try_vllm_fp8_gemm(
     if _self_validate(_run_scaled, cand_args, ref_fn, ref_args, max_atol):
         return PreparedRunner(
             fn=_run_scaled,
-            implementation_name="vllm_fp8_scaled_mm",
+            implementation_name="vllm_torch_scaled_mm_fallback",
             candidate_args=cand_args,
         )
 
-    m, k = int(x0.shape[0]), int(x0.shape[1])
-    if m % 16 != 0:
-        m_pad = math.ceil(m / 16) * 16
-        pad_x = torch.zeros((m_pad, k), dtype=x0.dtype, device=x0.device)
-
-        def _run_pad16(x_in: torch.Tensor, w_c: torch.Tensor) -> torch.Tensor:
-            rows = x_in.shape[0]
-            pad_x[:rows].copy_(x_in)
-            return torch._scaled_mm(
-                pad_x,
-                w_c,
-                scale_a=scale_a,
-                scale_b=scale_b,
-                out_dtype=torch.bfloat16,
-            )[:rows]
-
-        if _self_validate(_run_pad16, cand_args, ref_fn, ref_args, max_atol):
-            return PreparedRunner(
-                fn=_run_pad16,
-                implementation_name="vllm_fp8_scaled_mm_pad16",
-                candidate_args=cand_args,
-            )
+    padded = _try_vllm_fp8_pad16_fallback(
+        x0,
+        cand_args,
+        ref_args,
+        scale_a=scale_a,
+        scale_b=scale_b,
+        ref_fn=ref_fn,
+        max_atol=max_atol,
+    )
+    if padded is not None:
+        return padded
     return _unavailable(prototype_args, "vllm_fp8_gemm_unsupported")
 
 
@@ -381,7 +443,7 @@ def _try_aiter_fp8_gemm(
         return _unavailable(prototype_args, "fp8_scales_required")
     x0, w_t0 = prototype_args
     w_nk = w_t0.t().contiguous()
-    ref_args: list[Any] = [x0.float(), w_t0.float()]
+    ref_args = _build_fp8_ref_args(x0, w_t0, scale_a, scale_b, ref_fn)
     sa_2d = scale_a.expand(x0.shape[0], 1).contiguous()
     sb_2d = scale_b.expand(w_nk.shape[0], 1).contiguous()
     scale_pairs = ((sa_2d, sb_2d), (scale_a, scale_b))
@@ -745,8 +807,9 @@ def _make_vllm_pa_v2_runner(
     scale: float,
     k_scale: torch.Tensor,
     v_scale: torch.Tensor,
+    partition_size: int = 256,
 ) -> Callable[..., torch.Tensor]:
-    num_parts = max(1, math.ceil(packed.max_seq_len / 512))
+    num_parts = max(1, math.ceil(packed.max_seq_len / partition_size))
     scratch_shape = (q.shape[0], packed.q_heads, num_parts)
     exp_sums = torch.empty(scratch_shape, dtype=torch.float32, device=q.device)
     max_logits = torch.empty(
@@ -803,7 +866,12 @@ def _probe_vllm_pa_op(
     scale = 1.0 / math.sqrt(packed.head_dim)
     k_scale = torch.ones(1, dtype=torch.float32, device=q.device)
     v_scale = torch.ones(1, dtype=torch.float32, device=q.device)
-    run_v2 = _make_vllm_pa_v2_runner(pa_fn, packed, q, scale, k_scale, v_scale)
+    run_v2_256 = _make_vllm_pa_v2_runner(
+        pa_fn, packed, q, scale, k_scale, v_scale, partition_size=256
+    )
+    run_v2_512 = _make_vllm_pa_v2_runner(
+        pa_fn, packed, q, scale, k_scale, v_scale, partition_size=512
+    )
 
     def _run_v1(
         q_in: torch.Tensor,
@@ -836,7 +904,7 @@ def _probe_vllm_pa_op(
         )
         return out
 
-    for runner in (run_v2, _run_v1):
+    for runner in (run_v2_256, run_v2_512, _run_v1):
         if _self_validate(runner, cand_args, ref_fn, prototype_args, max_atol):
             return PreparedRunner(
                 fn=runner,

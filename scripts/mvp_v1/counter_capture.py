@@ -159,7 +159,7 @@ def _query_rocm_available_counters(
     return parse_available_counters(avail_res.stdout)
 
 
-def _marker_window_ns(pass_dir: Path) -> tuple[int, int] | None:
+def _marker_window_info(pass_dir: Path) -> tuple[int, int, str] | None:
     for marker_csv in sorted(pass_dir.rglob("*marker_api_trace*.csv")):
         with marker_csv.open(newline="", encoding="utf-8-sig") as handle:
             for row in csv.DictReader(handle):
@@ -167,15 +167,41 @@ def _marker_window_ns(pass_dir: Path) -> tuple[int, int] | None:
                     start_raw = (row.get("Start_Timestamp") or "").strip()
                     end_raw = (row.get("End_Timestamp") or "").strip()
                     if start_raw.isdigit() and end_raw.isdigit():
-                        return int(start_raw), int(end_raw)
+                        prefix = (
+                            marker_csv.name.split("_marker_api_trace", 1)[0]
+                            if "_marker_api_trace" in marker_csv.name
+                            else ""
+                        )
+                        return int(start_raw), int(end_raw), prefix
     return None
 
 
-def _filter_pass_csv_to_marker(csv_path: Path, pass_dir: Path) -> Path:
-    window = _marker_window_ns(pass_dir)
-    if window is None:
-        return csv_path
-    start_ns, end_ns = window
+def _marker_window_ns(pass_dir: Path) -> tuple[int, int] | None:
+    info = _marker_window_info(pass_dir)
+    return (info[0], info[1]) if info is not None else None
+
+
+def _select_pass_counter_csvs(pass_dir: Path, prefix: str) -> list[Path]:
+    found = sorted(pass_dir.rglob("*counter_collection*.csv"))
+    if not prefix:
+        return found
+    return [
+        p for p in found if p.name.split("_counter_collection", 1)[0] == prefix
+    ]
+
+
+def _filter_pass_csv_to_marker(
+    csv_path: Path,
+    pass_dir: Path,
+    *,
+    window: tuple[int, int] | None = None,
+) -> Path:
+    resolved = window if window is not None else _marker_window_ns(pass_dir)
+    if resolved is None:
+        raise ValueError(
+            f"{PROFILE_RANGE_MARKER} missing from marker_api_trace in {pass_dir}"
+        )
+    start_ns, end_ns = resolved
     with csv_path.open(newline="", encoding="utf-8-sig") as handle:
         reader = csv.DictReader(handle)
         fieldnames = list(reader.fieldnames or ())
@@ -227,6 +253,7 @@ def _execute_rocm_groups(
     csvs: list[Path] = []
     pass_idx = 0
     last_rc = 0
+    saw_zero_rc = False
     while pending:
         group = pending.pop(0)
         pass_idx += 1
@@ -242,10 +269,26 @@ def _execute_rocm_groups(
             if skipped_out is not None:
                 skipped_out.append(group[0])
             continue
-        found = sorted(pass_dir.rglob("*counter_collection*.csv"))
-        for raw_csv in found:
-            csvs.append(_filter_pass_csv_to_marker(raw_csv, pass_dir))
+        saw_zero_rc = True
+        info = _marker_window_info(pass_dir)
+        if info is None:
+            return (
+                [],
+                f"{PROFILE_RANGE_MARKER} missing from marker_api_trace",
+            )
+        start_ns, end_ns, prefix = info
+        for raw_csv in _select_pass_counter_csvs(pass_dir, prefix):
+            csvs.append(
+                _filter_pass_csv_to_marker(
+                    raw_csv, pass_dir, window=(start_ns, end_ns)
+                )
+            )
     if not csvs:
+        if saw_zero_rc:
+            return (
+                [],
+                f"no counter_collection CSV matched {PROFILE_RANGE_MARKER} process prefix",
+            )
         return [], f"all rocprofv3 passes failed (last rc={last_rc})"
     return csvs, None
 

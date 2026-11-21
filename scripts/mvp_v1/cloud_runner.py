@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -230,7 +231,8 @@ def run_single_op_replay(
     flusher = LLCRotatingFlusher(device, flush_bytes)
     pool = RotatingBufferPool(case.candidate_args, min_ring_bytes=1)
     is_gpu = device != "cpu" and torch.cuda.is_available()
-    with torch.no_grad():
+    dev_ctx = torch.cuda.device(device) if is_gpu else contextlib.nullcontext()
+    with torch.no_grad(), dev_ctx:
         _ = cand_fn(*pool.next_args())
         flusher.flush()
         if is_gpu:
