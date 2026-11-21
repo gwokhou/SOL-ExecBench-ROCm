@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
-# One-click 15-minute cloud capture and tarball packager for v0.1 3-operator MVP.
+# One-click 15-minute cloud capture and tarball packager for v0.1 6-family ROCm SOL suite.
 
 set -euo pipefail
 

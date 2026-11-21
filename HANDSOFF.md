@@ -1,6 +1,6 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-11-21 (`main`, Stage 1 `ffa928e0` + Stage 2 `9d4be7eb` + Stage 3 `MI300X` 3-tier vertical capture & `gfx942_v1.yaml` hardware confirmation + `F2` CPU closeout `5153900d`)
+Last audited: 2026-11-21 (`v0.1` release closeout across Stages 1–4 following `768944f9`: `v0.1` MI300X vertical SOL report, `README.md` repositioning, and 43 untracked drafts archived + `F2` CPU closeout `5153900d`)
 following the strategic stop-loss and pivot to the `v0.1` ROCm vertical
 inference primitives SOL mainline (historical baseline audit: 2026-08-13 against
 source revision `fd7970520e205318e2e63d8a96d5203e1d5972c3`, the live ignored
@@ -14,8 +14,8 @@ one-time inventories belong in Git history.
 
 ## Current state
 
-- **2026-11-21 Strategic Stop-Loss & Pivot (Active Directive — Stage 1 `ffa928e0` & Stage 2 `9d4be7eb` pushed; Stage 3 MI300X `vLLM + AITER` 3-tier capture & `gfx942_v1.yaml` confirmed locally)**:
-  - **Sole active mainline (`v0.1` ROCm 推理原语纵向三层 SOL 诊断收口)**: **Stage 1（`ffa928e0`）与 Stage 2（`9d4be7eb`）已在 `main` 推进；Stage 3 已在云端 `AMD Instinct MI300X VF`（`amddeveloperclou-vllm0271vllmomni` 容器：`Python 3.12.16`、`torch 2.13.0+rocm10.0.0`、`hip 7.15.26333`、`triton 3.8.0`、`vllm 0.34.0`、`aiter`）完成全 6 大推理原语族（34 Workload × `portable` / `vllm` / `aiter` 三层纵向对比 + 硬件计数器确认）并校验落盘至未入库的 `data/outputs/mi300x_stage3_v01/`，实例已销毁并通过 HTTP `404` 核验（`0` 残留）。** 范围收敛至 ROCm 核心推理原语（以 `flashinfer-bench` Collection #4 同源算子族为参考边界），输入/输出复用现有 `FlashInfer-Trace` 契约（`definition.json` + `workload.jsonl` + `solution.json` + `Trace`）；SOL 理论上限统一采用透明可核算的解析式 Roofline（字节搬运量 + FLOPs + 硬件带宽/算力上限），彻底剥离 `Orojenesis` 重型搜索。
+- **2026-11-21 Strategic Stop-Loss & Pivot (Active Directive — `v0.1` ROCm vertical SOL diagnosis closed out across Stages 1–4)**:
+  - **Sole active mainline (`v0.1` ROCm 推理原语纵向三层 SOL 诊断收口)**: **Stages 1–3B（`ffa928e0`、`9d4be7eb`、`a528f1e8`、`768944f9`）已合并推送 `origin/main`；已在云端 `AMD Instinct MI300X VF`（`amddeveloperclou-vllm0271vllmomni` 容器：`Python 3.12.16`、`torch 2.13.0+rocm10.0.0`、`hip 7.15.26333`、`triton 3.8.0`、`vllm 0.34.0`、`aiter`）完成全 6 大推理原语族（8 Definition · 34 Workload × `portable` / `vllm` / `aiter` 三层全量实测 + 15 组 `rocprofv3` `Amp` 硬件计数器实采）并校验落盘至未入库的 `data/outputs/mi300x_stage3b_final/`，全部临时实例均已销毁并通过 HTTP `404` 核验（`0` 残留）；Stage 4 报告 [docs/v0.1_mi300x_sol_report.md](docs/v0.1_mi300x_sol_report.md)、[README.md](README.md) 首页重构及 43 份未跟踪草稿归档（移入 `data/archive/internal_drafts_2026_11/`）均已完成收口并发布 `v0.1` 基线。** 范围收敛至 ROCm 核心推理原语（以 `flashinfer-bench` Collection #4 同源算子族为参考边界），输入/输出复用现有 `FlashInfer-Trace` 契约（`definition.json` + `workload.jsonl` + `solution.json` + `Trace`）；SOL 理论上限统一采用透明可核算的解析式 Roofline（字节搬运量 + FLOPs + 硬件带宽/算力上限），彻底剥离 `Orojenesis` 重型搜索。
   - **Hardware role switch**: 本地 `RX 9060 XT (gfx1200)` 正式降级为**免费本地开发、纯 CPU 单测与采集脚本联调机**；核心性能与计数器采集面向云端数据中心卡 **`AMD MI300X / MI308X (gfx942)`**（聚焦同卡 `PyTorch/Portable` vs. `vLLM` 默认路由 vs. `AITER` 最优算子三层纵向对比，本地定型脚本，云端短时一键采集即销毁）。
   - **Terminated / permanently frozen tracks**:
     - `F2`（嵌套 `PGID_2` 超时回收与 `mapper_timeout` 分类）已于纯 CPU 范围完成收口（`5153900d`），严禁以此触发任何 GPU 重跑或续跑；
@@ -106,17 +106,17 @@ one-time inventories belong in Git history.
 
 ### Sole active mainline — MI300X ROCm vertical SOL diagnosis (`v0.1`)
 
-- **Current progress (Stage 1 `ffa928e0` & Stage 2 `9d4be7eb` pushed; Stage 3 MI300X real-hardware capture complete locally)**:
-  - `scripts/mvp_v1/` 已完成 **Stage 1**（`ffa928e0`）与 **Stage 2**（`9d4be7eb`）合并推送至 `origin/main`，覆盖 **6 大核心 ROCm 推理原语族（8 个 Definition、10 个 Smoke / 34 个 Full Workload）**；
-  - **Stage 3** 已完成单机 `AMD Instinct MI300X VF`（`amddeveloperclou-vllm0271vllmomni`，`vllm 0.34.0` + `aiter` + `torch 2.13.0+rocm10.0.0`）三层纵向实采：
-    - 依据 `rocprofv3 --list-avail` 与 `rocprofv3-avail -d 0 info --pmc`（479 个计数器）确认并更新 [src/sol_execbench/data/rocprofv3_counters/gfx942_v1.yaml](src/sol_execbench/data/rocprofv3_counters/gfx942_v1.yaml)（`LDSBankConflict` 为百分比派生指标，`SQ_LDS_BANK_CONFLICT` 为 cycles 且 `*_sum` 在 `gfx942` 不存在，`SQ_INSTS_MFMA` / `GRBM_GUI_ACTIVE` 无 `_sum` 后缀；实测 `skinny_gemm_bf16_m16_n512_k256` 与 `skinny_gemm_bf16_m16_n4096_k7168` 全部 `8` 项计数器 `status=collected`）；
+- **Current progress (`v0.1` closed out across Stages 1–4: Stages 1–3B `ffa928e0`..`768944f9` + Stage 4 `v0.1` report, `README.md`, and draft archival)**:
+  - `scripts/mvp_v1/` 已完成 **Stage 1**（`ffa928e0`）、**Stage 2**（`9d4be7eb`）、**Stage 3**（`a528f1e8`）与 **Stage 3B**（`768944f9`）合并推送至 `origin/main`，覆盖 **6 大核心 ROCm 推理原语族（8 个 Definition、10 个 Smoke / 34 个 Full Workload）**；
+  - **Stage 3 / 3B** 已完成单机 `AMD Instinct MI300X VF`（`amddeveloperclou-vllm0271vllmomni`，`vllm 0.34.0` + `aiter` + `torch 2.13.0+rocm10.0.0`）三层纵向实采：
+    - 依据 `rocprofv3 --list-avail` 与 `rocprofv3-avail -d 0 info --pmc`（479 个计数器）确认并更新 [src/sol_execbench/data/rocprofv3_counters/gfx942_v1.yaml](src/sol_execbench/data/rocprofv3_counters/gfx942_v1.yaml)（`LDSBankConflict` 为百分比派生指标，`SQ_LDS_BANK_CONFLICT` 为 cycles 且 `*_sum` 在 `gfx942` 不存在，`SQ_INSTS_MFMA` / `GRBM_GUI_ACTIVE` 无 `_sum` 后缀；实测 `skinny_gemm_bf16_m16_n512_k256`、`skinny_gemm_bf16_m16_n4096_k7168` 与 Stage-3B 全 6 大原语族 15 组组合全部 `status=collected`）；
     - 在真机调通中修复了 [triton_ops_ext.py](scripts/mvp_v1/triton_ops_ext.py) Triton 3.8 编译类型与 [vendor_adapters.py](scripts/mvp_v1/vendor_adapters.py) / [vendor_adapters_ext.py](scripts/mvp_v1/vendor_adapters_ext.py) 的 `aiter.hipb_create_extension()`、`aiter.fused_moe.fused_moe`、`vllm.model_executor.layers.fused_moe.fused_experts`、`vllm_paged_attention_rocm` (`query_start_loc`)、`aiter_pa_fwd_asm` (`head_dim == 128` 护栏) 与 `aiter.ops.activation.silu_and_mul_quant` 适配；
     - 全部 3 份 Stage-3B 增补后 34-workload 产物包（`data/outputs/mi300x_stage3b_final/{portable,vllm,aiter}.tar.gz`，其中 `vllm` 34/34 全通、`aiter` 30/34 跑通并补齐 `aiter_mla_decode_fwd` 手写汇编 MLA；同步补齐 `vllm_fp8_fused_moe`、`vllm_triton_mla_decode`、`vllm_fused_qk_norm_rope` 与 `vllm_silu_mul_then_fp8_quant`，并消除计时环内 `.clone()`）、覆盖全 6 大原语族的 15 组 `rocprofv3` `Amp` 硬件计数器（`counters_stage3b.json`）及合并后的 `compare_3tier.md` 已全部通过 `cloud_preflight verify` SHA256 与 Trace 校验落盘，全部临时实例（`20261121T070021Z-dbc15b`、`20261121T082703Z-e0df2f`、`20261121T090915Z-1deb68`、`20261121T093702Z-f4b39d`）均已销毁并通过 HTTP `404` 核验（`0` 在线实例）。
+    - **Stage 4（`v0.1` 封版发布与卫生清零，已完成）**：正式发布 [docs/v0.1_mi300x_sol_report.md](docs/v0.1_mi300x_sol_report.md)，同步重写 [README.md](README.md) 首页定位（将 `gfx1200` `0.497818327` 归档为已完成里程碑），并将 43 份未跟踪 `docs/internal/*.md` 调研草稿无损归档至未入库的 `data/archive/internal_drafts_2026_11/`（`scripts/check_current_docs.py` 与全仓门禁通过，本仓 `v0.1` 主线封版完结）。
   - 历史 Phase 1 3 算子 18/18 Portable 基线与 `rocprofv3` `Amp` 实采仍保留于 `data/outputs/mi300x_devcloud/report.md`（均不入库）。
 - **Scoped focus**: 因本仓相对上游 `NVIDIA/SOL-ExecBench` 已在题库、契约（`Trace` 扩展字段）与 SOL 分母模型上大幅重写并单向 ROCm 化，本仓 `v0.1` 收口不再强求与原版 NVIDIA 仓跨仓横向跑分拼表，聚焦于 **同卡 MI300X 软件栈纵向三层 SOL 诊断**（`PyTorch/hipBLASLt/Portable Triton` 下限 vs. `vLLM (ROCm)` 默认路由 vs. `ROCm/AITER` 最优算子天花板），覆盖上述 6 大推理原语族，契约复用 `FlashInfer-Trace`（零新增 Schema，彻底旁路 `Orojenesis`）。
 - **Execution model**: 本地 `RX 9060 XT (gfx1200)` 仅作纯 CPU 单测与脚本联调；核心性能与计数器采集面向云端 `AMD MI300X (gfx942)`（优先带 `vLLM + AITER` 的官方 ROCm 镜像，按云端前置门禁一次采完并校验包完整性后销毁）；本转向下不再推进下述历史 M0–M3 / Post-D0 路线。
-- **Next closeout step in-repo**:
-  1. **Stage 4（`v0.1` 封版发布与卫生清零）**：发布《AMD MI300X (`gfx942`) 核心推理算子 SOL 达成率与软件栈三层诊断报告》并打 `v0.1` Tag，同步重写 `README.md` 首页定位、清理/归档 `docs/internal/*.md` 未跟踪草稿并完成核心代码白盒复盘。
+- **In-repo closeout status**: 本仓 `v0.1` 主线（Stages 1–4）已全部收口完结并归档；无任何待执行的本仓阻塞步骤，仅保留下方 3 项外部/剥离调研门控 TODO 挂起。
 
 ### Deferred upstream & spin-off TODOs (gated on deep value & ROI research)
 

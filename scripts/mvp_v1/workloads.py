@@ -79,7 +79,7 @@ class SweepMode(StrEnum):
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class WorkloadSpec:
-    """One concrete workload in the Phase 1 3-operator suite."""
+    """One concrete workload in the v0.1 6-family ROCm inference primitive suite."""
 
     workload_id: str
     operator: MVPOperator

@@ -27,7 +27,7 @@ class MVPOperator(StrEnum):
 
 
 class PrecisionMode(StrEnum):
-    """Supported compute precisions in the Phase 1 MVP."""
+    """Supported compute precisions in the v0.1 ROCm SOL suite."""
 
     BF16 = "bf16"
     FP8 = "fp8"
