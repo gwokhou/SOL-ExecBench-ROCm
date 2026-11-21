@@ -4,6 +4,10 @@
 """Stable import surface for generated trusted-reference processes."""
 
 from sol_execbench.core.bench.reference_protocol import (
+    REFERENCE_ATTESTATION_CONFIG_FILE,
+    REFERENCE_ATTESTATION_FILE_ENV,
+    REFERENCE_ATTESTATION_KEY_ENV,
+    REFERENCE_ATTESTATION_RECEIPT_FILE,
     REFERENCE_PID_ENV,
     REFERENCE_REQUEST_FD_ENV,
     REFERENCE_RESPONSE_FD_ENV,
@@ -19,6 +23,10 @@ from sol_execbench.core.bench.reference_protocol import (
 )
 
 __all__ = [
+    "REFERENCE_ATTESTATION_CONFIG_FILE",
+    "REFERENCE_ATTESTATION_FILE_ENV",
+    "REFERENCE_ATTESTATION_KEY_ENV",
+    "REFERENCE_ATTESTATION_RECEIPT_FILE",
     "REFERENCE_PID_ENV",
     "REFERENCE_REQUEST_FD_ENV",
     "REFERENCE_RESPONSE_FD_ENV",

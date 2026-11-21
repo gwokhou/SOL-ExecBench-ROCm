@@ -350,7 +350,17 @@ def test_run_evaluation_runtime_falls_back_when_profile_unavailable(
         skipped_reason="rocprofv3 unavailable",
     )
 
-    def _run_profiled(eval_cmd, *, staging_dir, output_file, timeout):
+    def _run_profiled(
+        eval_cmd,
+        *,
+        staging_dir,
+        output_file,
+        timeout,
+        counter_mode=False,
+        lifecycle=None,
+    ):
+        assert counter_mode is False
+        assert lifecycle is not None
         return None, profile_result
 
     def _run_command(eval_cmd, *, staging_dir, timeout):
@@ -558,7 +568,7 @@ def test_scope_profile_does_not_instrument_canonical_timing(
     assert packager.converted_stdout == "canonical\n"
 
 
-def test_profile_failure_restages_consumed_reference_before_fallback(
+def test_profile_failure_after_canonical_evaluation_preserves_canonical_traces(
     tmp_path, monkeypatch
 ):
     packager = _FakePackager(traces=[_trace()])
@@ -569,17 +579,25 @@ def test_profile_failure_restages_consumed_reference_before_fallback(
         output_file="out.json",
         failed_reason="profile failed after reference READY",
     )
-    monkeypatch.setattr(
-        evaluation_runtime,
-        "_run_profiled_or_none",
-        lambda *_, **kw: (None, failed_profile),
-    )
+    order: list[str] = []
 
-    def run(command, **_kwargs):
-        assert packager.restage_calls == 1
+    def run_canonical(command, **_kwargs):
+        order.append("canonical")
         return subprocess.CompletedProcess(command, 0, '{"trace": 1}\n', "")
 
-    monkeypatch.setattr(cli_evaluation, "_run_evaluation_command", run)
+    def run_profiled(*_args, **kwargs):
+        order.append("profile")
+        prepare = kwargs["lifecycle"].prepare_profiled_application
+        assert prepare is not None
+        prepare()
+        return None, failed_profile
+
+    monkeypatch.setattr(
+        cli_evaluation, "_run_evaluation_command", run_canonical
+    )
+    monkeypatch.setattr(
+        cli_evaluation, "_run_profiled_evaluation", run_profiled
+    )
     result = evaluation_runtime.run_evaluation_runtime(
         packager,
         eval_cmd=["python", "fixture.py"],
@@ -589,4 +607,153 @@ def test_profile_failure_restages_consumed_reference_before_fallback(
         profile=ProfileMode.ROCPROFV3,
     )
     assert isinstance(result, evaluation_runtime.EvaluationRuntimeSuccess)
+    assert order == ["canonical", "profile"]
+    assert packager.restage_calls == 1
     assert result.profile_fallback_reason == failed_profile.failed_reason
+
+
+def test_rocprofv3_profile_preserves_canonical_timing_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    packager = _FakePackager(traces=[_trace()])
+    timing_file = tmp_path / "performance-timing-raw.jsonl"
+    profile_result = Rocprofv3ProfileResult(
+        status=Rocprofv3ProfileStatus.SUCCESS,
+        command=("rocprofv3",),
+        output_directory=tmp_path,
+        output_file="profile",
+    )
+
+    def run_canonical(*_args, **_kwargs):
+        timing_file.write_text('{"canonical": true}\n')
+        return subprocess.CompletedProcess(["python"], 0, "canonical\n", "")
+
+    def run_profiled(*_args, **kwargs):
+        assert kwargs["counter_mode"] is False
+        timing_file.write_text('{"polluted_by_profiler": true}\n')
+        return (
+            subprocess.CompletedProcess(["rocprofv3"], 0, "profiled\n", ""),
+            profile_result,
+        )
+
+    monkeypatch.setattr(
+        cli_evaluation, "_run_evaluation_command", run_canonical
+    )
+    monkeypatch.setattr(
+        cli_evaluation, "_run_profiled_evaluation", run_profiled
+    )
+
+    result = evaluation_runtime.run_evaluation_runtime(
+        packager,
+        eval_cmd=["python", "candidate.py"],
+        staging_dir=tmp_path,
+        output_file=tmp_path / "trace.jsonl",
+        timeout=5,
+        profile=ProfileMode.ROCPROFV3,
+    )
+
+    assert isinstance(result, evaluation_runtime.EvaluationRuntimeSuccess)
+    assert packager.converted_stdout == "canonical\n"
+    assert timing_file.read_text() == '{"canonical": true}\n'
+    assert result.profile_result is profile_result
+
+
+def test_runtime_verifies_worker_attestation_and_rejects_forged_traces(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from sol_execbench_type_helpers import (
+        make_definition,
+        make_solution,
+        make_workload,
+    )
+
+    from sol_execbench.core import BenchmarkConfig
+    from sol_execbench.driver.problem_packager import ProblemPackager
+
+    definition = make_definition(
+        name="att_vecadd",
+        op_type="elementwise",
+        axes={"n": {"type": "const", "value": 8}},
+        inputs={"x": {"shape": ["n"], "dtype": "float32"}},
+        outputs={"z": {"shape": ["n"], "dtype": "float32"}},
+        reference="def run(x):\n    return x + 2.0\n",
+    )
+    workload = make_workload(
+        uuid="att-wkl-1",
+        axes={},
+        inputs={"x": {"type": "random"}},
+        checks=[{"type": "numeric", "output": "z"}],
+    )
+    solution = make_solution(
+        name="att_sol",
+        definition="att_vecadd",
+        author="test",
+        spec={
+            "languages": ["pytorch"],
+            "target_hardware": ["LOCAL"],
+            "entry_point": "kernel.py::run",
+            "destination_passing_style": False,
+        },
+        sources=[
+            {
+                "path": "kernel.py",
+                "content": "def run(x):\n    return x + 2.0\n",
+            }
+        ],
+    )
+    staging = tmp_path / "staging"
+    packager = ProblemPackager(
+        definition=definition,
+        workloads=[workload],
+        solution=solution,
+        config=BenchmarkConfig(
+            lock_clocks=False,
+            benchmark_reference=False,
+            warmup_runs=1,
+            iterations=2,
+            trials=1,
+        ),
+        output_dir=staging,
+        keep_output_dir=True,
+    )
+    eval_cmd = packager.execute()
+
+    monkeypatch.setenv("SOL_EXECBENCH_CLOCKS_LOCKED", "0")
+    monkeypatch.setenv("SOL_EXECBENCH_ALLOW_CPU_TIMING", "1")
+    real_result = evaluation_runtime.run_evaluation_runtime(
+        packager,
+        eval_cmd=eval_cmd,
+        staging_dir=staging,
+        output_file=None,
+        timeout=30,
+        profile=ProfileMode.NONE,
+        expected_trace_count=1,
+    )
+    assert isinstance(real_result, evaluation_runtime.EvaluationRuntimeSuccess)
+    assert real_result.traces[0].is_successful()
+
+    # Now simulate a candidate process that consumed/deleted the attestation
+    # config and emitted a forged PASSED trace on stdout without worker receipt.
+    forged_stdout = real_result.stdout
+
+    def forged_run(cmd, *, staging_dir, timeout):
+        for cfg_file in staging_dir.glob("reference_attestation_*.json"):
+            cfg_file.unlink()
+        return subprocess.CompletedProcess(cmd, 0, forged_stdout, "")
+
+    monkeypatch.setattr(cli_evaluation, "_run_evaluation_command", forged_run)
+    forged_result = evaluation_runtime.run_evaluation_runtime(
+        packager,
+        eval_cmd=eval_cmd,
+        staging_dir=staging,
+        output_file=None,
+        timeout=30,
+        profile=ProfileMode.NONE,
+        expected_trace_count=1,
+    )
+    assert isinstance(
+        forged_result, evaluation_runtime.EvaluationRuntimeIncomplete
+    )
+    assert "attestation" in forged_result.message.lower()

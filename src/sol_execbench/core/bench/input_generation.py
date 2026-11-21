@@ -113,6 +113,14 @@ def _cast_to_fp4x2(x: torch.Tensor) -> torch.Tensor:
     return packed.view(torch.float4_e2m1fn_x2)
 
 
+_FP8_DTYPES = (
+    torch.float8_e4m3fn,
+    torch.float8_e4m3fnuz,
+    torch.float8_e5m2,
+    torch.float8_e5m2fnuz,
+)
+
+
 def _rand_tensor(
     shape: Sequence[int],
     dtype: torch.dtype,
@@ -122,7 +130,7 @@ def _rand_tensor(
         return torch.randn(shape, dtype=dtype, device=device)
 
     # low-precision floats
-    if dtype in (torch.float8_e4m3fn, torch.float8_e5m2):
+    if dtype in _FP8_DTYPES:
         t = torch.randn(shape, dtype=torch.float32, device=device).clamp_(
             -2.0,
             2.0,
@@ -262,6 +270,8 @@ def _materialize_input(
     if value is None:
         value = _rand_tensor(shape, dtype, device)
     if is_sampling_operation(definition) and name == "probs":
+        if dtype in _FP8_DTYPES:
+            return torch.softmax(value.float(), dim=-1).to(dtype)
         return torch.softmax(value, dim=-1)
     return value
 

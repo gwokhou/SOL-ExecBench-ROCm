@@ -25,7 +25,9 @@ detected.
 from __future__ import annotations
 
 import ast
+import re
 from collections.abc import Iterable
+from pathlib import PurePosixPath
 from typing import Any
 
 import torch
@@ -44,6 +46,7 @@ from sol_execbench.core.bench.reward_hack.models import (
     _PROCESS_ATTRS,
     _PROCESS_PREFIXES,
     _RISKY_DECODE_CALLS,
+    _RISKY_EXIT_CALLS,
     _RISKY_FILE_CALLS,
     _RISKY_IMPORT_ROOTS,
     _RISKY_METHODS,
@@ -53,6 +56,7 @@ from sol_execbench.core.bench.reward_hack.models import (
     _RISKY_TYPES_ATTRS,
     _RULE_BY_NAME,
     _STATIC_RULES,
+    CANDIDATE_PROTECTED_MODULE_NAMES,
     SourceReview,
     SourceReviewIssue,
     _SourceRule,
@@ -77,6 +81,18 @@ def review_solution_sources(
         path = str(getattr(source, "path", ""))
         content = str(getattr(source, "content", ""))
         if path.endswith(".py"):
+            top_module = _candidate_top_module_name(path)
+            if top_module in CANDIDATE_PROTECTED_MODULE_NAMES:
+                rule = _RULE_BY_NAME["unauthorized_file_or_loader"]
+                issues.append(
+                    SourceReviewIssue(
+                        path=path,
+                        rule=rule.rule,
+                        severity=rule.severity,
+                        message=rule.message,
+                        evidence=path[:120],
+                    ),
+                )
             issues.extend(_match_python_source(path, content, float32_contract))
         else:
             for rule in _STATIC_RULES:
@@ -86,6 +102,17 @@ def review_solution_sources(
                     _match_rule(path, content, _PRECISION_DOWNGRADE_RULE),
                 )
     return SourceReview(issues=tuple(issues))
+
+
+def _candidate_top_module_name(path: str) -> str:
+    parts = [
+        part for part in PurePosixPath(path).parts if part not in ("", ".")
+    ]
+    if not parts:
+        return ""
+    if len(parts) > 1:
+        return parts[0]
+    return PurePosixPath(parts[0]).stem
 
 
 def _match_python_source(
@@ -98,9 +125,16 @@ def _match_python_source(
     except SyntaxError:
         issues: list[SourceReviewIssue] = []
         for rule in _STATIC_RULES:
-            issues.extend(_match_rule(path, content, rule))
+            issues.extend(_match_rule(path, content, rule, is_python=True))
         if float32_contract:
-            issues.extend(_match_rule(path, content, _PRECISION_DOWNGRADE_RULE))
+            issues.extend(
+                _match_rule(
+                    path,
+                    content,
+                    _PRECISION_DOWNGRADE_RULE,
+                    is_python=True,
+                ),
+            )
         return tuple(issues)
 
     visitor = _PythonSourceReviewVisitor(path, content, float32_contract)
@@ -150,6 +184,7 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
             node.value,
         ) or _writes_to_cache_container(node.targets):
             self._add("semantic_output_cache", node, self._node_source(node))
+        self._check_mutation_targets(node.targets, node)
         self.generic_visit(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
@@ -158,7 +193,70 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
             or _writes_to_cache_container([node.target])
         ):
             self._add("semantic_output_cache", node, self._node_source(node))
+        self._check_mutation_targets([node.target], node)
         self.generic_visit(node)
+
+    def visit_AugAssign(self, node: ast.AugAssign) -> None:
+        self._check_mutation_targets([node.target], node)
+        self.generic_visit(node)
+
+    def visit_Delete(self, node: ast.Delete) -> None:
+        self._check_mutation_targets(node.targets, node)
+        self.generic_visit(node)
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        for base in node.bases:
+            resolved_base = self._resolved_name(base)
+            if resolved_base in {
+                "torch.Tensor",
+                "Tensor",
+                "torch._C.TensorBase",
+            } or resolved_base.endswith(".Tensor"):
+                bases_src = ", ".join(self._node_source(b) for b in node.bases)
+                self._add(
+                    "lazy_output_interception",
+                    node,
+                    f"class {node.name}({bases_src})",
+                )
+                break
+        self.generic_visit(node)
+
+    def visit_Raise(self, node: ast.Raise) -> None:
+        if node.exc is not None:
+            exc_target = (
+                node.exc.func if isinstance(node.exc, ast.Call) else node.exc
+            )
+            if self._resolved_name(exc_target) in {
+                "SystemExit",
+                "builtins.SystemExit",
+            }:
+                self._add(
+                    "unauthorized_file_or_loader",
+                    node,
+                    self._node_source(node),
+                )
+        self.generic_visit(node)
+
+    def _check_mutation_targets(
+        self,
+        targets: Iterable[ast.AST],
+        node: ast.AST,
+    ) -> None:
+        for target in _flatten_targets(targets):
+            if isinstance(target, ast.Attribute):
+                if target.attr in {"__torch_function__", "__torch_dispatch__"}:
+                    self._add(
+                        "lazy_output_interception",
+                        node,
+                        self._node_source(node),
+                    )
+                resolved = self._resolved_name(target)
+                if resolved.startswith(("torch.", "sol_execbench.")):
+                    self._add(
+                        "runtime_monkey_patch",
+                        node,
+                        self._node_source(node),
+                    )
 
     def visit_Global(self, node: ast.Global) -> None:
         if any("cache" in name.lower() for name in node.names):
@@ -175,6 +273,14 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
             self._add("parallel_execution", node, name)
         if self._is_cache_call(name):
             self._add("semantic_output_cache", node, name)
+        if self._is_monkey_patch_call(node, name):
+            self._add("runtime_monkey_patch", node, self._node_source(node))
+        if self._is_lazy_interception_call(node, name):
+            self._add(
+                "lazy_output_interception",
+                node,
+                name or self._node_source(node),
+            )
         if self._is_unauthorized_call(node, name):
             self._add(
                 "unauthorized_file_or_loader",
@@ -193,10 +299,14 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        if node.name in {"__torch_function__", "__torch_dispatch__"}:
+            self._add("lazy_output_interception", node, node.name)
         self._check_decorators(node.decorator_list)
         self.generic_visit(node)
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        if node.name in {"__torch_function__", "__torch_dispatch__"}:
+            self._add("lazy_output_interception", node, node.name)
         self._check_decorators(node.decorator_list)
         self.generic_visit(node)
 
@@ -267,12 +377,49 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
             "hashlib.sha256",
         } or name.endswith(tuple(f".{method}" for method in _CACHE_METHODS))
 
+    def _is_monkey_patch_call(self, node: ast.Call, name: str) -> bool:
+        if name not in {
+            "setattr",
+            "builtins.setattr",
+            "delattr",
+            "builtins.delattr",
+            "object.__setattr__",
+        }:
+            return False
+        if not node.args:
+            return False
+        target = self._resolved_name(node.args[0])
+        return target == "torch" or target.startswith(
+            ("torch.", "sol_execbench.")
+        )
+
+    def _is_lazy_interception_call(self, node: ast.Call, name: str) -> bool:
+        if name in {"_make_subclass", "as_subclass"} or name.endswith(
+            ("._make_subclass", ".as_subclass")
+        ):
+            return True
+        return (
+            name in {"setattr", "builtins.setattr", "object.__setattr__"}
+            and len(node.args) >= 2
+            and isinstance(node.args[1], ast.Constant)
+            and node.args[1].value
+            in {"__torch_function__", "__torch_dispatch__"}
+        )
+
     def _is_unauthorized_call(self, node: ast.Call, name: str) -> bool:
         if name == "triton.language.load":
             return False
-        if name in _RISKY_FILE_CALLS or name in _RISKY_DECODE_CALLS:
+        if (
+            name in _RISKY_FILE_CALLS
+            or name in _RISKY_DECODE_CALLS
+            or name in _RISKY_EXIT_CALLS
+        ):
             return True
         if name in {
+            "sys.exit",
+            "builtins.exit",
+            "builtins.quit",
+            "builtins.SystemExit",
             "importlib.import_module",
             "importlib.util.spec_from_file_location",
             "ctypes.CDLL",
@@ -315,7 +462,9 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
             return True
         if name == "__builtins__" or name.startswith("__builtins__."):
             return True
-        if name.startswith(("subprocess.", "socket.")):
+        if name.startswith(
+            ("subprocess.", "socket.", "io.", "_io.", "pathlib.")
+        ):
             return True
         return self._is_risky_getattr_call(node)
 
@@ -474,20 +623,33 @@ def _value_is_cache(value: ast.AST) -> bool:
     return False
 
 
+def _flatten_targets(targets: Iterable[ast.AST]) -> list[ast.AST]:
+    flat: list[ast.AST] = []
+    for target in targets:
+        if isinstance(target, (ast.Tuple, ast.List)):
+            flat.extend(_flatten_targets(target.elts))
+        else:
+            flat.append(target)
+    return flat
+
+
 def _dotted_name(node: ast.AST) -> str:
     if isinstance(node, ast.Name):
         return node.id
     if isinstance(node, ast.Attribute):
         base = _dotted_name(node.value)
         return f"{base}.{node.attr}" if base else node.attr
-    if (
-        isinstance(node, ast.Call)
-        and _dotted_name(node.func) == "__import__"
-        and node.args
-        and isinstance(node.args[0], ast.Constant)
-        and isinstance(node.args[0].value, str)
-    ):
-        return node.args[0].value
+    if isinstance(node, ast.Call):
+        func_name = _dotted_name(node.func)
+        if (
+            func_name == "__import__"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+        ):
+            return node.args[0].value
+        if func_name in {"cast", "typing.cast"} and len(node.args) >= 2:
+            return _dotted_name(node.args[1])
     return ""
 
 
@@ -507,11 +669,15 @@ def _match_rule(
     path: str,
     content: str,
     rule: _SourceRule,
+    *,
+    is_python: bool = False,
 ) -> Iterable[SourceReviewIssue]:
     if not rule.applies_to(path):
         return ()
     found: list[SourceReviewIssue] = []
-    for match in rule.pattern.finditer(_strip_comments(content)):
+    for match in rule.pattern.finditer(
+        _strip_comments(content, is_python=is_python)
+    ):
         evidence = match.group(0).strip()
         found.append(
             SourceReviewIssue(
@@ -525,12 +691,15 @@ def _match_rule(
     return tuple(found)
 
 
-def _strip_comments(content: str) -> str:
-    """Remove simple line comments before pattern scanning."""
-    lines = []
-    for line in content.splitlines():
-        stripped = line.lstrip()
-        if stripped.startswith(("#", "//")):
-            continue
-        lines.append(line)
-    return "\n".join(lines)
+def _strip_comments(content: str, *, is_python: bool = False) -> str:
+    """Collapse line continuations and strip comments before pattern scanning."""
+    spliced = re.sub(r"\\\r?\n", "", content)
+    if is_python:
+        lines = [
+            line
+            for line in spliced.splitlines()
+            if not line.lstrip().startswith("#")
+        ]
+        return "\n".join(lines)
+    without_blocks = re.sub(r"/\*.*?\*/", " ", spliced, flags=re.DOTALL)
+    return re.sub(r"//[^\n]*", "", without_blocks)

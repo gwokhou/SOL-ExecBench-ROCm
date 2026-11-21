@@ -36,7 +36,16 @@ def normalize_outputs(
 
     def to_tensor(name: str, v: Any) -> torch.Tensor:
         if isinstance(v, torch.Tensor):
-            return v.to(device) if v.device != device else v
+            if v.device != device:
+                if v.dtype == torch.float4_e2m1fn_x2:
+                    return (
+                        v.contiguous()
+                        .view(torch.uint8)
+                        .to(device)
+                        .view(torch.float4_e2m1fn_x2)
+                    )
+                return v.to(device)
+            return v
         dtype = output_dtypes[name]
         return torch.tensor(v, dtype=dtype, device=device)
 
@@ -103,6 +112,22 @@ def allocate_outputs(
 
     dtypes = definition.torch_output_dtypes
     return [
-        torch.zeros([] if shape is None else shape, dtype=dtype, device=device)
+        _allocate_zero_tensor(shape, dtype=dtype, device=device)
         for shape, dtype in zip(output_shapes, dtypes, strict=True)
     ]
+
+
+def _allocate_zero_tensor(
+    shape: tuple[int, ...] | list[int] | None,
+    *,
+    dtype: torch.dtype,
+    device: str,
+) -> torch.Tensor:
+    resolved_shape = [] if shape is None else shape
+    if dtype == torch.float4_e2m1fn_x2:
+        return torch.zeros(
+            resolved_shape,
+            dtype=torch.uint8,
+            device=device,
+        ).view(torch.float4_e2m1fn_x2)
+    return torch.zeros(resolved_shape, dtype=dtype, device=device)

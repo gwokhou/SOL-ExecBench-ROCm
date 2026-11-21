@@ -120,7 +120,7 @@ def run_correctness_rounds(
             request=request,
             workload=workload,
             emitter=emitter,
-            inputs=inputs,
+            inputs=_clone_case_inputs(inputs),
             resolved_axes=resolved_axes,
         )
         if user_outputs is None:
@@ -158,6 +158,25 @@ def run_correctness_rounds(
     )
 
 
+def _clone_case_inputs(inputs: list[object]) -> list[object]:
+    """Clone input tensors so candidate in-place edits cannot corrupt checks."""
+    cloned: list[object] = []
+    for item in inputs:
+        if isinstance(item, torch.Tensor):
+            if item.dtype == torch.float4_e2m1fn_x2:
+                cloned.append(
+                    item.contiguous()
+                    .view(torch.uint8)
+                    .clone()
+                    .view(torch.float4_e2m1fn_x2)
+                )
+            else:
+                cloned.append(item.clone())
+        else:
+            cloned.append(item)
+    return cloned
+
+
 def _check_observed_round(
     request: WorkloadEvaluationRequest,
     workload: Workload,
@@ -169,7 +188,7 @@ def _check_observed_round(
     correctness: Correctness,
 ) -> tuple[Correctness, bool]:
     check_start = time.monotonic()
-    if round_index == 0 and _first_round_failed(
+    if _round_structure_failed(
         emitter,
         workload,
         case.outputs,
@@ -287,7 +306,7 @@ def _load_reference_case(
     return None
 
 
-def _first_round_failed(
+def _round_structure_failed(
     emitter: WorkloadTraceEmitter,
     workload: Workload,
     reference_outputs: list[torch.Tensor],

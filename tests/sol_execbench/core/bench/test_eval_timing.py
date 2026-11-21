@@ -347,3 +347,25 @@ def test_device_guard_rejects_host_output_before_end_event() -> None:
 
     with pytest.raises(RewardHackError, match="timed GPU"):
         guarded(torch.ones(1))
+
+
+def test_device_guard_rejects_tensor_subclass_inside_timed_region() -> None:
+    class _TimedSubclass(torch.Tensor):
+        pass
+
+    request = cast(
+        WorkloadEvaluationRequest,
+        SimpleNamespace(
+            device="cpu",
+            output_names=["output"],
+            definition=SimpleNamespace(inputs={"input": object()}),
+            destination_passing_style=False,
+        ),
+    )
+    guarded = eval_timing._device_guarded_callable(
+        request,
+        lambda value: value.as_subclass(_TimedSubclass),
+    )
+
+    with pytest.raises(RewardHackError, match="_TimedSubclass"):
+        guarded(torch.ones(4))

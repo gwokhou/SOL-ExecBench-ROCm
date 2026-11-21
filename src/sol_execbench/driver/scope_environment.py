@@ -13,7 +13,9 @@ from sol_execbench.core.bench.rocm_profiler.evaluate_scope_models import (
 )
 
 PROFILER_ENV_PREFIXES = ("ROCP", "SOL_SCOPE_")
-PROFILER_LOADER_NAMES = frozenset({"LD_PRELOAD", "LD_AUDIT", SCOPE_ENV})
+PROFILER_LOADER_NAMES = frozenset(
+    {"HSA_TOOLS_LIB", "LD_PRELOAD", "LD_AUDIT", SCOPE_ENV}
+)
 
 
 def unprofiled_reference_environment(
@@ -38,5 +40,6 @@ def exec_scope_candidate(
     """
     launch = json.loads((staging / SCOPE_LAUNCH_FILE).read_text())
     environment.update(launch["environment"])
+    environment["PYTHONSAFEPATH"] = "1"
     command = launch["command"]
     os.execvpe(command[0], command, environment)

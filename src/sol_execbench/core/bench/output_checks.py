@@ -5,11 +5,13 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 
 import torch
 
 from sol_execbench.core.bench.correctness import (
+    _sanity_check_view,
     _tensor_chunks,
     check_tensor_sanity,
     compute_error_stats,
@@ -79,18 +81,10 @@ def _normalized_max_metrics(
         _tensor_chunks(reference),
         strict=True,
     ):
-        max_abs = max(
-            max_abs,
-            float(
-                (output_chunk.float() - reference_chunk.float())
-                .abs()
-                .max()
-                .item()
-            ),
-        )
-        max_ref = max(
-            max_ref, float(reference_chunk.float().abs().max().item())
-        )
+        out_f = _sanity_check_view(output_chunk).float()
+        ref_f = _sanity_check_view(reference_chunk).float()
+        max_abs = max(max_abs, float((out_f - ref_f).abs().max().item()))
+        max_ref = max(max_ref, float(ref_f.abs().max().item()))
     return (
         max_abs,
         max_abs / (max_ref + check.denominator_epsilon),
@@ -140,11 +134,21 @@ def _exact_result(
     reference: torch.Tensor,
     round_index: int,
 ) -> ExactCheckResult:
+    left_view = (
+        output.contiguous().view(torch.uint8)
+        if output.dtype == torch.float4_e2m1fn_x2
+        else output
+    )
+    right_view = (
+        reference.contiguous().view(torch.uint8)
+        if reference.dtype == torch.float4_e2m1fn_x2
+        else reference
+    )
     mismatches = sum(
         int((left != right).sum().item())
         for left, right in zip(
-            _tensor_chunks(output),
-            _tensor_chunks(reference),
+            _tensor_chunks(left_view),
+            _tensor_chunks(right_view),
             strict=True,
         )
     )
@@ -204,11 +208,19 @@ def _routing_token_metrics(
     topk: int,
     tie_atol: float,
 ) -> tuple[int, float]:
+    num_experts = int(scores.shape[-1])
+    if topk > num_experts or not bool(torch.isfinite(scores).all().item()):
+        return 1, 0.0
     sorted_scores = scores.sort(descending=True).values
     cutoff = float(sorted_scores[topk - 1].item())
-    reference_set = set(reference_ids.tolist())
-    output_set = set(output_ids.tolist())
-    mismatch = int(len(output_set) != topk)
+    ref_id_list = [int(item) for item in reference_ids.tolist()]
+    out_id_list = [int(item) for item in output_ids.tolist()]
+    reference_set = set(ref_id_list)
+    output_set = set(out_id_list)
+    in_bounds = all(0 <= item < num_experts for item in out_id_list)
+    mismatch = int(
+        len(out_id_list) != topk or len(output_set) != topk or not in_bounds
+    )
     if not mismatch and output_set != reference_set:
         extra = output_set - reference_set
         missing = reference_set - output_set
@@ -219,20 +231,21 @@ def _routing_token_metrics(
             float(scores[item].item()) <= cutoff + tie_atol for item in missing
         )
         mismatch = int(not tied)
-    positions = {
-        int(item): index for index, item in enumerate(reference_ids.tolist())
-    }
-    weight_error = max(
-        (
-            abs(
-                float(output_weights[index].item())
-                - float(reference_weights[positions[int(item)]].item())
-            )
-            for index, item in enumerate(output_ids.tolist())
-            if int(item) in positions
-        ),
-        default=0.0,
-    )
+    positions = {item: index for index, item in enumerate(ref_id_list)}
+    weight_error = 0.0
+    for index, item in enumerate(out_id_list):
+        weight = float(output_weights[index].item())
+        if not math.isfinite(weight):
+            mismatch = 1
+            continue
+        if item in positions:
+            expected_weight = float(reference_weights[positions[item]].item())
+            if not math.isfinite(expected_weight):
+                mismatch = 1
+                continue
+            weight_error = max(weight_error, abs(weight - expected_weight))
+        elif not mismatch:
+            weight_error = max(weight_error, abs(weight - cutoff))
     return mismatch, weight_error
 
 
@@ -242,20 +255,30 @@ def _topk_result(
     reference_map: dict[str, torch.Tensor],
     output_map: dict[str, torch.Tensor],
     round_index: int,
-) -> TopKRoutingCheckResult:
+) -> tuple[TopKRoutingCheckResult, Correctness]:
     gating = torch.as_tensor(input_map[check.gating_input]).float()
     scores = torch.softmax(gating, dim=-1)
     if check.bias_input is not None:
         scores = scores + torch.as_tensor(input_map[check.bias_input]).float()
-    tensors = (
-        reference_map[check.ids_output].cpu(),
-        reference_map[check.weights_output].float().cpu(),
-        output_map[check.ids_output].cpu(),
-        output_map[check.weights_output].float().cpu(),
-        scores.cpu(),
+    reference_ids = (
+        reference_map[check.ids_output].cpu().reshape(-1, check.topk)
     )
-    reference_ids, reference_weights, output_ids, output_weights, score_rows = (
-        tensors
+    reference_weights = (
+        reference_map[check.weights_output]
+        .float()
+        .cpu()
+        .reshape(-1, check.topk)
+    )
+    output_ids = output_map[check.ids_output].cpu().reshape(-1, check.topk)
+    output_weights = (
+        output_map[check.weights_output].float().cpu().reshape(-1, check.topk)
+    )
+    score_rows = scores.cpu().reshape(-1, scores.shape[-1])
+    has_nan = bool(torch.isnan(output_weights).any().item()) or bool(
+        torch.isnan(reference_weights).any().item()
+    )
+    has_inf = bool(torch.isinf(output_weights).any().item()) or bool(
+        torch.isinf(reference_weights).any().item()
     )
     metrics = [
         _routing_token_metrics(
@@ -267,20 +290,30 @@ def _topk_result(
             check.topk,
             check.tie_atol,
         )
-        for index in range(tensors[0].shape[0])
+        for index in range(reference_ids.shape[0])
     ]
     mismatch_ratio = sum(item[0] for item in metrics) / max(len(metrics), 1)
     max_weight_error = max((item[1] for item in metrics), default=0.0)
-    return TopKRoutingCheckResult(
-        ids_output=check.ids_output,
-        weights_output=check.weights_output,
-        round_index=round_index,
-        passed=(
-            mismatch_ratio <= check.max_mismatch_ratio
-            and max_weight_error <= check.weight_atol
+    passed = (
+        not has_nan
+        and not has_inf
+        and mismatch_ratio <= check.max_mismatch_ratio
+        and max_weight_error <= check.weight_atol
+    )
+    return (
+        TopKRoutingCheckResult(
+            ids_output=check.ids_output,
+            weights_output=check.weights_output,
+            round_index=round_index,
+            passed=passed,
+            genuine_mismatch_ratio=mismatch_ratio,
+            max_matched_weight_error=max_weight_error,
         ),
-        genuine_mismatch_ratio=mismatch_ratio,
-        max_matched_weight_error=max_weight_error,
+        Correctness(
+            max_absolute_error=max_weight_error,
+            has_nan=has_nan,
+            has_inf=has_inf and not has_nan,
+        ),
     )
 
 
@@ -361,7 +394,7 @@ def _run_check(
             round_index,
         )
     elif isinstance(check, TopKRoutingCheck):
-        result = _topk_result(
+        return _topk_result(
             check, input_map, reference_map, output_map, round_index
         )
     else:  # pragma: no cover - closed schema union

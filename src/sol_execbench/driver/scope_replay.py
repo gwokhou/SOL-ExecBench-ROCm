@@ -3,6 +3,7 @@
 
 import ctypes
 import os
+from collections.abc import Mapping
 from pathlib import Path
 
 import torch
@@ -16,6 +17,7 @@ from sol_execbench.core.bench.output_allocation import (
     normalize_outputs,
 )
 from sol_execbench.core.bench.reward_hack import (
+    RewardHackError,
     ThreadInjectionMonitor,
     check_thread_injection_from_monitor,
 )
@@ -93,12 +95,30 @@ def _invoke(
         if request.destination_passing_style
         else []
     )
+    target_device = torch.device(request.device)
     monitor = ThreadInjectionMonitor()
     with monitor:
         torch.cuda.synchronize(request.device)
         if scoped:
             tool.sol_scope_boundary(1)
         result = request.dependencies.user_fn(*case.inputs, *outputs)
+        raw_outputs = (
+            list(outputs)
+            if request.destination_passing_style
+            else _extract_scope_outputs(result, request.output_names)
+        )
+        if len(raw_outputs) != len(request.output_names):
+            raise RewardHackError("scope_output_count_mismatch")
+        for value in raw_outputs:
+            if (
+                not isinstance(value, torch.Tensor)
+                or type(value) is not torch.Tensor
+            ):
+                raise RewardHackError(
+                    f"Lazy evaluation detected: output is {type(value).__name__}, not torch.Tensor",
+                )
+            if value.device != target_device:
+                raise ValueError("scope_outputs_wrong_device")
         torch.cuda.synchronize(request.device)
         if scoped:
             tool.sol_scope_boundary(0)
@@ -110,17 +130,29 @@ def _invoke(
     if not request.destination_passing_style:
         normalized = normalize_outputs(
             result,
-            device=torch.device(request.device),
+            device=target_device,
             output_names=request.output_names,
             output_dtypes=request.output_dtypes_torch,
         )
         outputs = [normalized[name] for name in request.output_names]
-    if not outputs or any(
-        output.device != torch.device(request.device) for output in outputs
-    ):
+    if not outputs or any(output.device != target_device for output in outputs):
         raise ValueError("scope_outputs_wrong_device")
     request.dependencies.reference_client.validate_timing_outputs(outputs)
     return case.input_sha256
+
+
+def _extract_scope_outputs(
+    result: object,
+    output_names: list[str],
+) -> list[object]:
+    if isinstance(result, Mapping):
+        by_name = {str(key): val for key, val in result.items()}
+        return [by_name[name] for name in output_names if name in by_name]
+    if isinstance(result, (list, tuple)):
+        return list(result)
+    if result is None:
+        return []
+    return [result]
 
 
 def evaluate_driver_workloads(

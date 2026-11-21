@@ -210,10 +210,23 @@ class TestBenchTimeWithDeviceEvents:
             "sol_execbench.core.bench.timing._clear_cache",
             lambda cache: None,
         )
-        monkeypatch.setattr(torch.cuda, "Event", MockEvent)
         monkeypatch.setattr(
-            torch.cuda,
-            "synchronize",
+            "sol_execbench.core.bench.timing._CUDA_EVENT_CLS", MockEvent
+        )
+        monkeypatch.setattr(
+            "sol_execbench.core.bench.timing._CUDA_EVENT_RECORD",
+            MockEvent.record,
+        )
+        monkeypatch.setattr(
+            "sol_execbench.core.bench.timing._CUDA_EVENT_SYNCHRONIZE",
+            MockEvent.synchronize,
+        )
+        monkeypatch.setattr(
+            "sol_execbench.core.bench.timing._CUDA_EVENT_ELAPSED_TIME",
+            MockEvent.elapsed_time,
+        )
+        monkeypatch.setattr(
+            "sol_execbench.core.bench.timing._CUDA_SYNCHRONIZE",
             lambda: calls.append("device_sync"),
         )
 
@@ -251,10 +264,32 @@ class TestBenchTimeWithDeviceEvents:
 
         monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
         monkeypatch.setattr(torch.cuda, "device_count", lambda: 2)
-        monkeypatch.setattr(torch.cuda, "current_device", current_device)
-        monkeypatch.setattr(torch.cuda, "set_device", lambda index: None)
-        monkeypatch.setattr(torch.cuda, "Event", MockEvent)
-        monkeypatch.setattr(torch.cuda, "synchronize", lambda: None)
+        monkeypatch.setattr(
+            "sol_execbench.core.bench.timing._CUDA_CURRENT_DEVICE",
+            current_device,
+        )
+        monkeypatch.setattr(
+            "sol_execbench.core.bench.timing._CUDA_SET_DEVICE",
+            lambda index: None,
+        )
+        monkeypatch.setattr(
+            "sol_execbench.core.bench.timing._CUDA_EVENT_CLS", MockEvent
+        )
+        monkeypatch.setattr(
+            "sol_execbench.core.bench.timing._CUDA_EVENT_RECORD",
+            MockEvent.record,
+        )
+        monkeypatch.setattr(
+            "sol_execbench.core.bench.timing._CUDA_EVENT_SYNCHRONIZE",
+            MockEvent.synchronize,
+        )
+        monkeypatch.setattr(
+            "sol_execbench.core.bench.timing._CUDA_EVENT_ELAPSED_TIME",
+            MockEvent.elapsed_time,
+        )
+        monkeypatch.setattr(
+            "sol_execbench.core.bench.timing._CUDA_SYNCHRONIZE", lambda: None
+        )
         monkeypatch.setattr(
             "sol_execbench.core.bench.timing._get_empty_cache_for_benchmark",
             lambda device, policy: None,

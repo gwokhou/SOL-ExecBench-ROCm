@@ -36,6 +36,44 @@ _CORRECTNESS_CHUNK_ELEMENTS = 1 << 20
 # never trip the gate.
 _SLICE_SKIP_RUN_FLOOR = 256
 _SLICE_SKIP_RUN_FRACTION = 0.005
+_FP4_E2M1_LUT = (
+    0.0,
+    0.5,
+    1.0,
+    1.5,
+    2.0,
+    3.0,
+    4.0,
+    6.0,
+    -0.0,
+    -0.5,
+    -1.0,
+    -1.5,
+    -2.0,
+    -3.0,
+    -4.0,
+    -6.0,
+)
+
+
+def _sanity_check_view(chunk: torch.Tensor) -> torch.Tensor:
+    """Promote low-precision floating chunks to float32 before torch predicates."""
+    if chunk.dtype == torch.float4_e2m1fn_x2:
+        raw = chunk.contiguous().view(torch.uint8).to(torch.long)
+        lut = torch.tensor(
+            _FP4_E2M1_LUT,
+            dtype=torch.float32,
+            device=chunk.device,
+        )
+        low = lut[raw & 0x0F]
+        high = lut[(raw >> 4) & 0x0F]
+        return torch.stack((low, high), dim=-1).reshape(-1)
+    if chunk.dtype.is_floating_point and chunk.dtype not in (
+        torch.float32,
+        torch.float64,
+    ):
+        return chunk.float()
+    return chunk
 
 
 def _tensor_chunks(tensor: torch.Tensor) -> tuple[torch.Tensor, ...]:
@@ -128,11 +166,13 @@ def check_tensor_sanity(
     ref_nonzero = False
     sol_nonzero = False
     ref_norm_squared = 0.0
-    for sol_chunk, ref_chunk in zip(
+    for sol_raw, ref_raw in zip(
         _tensor_chunks(sol_tensor),
         _tensor_chunks(ref_tensor),
         strict=True,
     ):
+        sol_chunk = _sanity_check_view(sol_raw)
+        ref_chunk = _sanity_check_view(ref_raw)
         ref_nonfinite = ~torch.isfinite(ref_chunk)
         sol_nonfinite = ~torch.isfinite(sol_chunk)
         if allow_negative_inf:
@@ -202,8 +242,8 @@ def compute_error_stats(
         _tensor_chunks(reference),
         strict=True,
     ):
-        x = output_chunk.float()
-        y = reference_chunk.float()
+        x = _sanity_check_view(output_chunk).float()
+        y = _sanity_check_view(reference_chunk).float()
         if allow_neg_inf:
             finite_mask = ~((x == float("-inf")) & (y == float("-inf")))
             x = x[finite_mask]

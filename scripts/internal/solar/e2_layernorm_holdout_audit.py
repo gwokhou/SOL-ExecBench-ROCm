@@ -251,12 +251,15 @@ def _review(
     bound = identities[
         f"{case.workload_index}/{case.family}/{slot.session.strategy}"
     ]
+    staged_candidate = folder / "candidate" / "candidate.py"
+    if not staged_candidate.is_file():
+        staged_candidate = folder / "candidate.py"
     if (
         result["session_id"] != slot.session.identity
         or result["feature_shift"] != slot.shift
         or result["candidate_sha256"] != bound["candidate_sha256"]
         or result["reference_sha256"] != bound["reference_sha256"]
-        or sha256_file(folder / "candidate.py") != bound["candidate_sha256"]
+        or sha256_file(staged_candidate) != bound["candidate_sha256"]
         or result["original_checks"] != bound["checks"]
     ):
         raise ValueError("staged holdout slot identity disagrees with freeze")

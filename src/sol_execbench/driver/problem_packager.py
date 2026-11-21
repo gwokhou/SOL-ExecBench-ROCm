@@ -187,7 +187,7 @@ class ProblemPackager:
             (_TEMPLATES_DIR / "build_ext.py").read_text(),
         )
 
-        cmd = [sys.executable, "build_ext.py"]
+        cmd = [sys.executable, "-P", "build_ext.py"]
         artifact_path = str(self.output_dir / "benchmark_kernel.so")
         return cmd, artifact_path
 
@@ -215,7 +215,7 @@ class ProblemPackager:
                 (_TEMPLATES_DIR / name).read_text(),
             )
 
-        return [sys.executable, "evaluation_orchestrator.py"]
+        return [sys.executable, "-P", "evaluation_orchestrator.py"]
 
     def restage_trusted_reference(self) -> None:
         """Restore worker-only reference input for one independent replay."""

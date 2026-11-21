@@ -25,12 +25,14 @@ detected.
 from __future__ import annotations
 
 import _thread
+import os
 import threading
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Any, Self
 
 import torch
 
+from sol_execbench.core.bench.reference_protocol import ReferenceClient
 from sol_execbench.core.bench.reward_hack.models import RewardHackError
 
 
@@ -101,9 +103,100 @@ def _resolve_elapsed_time() -> Any:
         return None
 
 
+def _safe_getattr(owner_fn: Callable[[], object], attr: str) -> object:
+    try:
+        owner = owner_fn()
+        return getattr(owner, attr) if owner is not None else None
+    except AttributeError, RuntimeError:
+        return None
+
+
+def _cuda_module() -> object:
+    try:
+        import torch.cuda
+
+        return torch.cuda
+    except AttributeError, RuntimeError:
+        return None
+
+
+def _cuda_event_cls() -> object:
+    return _safe_getattr(_cuda_module, "Event")
+
+
+def _cuda_event_base_cls() -> object:
+    return getattr(getattr(torch, "_C", None), "_CudaEventBase", None)
+
+
 # Sealed strong reference captured at import, before any candidate code runs.
 # This is the authoritative guard used by check_monkey_patch / verify below.
 _TIMING_GUARD = _SealedReference(_resolve_elapsed_time())
+
+
+def _build_sealed_runtime_guards() -> tuple[
+    tuple[str, _SealedReference, Callable[[], object]],
+    ...,
+]:
+    specs: list[tuple[str, Callable[[], object]]] = [
+        ("torch.cuda.Event", _cuda_event_cls),
+        (
+            "torch.cuda.Event.record",
+            lambda: _safe_getattr(_cuda_event_cls, "record"),
+        ),
+        (
+            "torch.cuda.Event.synchronize",
+            lambda: _safe_getattr(_cuda_event_cls, "synchronize"),
+        ),
+        (
+            "torch.cuda.synchronize",
+            lambda: _safe_getattr(_cuda_module, "synchronize"),
+        ),
+        (
+            "torch.cuda.current_device",
+            lambda: _safe_getattr(_cuda_module, "current_device"),
+        ),
+        (
+            "torch.cuda.set_device",
+            lambda: _safe_getattr(_cuda_module, "set_device"),
+        ),
+        (
+            "torch.Tensor.zero_",
+            lambda: getattr(torch.Tensor, "zero_", None),
+        ),
+    ]
+    if _cuda_event_base_cls() is not None:
+        for method_name in ("record", "synchronize", "elapsed_time"):
+            specs.append(
+                (
+                    f"torch._C._CudaEventBase.{method_name}",
+                    lambda m=method_name: _safe_getattr(
+                        _cuda_event_base_cls, m
+                    ),
+                )
+            )
+    for client_method in (
+        "correctness_case",
+        "timing_case",
+        "timing_iteration_case",
+        "validate_timing_outputs",
+        "_request",
+        "close",
+    ):
+        specs.append(
+            (
+                f"ReferenceClient.{client_method}",
+                lambda m=client_method: getattr(ReferenceClient, m, None),
+            )
+        )
+    guards = [
+        ("torch.cuda.Event.elapsed_time", _TIMING_GUARD, _resolve_elapsed_time),
+    ]
+    for label, resolver in specs:
+        guards.append((label, _SealedReference(resolver()), resolver))
+    return tuple(guards)
+
+
+_SEALED_RUNTIME_GUARDS = _build_sealed_runtime_guards()
 
 # Deprecated diagnostic alias for the captured id(); retained for back-compat
 # with tooling and tests. NOT security-critical: check_monkey_patch reads the
@@ -120,30 +213,28 @@ def timing_function_available() -> bool:
 
 
 def check_monkey_patch() -> None:
-    """Detect if torch.cuda.Event.elapsed_time has been patched.
+    """Detect if timing, synchronization, tensor zeroing, or IPC methods were patched.
 
-    Compares the **live** function object against the pristine strong reference
-    captured at module import (before any candidate code runs).  Must be called
-    before every timed section.
+    Compares **live** function/method objects against the pristine strong
+    references captured at module import (before any candidate code runs).
 
     Raises:
-        RewardHackError: If the timing function identity has changed, or if it
-            only became available after the guard was captured.
+        RewardHackError: If any guarded identity has changed, or if it only
+            became available after the guard was captured.
 
     """
-    current = _resolve_elapsed_time()
-    pristine = _TIMING_GUARD.reference
-    if current is None:
-        return  # torch.cuda unavailable on this target (e.g. CPU-only run)
-    if pristine is None:
-        raise RewardHackError(
-            "torch.cuda.Event.elapsed_time became available after the integrity "
-            "guard was captured; timing function cannot be trusted",
-        )
-    if not _TIMING_GUARD.is_intact(current):
-        raise RewardHackError(
-            "torch.cuda.Event.elapsed_time has been monkey-patched",
-        )
+    for label, guard, resolver in _SEALED_RUNTIME_GUARDS:
+        current = resolver()
+        pristine = guard.reference
+        if current is None and pristine is None:
+            continue
+        if pristine is None:
+            raise RewardHackError(
+                f"{label} became available after the integrity "
+                "guard was captured; timing function cannot be trusted",
+            )
+        if not guard.is_intact(current):
+            raise RewardHackError(f"{label} has been monkey-patched")
 
 
 def verify_timing_function_intact() -> None:
@@ -173,6 +264,14 @@ def check_thread_injection(threads_before: int, threads_after: int) -> None:
             f"Thread injection detected: "
             f"{threads_after} threads after call vs {threads_before} before",
         )
+
+
+def _os_task_count() -> int | None:
+    """Return the Linux OS thread count for the current process when available."""
+    try:
+        return len(os.listdir("/proc/self/task"))
+    except OSError:
+        return None
 
 
 class ThreadInjectionMonitor:
@@ -211,7 +310,7 @@ class ThreadInjectionMonitor:
         """Install thread-start guards and begin sampling."""
         # Baseline is captured before the monitor thread starts, so it does not
         # include the monitor itself.
-        self._baseline = threading.active_count()
+        self._baseline = max(threading.active_count(), _os_task_count() or 0)
         self._peak = self._baseline
         self._starts_observed = 0
         self._stop.clear()
@@ -300,8 +399,12 @@ class ThreadInjectionMonitor:
 
     def _sample(self) -> None:
         while not self._stop.is_set():
-            # Exclude this monitor thread from the count.
-            current = threading.active_count() - 1
+            # Exclude this monitor thread from both Python and OS task counts.
+            os_tasks = _os_task_count()
+            current = max(
+                threading.active_count() - 1,
+                (os_tasks - 1) if os_tasks is not None else 0,
+            )
             self._peak = max(self._peak, current)
             self._ready.set()
             if self._stop.wait(self._interval):
@@ -510,6 +613,7 @@ def check_runtime_integrity(
     driver_namespace: dict[str, Any],
 ) -> None:
     """Detect monkey-patching across the complete evaluation call graph."""
+    check_monkey_patch()
     check_eval_integrity(
         snapshot,
         _runtime_integrity_namespace(driver_namespace),

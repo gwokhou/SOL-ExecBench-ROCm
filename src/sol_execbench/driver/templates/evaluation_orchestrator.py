@@ -7,10 +7,12 @@
 
 from __future__ import annotations
 
+import json
 import os
 import secrets
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 from sol_execbench.core.bench.rocm_profiler.evaluate_scope_models import (
@@ -20,6 +22,10 @@ from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_INPUT_NONCE,
 )
 from sol_execbench.driver.reference_runtime_api import (
+    REFERENCE_ATTESTATION_CONFIG_FILE,
+    REFERENCE_ATTESTATION_FILE_ENV,
+    REFERENCE_ATTESTATION_KEY_ENV,
+    REFERENCE_ATTESTATION_RECEIPT_FILE,
     REFERENCE_PID_ENV,
     REFERENCE_REQUEST_FD_ENV,
     REFERENCE_RESPONSE_FD_ENV,
@@ -31,15 +37,46 @@ from sol_execbench.driver.scope_environment import (
     unprofiled_reference_environment,
 )
 
+
+def _fallback_triton_cache_dir(
+    fallback_dir: Path, *, mode: int = 0o700
+) -> str | None:
+    """Provide a writable Triton cache when ~/.triton or $HOME is read-only."""
+    configured = os.environ.get("TRITON_CACHE_DIR")
+    if configured:
+        return configured
+    home = Path.home()
+    triton_home = home / ".triton"
+    probe = triton_home if triton_home.exists() else home
+    if os.access(probe, os.W_OK):
+        return None
+    fallback_dir.mkdir(parents=True, exist_ok=True, mode=mode)
+    return str(fallback_dir)
+
+
 STAGING_DIR = Path(__file__).parent.resolve()
 _token = secrets.token_hex(32)
 _request_read, _request_write = os.pipe()
 _response_read, _response_write = os.pipe()
-_worker_environment = (
-    unprofiled_reference_environment(os.environ)
-    if SCOPE_ENV in os.environ
-    else dict(os.environ)
+_worker_environment = unprofiled_reference_environment(os.environ)
+_worker_triton_cache = _fallback_triton_cache_dir(
+    Path(tempfile.gettempdir()) / f"sol-execbench-triton-ref-{os.getuid()}"
 )
+if _worker_triton_cache is not None:
+    _worker_environment["TRITON_CACHE_DIR"] = _worker_triton_cache
+_attestation_config_path = STAGING_DIR / REFERENCE_ATTESTATION_CONFIG_FILE
+if _attestation_config_path.is_file():
+    _attestation_cfg = json.loads(_attestation_config_path.read_text())
+    _attestation_config_path.unlink()
+    _worker_environment[REFERENCE_ATTESTATION_KEY_ENV] = str(
+        _attestation_cfg["key"]
+    )
+    _receipt_name = str(
+        _attestation_cfg.get("receipt") or REFERENCE_ATTESTATION_RECEIPT_FILE
+    )
+    _worker_environment[REFERENCE_ATTESTATION_FILE_ENV] = str(
+        STAGING_DIR / _receipt_name
+    )
 _worker_environment[REFERENCE_REQUEST_FD_ENV] = str(_request_read)
 _worker_environment[REFERENCE_RESPONSE_FD_ENV] = str(_response_write)
 _worker_environment[REFERENCE_TOKEN_ENV] = _token
@@ -48,7 +85,7 @@ _worker_environment[ENV_SOL_EXECBENCH_INPUT_NONCE] = os.environ.get(
 ) or secrets.token_hex(32)
 
 _worker = subprocess.Popen(
-    [sys.executable, "reference_worker.py"],
+    [sys.executable, "-P", "reference_worker.py"],
     cwd=STAGING_DIR,
     env=_worker_environment,
     stdin=subprocess.DEVNULL,
@@ -72,9 +109,11 @@ try:
     os.set_inheritable(_request_write, True)
     os.set_inheritable(_response_read, True)
     _candidate_environment = dict(os.environ)
-    # The worker retains the per-run entropy used to generate inputs. Candidate
-    # code must not receive it or it could reproduce timed inputs ahead of use.
+    # The worker retains the per-run entropy and attestation key. Candidate
+    # code must not receive either credential.
     _candidate_environment.pop(ENV_SOL_EXECBENCH_INPUT_NONCE, None)
+    _candidate_environment.pop(REFERENCE_ATTESTATION_KEY_ENV, None)
+    _candidate_environment.pop(REFERENCE_ATTESTATION_FILE_ENV, None)
     _candidate_environment[REFERENCE_REQUEST_FD_ENV] = str(_request_write)
     _candidate_environment[REFERENCE_RESPONSE_FD_ENV] = str(_response_read)
     _candidate_environment[REFERENCE_TOKEN_ENV] = _token
@@ -85,11 +124,16 @@ try:
     # a candidate-created worker.  Set this before eval_driver imports torch;
     # the strict timing-region thread monitor therefore needs no allowlist.
     _candidate_environment["TORCHINDUCTOR_COMPILE_THREADS"] = "1"
+    _candidate_triton_cache = _fallback_triton_cache_dir(
+        STAGING_DIR / ".triton_cache"
+    )
+    if _candidate_triton_cache is not None:
+        _candidate_environment["TRITON_CACHE_DIR"] = _candidate_triton_cache
     if SCOPE_ENV in os.environ:
         exec_scope_candidate(STAGING_DIR, _candidate_environment)
     os.execve(
         sys.executable,
-        [sys.executable, "eval_driver.py"],
+        [sys.executable, "-P", "eval_driver.py"],
         _candidate_environment,
     )
 except BaseException:

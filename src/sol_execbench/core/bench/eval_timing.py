@@ -214,19 +214,45 @@ def _device_guarded_callable(
     request: WorkloadEvaluationRequest,
     fn: Callable[..., Any],
 ) -> Callable[..., Any]:
-    """Reject host-resident outputs before the timed invocation completes."""
-    if request.device.split(":", maxsplit=1)[0] != "cuda":
-        return fn
-    target = torch.device(request.device)
+    """Reject lazy/non-Tensor or host-resident outputs before the end event."""
+    is_cuda = request.device.split(":", maxsplit=1)[0] == "cuda"
+    target = torch.device(request.device) if is_cuda else None
+    output_names: list[str] | None = getattr(request, "output_names", None)
+    inputs_spec: object = getattr(request.definition, "inputs", None)
+    input_count = len(inputs_spec) if isinstance(inputs_spec, dict) else None
 
     def run(*args: Any) -> Any:
         result = fn(*args)
-        values = (
-            args[len(request.definition.inputs) :]
-            if request.destination_passing_style
-            else _result_tensors(result)
-        )
-        if not values or any(value.device != target for value in values):
+        if request.destination_passing_style:
+            values = (
+                list(args[input_count:])
+                if input_count is not None
+                else list(args[-len(output_names) :] if output_names else args)
+            )
+        else:
+            values = _extract_raw_timed_outputs(result, output_names)
+        if not values or (
+            output_names is not None and len(values) != len(output_names)
+        ):
+            raise RewardHackError(
+                "candidate outputs must reside on the timed GPU before "
+                "the end event"
+                if is_cuda
+                else "Lazy evaluation detected: candidate output count mismatch",
+            )
+        tensors: list[torch.Tensor] = []
+        for value in values:
+            if (
+                not isinstance(value, torch.Tensor)
+                or type(value) is not torch.Tensor
+            ):
+                raise RewardHackError(
+                    f"Lazy evaluation detected: output is {type(value).__name__}, not torch.Tensor",
+                )
+            tensors.append(value)
+        if target is not None and any(
+            tensor.device != target for tensor in tensors
+        ):
             raise RewardHackError(
                 "candidate outputs must reside on the timed GPU before "
                 "the end event",
@@ -236,18 +262,19 @@ def _device_guarded_callable(
     return run
 
 
-def _result_tensors(value: Any) -> list[torch.Tensor]:
-    if isinstance(value, torch.Tensor):
-        return [value]
+def _extract_raw_timed_outputs(
+    value: Any,
+    output_names: list[str] | None,
+) -> list[object]:
     if isinstance(value, dict):
-        return [
-            tensor
-            for item in value.values()
-            for tensor in _result_tensors(item)
-        ]
+        if output_names is not None:
+            return [value[name] for name in output_names if name in value]
+        return list(value.values())
     if isinstance(value, (list, tuple)):
-        return [tensor for item in value for tensor in _result_tensors(item)]
-    return []
+        return list(value)
+    if value is None:
+        return []
+    return [value]
 
 
 def replay_marker_ranges(workload_uuid: str) -> list[str]:

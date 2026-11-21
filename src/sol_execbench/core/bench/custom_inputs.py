@@ -119,7 +119,7 @@ def isolated_torch_rng(seed: int) -> Iterator[None]:
     """Temporarily seed Torch RNGs and restore their previous states."""
     cpu_state = torch.random.get_rng_state()
     cuda_states = None
-    if torch.cuda.is_available():
+    if torch.cuda.is_initialized():
         try:
             cuda_states = torch.cuda.get_rng_state_all()
         except RuntimeError:

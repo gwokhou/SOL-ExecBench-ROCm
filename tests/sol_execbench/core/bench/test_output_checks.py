@@ -194,3 +194,65 @@ def test_topk_routing_excuses_selection_ties_but_rejects_duplicates() -> None:
 
     assert not tied_failed
     assert duplicate_failed
+
+
+@pytest.mark.parametrize(
+    ("bad_weights", "bad_ids", "expect_nan", "expect_inf"),
+    [
+        (
+            torch.tensor([[float("nan"), 0.25]]),
+            torch.tensor([[0, 1]], dtype=torch.int32),
+            True,
+            False,
+        ),
+        (
+            torch.tensor([[float("inf"), 0.25]]),
+            torch.tensor([[0, 1]], dtype=torch.int32),
+            False,
+            True,
+        ),
+        (
+            torch.tensor([[0.25, 0.25]]),
+            torch.tensor([[-1, 0]], dtype=torch.int32),
+            False,
+            False,
+        ),
+        (
+            torch.tensor([[0.25, 0.25]]),
+            torch.tensor([[99, 0]], dtype=torch.int32),
+            False,
+            False,
+        ),
+        (
+            torch.tensor([[999.0, 999.0]]),
+            torch.tensor([[2, 3]], dtype=torch.int32),
+            False,
+            False,
+        ),
+    ],
+)
+def test_topk_routing_rejects_nonfinite_weights_oob_ids_and_bad_tied_weights(
+    bad_weights: torch.Tensor,
+    bad_ids: torch.Tensor,
+    expect_nan: bool,
+    expect_inf: bool,
+) -> None:
+    definition, workload = _routing_contract()
+    inputs = [torch.zeros((1, 4)), torch.zeros(4)]
+    reference = [
+        torch.tensor([[0.25, 0.25]]),
+        torch.tensor([[0, 1]], dtype=torch.int32),
+    ]
+
+    correctness, failed = compare_output_checks(
+        definition,
+        workload,
+        inputs,
+        reference,
+        [bad_weights, bad_ids],
+        0,
+    )
+
+    assert failed is True
+    assert correctness.has_nan is expect_nan
+    assert correctness.has_inf is expect_inf

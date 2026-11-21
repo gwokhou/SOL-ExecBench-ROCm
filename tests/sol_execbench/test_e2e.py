@@ -143,6 +143,10 @@ _CASES = [
         sample="triton_ref_vecadd",
         solution_file="solution_python.json",
         expected_count=3,
+        extra_markers=[
+            "requires_rocm_gpu",
+            "requires_triton_rocm",
+        ],
     ),
     Sample(
         test_id="rdna4_vecadd_hip",

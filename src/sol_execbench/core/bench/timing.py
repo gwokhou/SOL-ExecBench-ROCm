@@ -32,6 +32,18 @@ from sol_execbench.core.platform.runtime import (
     cache_clear_policy_for_device,
 )
 
+# Pristine torch/tensor callables captured at module import before candidate
+# code executes, preventing candidate attribute replacement from subverting
+# event measurement, synchronization, or L2 cache clearing.
+_CUDA_EVENT_CLS = torch.cuda.Event
+_CUDA_EVENT_RECORD = torch.cuda.Event.record
+_CUDA_EVENT_SYNCHRONIZE = torch.cuda.Event.synchronize
+_CUDA_EVENT_ELAPSED_TIME = torch.cuda.Event.elapsed_time
+_CUDA_SYNCHRONIZE = torch.cuda.synchronize
+_CUDA_CURRENT_DEVICE = torch.cuda.current_device
+_CUDA_SET_DEVICE = torch.cuda.set_device
+_TENSOR_ZERO_ = torch.Tensor.zero_
+
 
 def _summarize_statistics(
     times: list[float],
@@ -62,7 +74,7 @@ def _get_empty_cache_for_benchmark(
 
 def _clear_cache(cache: torch.Tensor) -> None:
     """Clear the cache buffer by zeroing it."""
-    cache.zero_()
+    _TENSOR_ZERO_(cache)
 
 
 def _measurement_budget_reached(
@@ -81,12 +93,12 @@ def _timing_device_index(device: str) -> int | None:
     if not torch.cuda.is_available():
         return None
     resolved = torch.device(device).index
-    return resolved if resolved is not None else torch.cuda.current_device()
+    return resolved if resolved is not None else _CUDA_CURRENT_DEVICE()
 
 
 def _assert_timing_device_unchanged(target_index: int | None) -> None:
     """Fail closed if the candidate switched the active CUDA device mid-timing."""
-    if target_index is not None and torch.cuda.current_device() != target_index:
+    if target_index is not None and _CUDA_CURRENT_DEVICE() != target_index:
         raise RewardHackError(
             "candidate switched the active CUDA device during timed execution",
         )
@@ -99,7 +111,7 @@ def _pin_timing_device(target_index: int | None) -> None:
     zero-overhead path and frozen timing evidence is byte-for-byte unaffected.
     """
     if target_index is not None and torch.cuda.device_count() > 1:
-        torch.cuda.set_device(target_index)
+        _CUDA_SET_DEVICE(target_index)
 
 
 def clone_args(args: list[Any]) -> list[Any]:
@@ -108,9 +120,21 @@ def clone_args(args: list[Any]) -> list[Any]:
     Returns fresh copies of all tensor arguments so each benchmark iteration
     starts with independent data. Non-tensor arguments are passed through.
     """
-    return [
-        arg.clone() if isinstance(arg, torch.Tensor) else arg for arg in args
-    ]
+    cloned: list[object] = []
+    for arg in args:
+        if isinstance(arg, torch.Tensor):
+            if arg.dtype == torch.float4_e2m1fn_x2:
+                cloned.append(
+                    arg.contiguous()
+                    .view(torch.uint8)
+                    .clone()
+                    .view(torch.float4_e2m1fn_x2)
+                )
+            else:
+                cloned.append(arg.clone())
+        else:
+            cloned.append(arg)
+    return cloned
 
 
 def bench_time_with_device_events(
@@ -142,7 +166,7 @@ def bench_time_with_device_events(
         raise ValueError("min_measurement_time_seconds must be > 0 or None")
     cache = _get_empty_cache_for_benchmark(device, cache_clear_policy)
     target_device_index = _timing_device_index(device)
-    torch.cuda.synchronize()
+    _CUDA_SYNCHRONIZE()
 
     if setup is None:
         _fn = fn
@@ -160,23 +184,23 @@ def bench_time_with_device_events(
         _assert_timing_device_unchanged(target_device_index)
         if validator is not None:
             validator(args, result)
-    torch.cuda.synchronize()
+    _CUDA_SYNCHRONIZE()
 
     times: list[float] = []
     for _ in range(rep):
         args = setup()
         _clear_cache(cache)
-        torch.cuda.synchronize()
+        _CUDA_SYNCHRONIZE()
         _pin_timing_device(target_device_index)
-        start_event = torch.cuda.Event(enable_timing=True)
-        end_event = torch.cuda.Event(enable_timing=True)
-        start_event.record()
+        start_event = _CUDA_EVENT_CLS(enable_timing=True)
+        end_event = _CUDA_EVENT_CLS(enable_timing=True)
+        _CUDA_EVENT_RECORD(start_event)
         result = fn(args)
         _assert_timing_device_unchanged(target_device_index)
-        torch.cuda.synchronize()
-        end_event.record()
-        end_event.synchronize()
-        times.append(start_event.elapsed_time(end_event))
+        _CUDA_SYNCHRONIZE()
+        _CUDA_EVENT_RECORD(end_event)
+        _CUDA_EVENT_SYNCHRONIZE(end_event)
+        times.append(float(_CUDA_EVENT_ELAPSED_TIME(start_event, end_event)))
         if validator is not None:
             validator(args, result)
         if _measurement_budget_reached(times, min_measurement_time_seconds):

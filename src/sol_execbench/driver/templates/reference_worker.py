@@ -19,6 +19,8 @@ from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_INPUT_NONCE,
 )
 from sol_execbench.driver.reference_runtime_api import (
+    REFERENCE_ATTESTATION_FILE_ENV,
+    REFERENCE_ATTESTATION_KEY_ENV,
     REFERENCE_REQUEST_FD_ENV,
     REFERENCE_RESPONSE_FD_ENV,
     REFERENCE_TOKEN_ENV,
@@ -33,15 +35,22 @@ _device = os.environ.get(
 # Pin the active device so reference outputs are always produced on the same
 # device the candidate is timed on (device-b3 parity with the eval driver).
 pin_cuda_device(_device)
-_token = os.environ[REFERENCE_TOKEN_ENV]
+_token = os.environ.pop(REFERENCE_TOKEN_ENV)
 _input_nonce = os.environ.pop(ENV_SOL_EXECBENCH_INPUT_NONCE)
+_attestation_key = os.environ.pop(REFERENCE_ATTESTATION_KEY_ENV, None)
+_attestation_file = os.environ.pop(REFERENCE_ATTESTATION_FILE_ENV, None)
+_attestation = (
+    (_attestation_key, Path(_attestation_file))
+    if _attestation_key and _attestation_file
+    else None
+)
 _request_stream = Connection(
-    int(os.environ[REFERENCE_REQUEST_FD_ENV]),
+    int(os.environ.pop(REFERENCE_REQUEST_FD_ENV)),
     readable=True,
     writable=False,
 )
 _response_stream = Connection(
-    int(os.environ[REFERENCE_RESPONSE_FD_ENV]),
+    int(os.environ.pop(REFERENCE_RESPONSE_FD_ENV)),
     readable=False,
     writable=True,
 )
@@ -55,6 +64,7 @@ try:
         input_nonce=_input_nonce,
         device=_device,
         ready_stream=sys.stdout,
+        attestation=_attestation,
     )
 finally:
     _request_stream.close()

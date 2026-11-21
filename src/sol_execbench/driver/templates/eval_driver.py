@@ -45,7 +45,6 @@ import torch
 
 # ── Staging directory ────────────────────────────────────────────────────────
 STAGING_DIR = Path(__file__).parent.resolve()
-sys.path.insert(0, str(STAGING_DIR))
 
 # ── Imports from sol_execbench runtime API ───────────────────────────────────
 from sol_execbench.driver.eval_runtime_api import (  # noqa: F401
@@ -159,12 +158,10 @@ _check_integrity = check_runtime_integrity
 try:
     # Resolve candidate code only after the trusted reference channel exists.
     # The reference implementation itself is never imported in this process.
-    user_fn = load_user_function(_solution, STAGING_DIR)
-    # A native __attribute__((constructor)) loaded during the dlopen above can
-    # replace torch.cuda.Event.elapsed_time. Re-confirm the pristine identity
-    # captured before candidate import before any workload is timed; emit a
-    # REWARD_HACK trace for every workload if the timing function was swapped.
+    # Native symbol guards in load_user_function and post-dlopen constructor
+    # checks in verify_timing_function_intact both raise RewardHackError.
     try:
+        user_fn = load_user_function(_solution, STAGING_DIR)
         verify_timing_function_intact()
     except RewardHackError as _timing_forge:
         _timing_msg = str(_timing_forge)
@@ -185,6 +182,7 @@ try:
             )
         _reference_client.close()
         os._exit(0)
+        raise SystemExit(0) from None
     _timing_records = []
     _request = WorkloadEvaluationRequest(
         definition=definition,

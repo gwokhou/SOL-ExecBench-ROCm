@@ -162,7 +162,9 @@ def _generate_heuristic_tensor(
     # fall back to _rand_tensor() which generates in float32 then converts.
     if dtype in (
         torch.float8_e4m3fn,
+        torch.float8_e4m3fnuz,
         torch.float8_e5m2,
+        torch.float8_e5m2fnuz,
         torch.float4_e2m1fn_x2,
     ):
         return None

@@ -50,8 +50,24 @@ def _make_solution_json(
     compile_options: dict | None = None,
     *,
     language: str = "hip_cpp",
+    sources: list[dict[str, str]] | None = None,
 ) -> str:
     """Create a minimal valid solution JSON string with given compile_options."""
+    resolved_sources = list(
+        sources or [{"path": "main.hip", "content": "// test source"}]
+    )
+    entry_file = next(
+        (
+            item["path"]
+            for item in resolved_sources
+            if Path(item["path"]).suffix
+            in (".hip", ".cpp", ".cc", ".cxx", ".c", ".h", ".hpp")
+        ),
+        None,
+    )
+    if entry_file is None:
+        entry_file = "entry_decl.h"
+        resolved_sources.append({"path": entry_file, "content": "// decl"})
     solution = {
         "schema_version": BenchmarkArtifactSchema.SOLUTION,
         "name": "test_solution",
@@ -60,11 +76,11 @@ def _make_solution_json(
         "spec": {
             "languages": [language],
             "target_hardware": ["LOCAL"],
-            "entry_point": "main.hip::run",
+            "entry_point": f"{entry_file}::run",
             "destination_passing_style": True,
             "compile_options": compile_options,
         },
-        "sources": [{"path": "main.hip", "content": "// test source"}],
+        "sources": resolved_sources,
     }
     return json.dumps(solution)
 
@@ -74,14 +90,33 @@ def _exec_build_ext(
     compile_options: dict | None = None,
     *,
     language: str = "hip_cpp",
+    sources: list[dict[str, str]] | None = None,
 ) -> MagicMock:
     """Write solution.json and execute the build_ext template in *cwd* with ext.load mocked.
 
     Returns the ``ext.load`` mock so callers can inspect how it was called.
     """
+    if sources is None:
+        search_root = cwd / "candidate" if (cwd / "candidate").is_dir() else cwd
+        discovered = [
+            {
+                "path": p.relative_to(search_root).as_posix(),
+                "content": p.read_text() or "// source",
+            }
+            for p in sorted(search_root.rglob("*"))
+            if p.is_file()
+            and p.name
+            not in {"solution.json", "build_ext.py", "benchmark_kernel.so"}
+            and not p.name.startswith("benchmark_kernel.")
+        ]
+        sources = discovered or [
+            {"path": "header_only.h", "content": "// header only"}
+        ]
     # Write solution.json
     (cwd / "solution.json").write_text(
-        _make_solution_json(compile_options, language=language),
+        _make_solution_json(
+            compile_options, language=language, sources=sources
+        ),
     )
 
     script = _TEMPLATE_PATH.read_text()
@@ -189,6 +224,31 @@ class TestSourceDiscovery:
         (tmp_path / "kernel.cu").write_text("// legacy source")
         with pytest.raises(RuntimeError, match="No HIP/C\\+\\+ source files"):
             _exec_build_ext(tmp_path)
+
+    def test_collects_subdirectory_sources_in_solution_order(self, tmp_path):
+        cand = tmp_path / "candidate"
+        (cand / "src" / "ops").mkdir(parents=True)
+        (cand / "src" / "ops" / "second.cpp").write_text("// second")
+        (cand / "src" / "first.hip").write_text("// first")
+        (cand / "src" / "header.hpp").write_text("// header")
+        (tmp_path / "stray_untracked.cpp").write_text("// untracked")
+        (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
+        mock = _exec_build_ext(
+            tmp_path,
+            sources=[
+                {"path": "src/first.hip", "content": "// first"},
+                {"path": "src/header.hpp", "content": "// header"},
+                {"path": "src/ops/second.cpp", "content": "// second"},
+            ],
+        )
+        sources = mock.load.call_args.kwargs["sources"]
+        assert sources == [
+            str((cand / "src" / "first.hip").resolve()),
+            str((cand / "src" / "ops" / "second.cpp").resolve()),
+        ]
+        assert mock.load.call_args.kwargs["extra_include_paths"] == [
+            str(cand.resolve())
+        ]
 
 
 class TestCompileOptions:

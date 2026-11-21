@@ -91,7 +91,9 @@ def test_staged_variant_updates_only_the_reference_and_equivalent_control(
             centered.definition.model_dump(exclude={"reference"})
         )
         staged = centered.solution.sources[0].content
-        assert (centered.output_dir / "candidate.py").read_text() == staged
+        assert (
+            centered.output_dir / "candidate" / "candidate.py"
+        ).read_text() == staged
         if strategy is JudgeStrategy.REFERENCE:
             assert staged != incumbent_source
             assert centered.definition.reference.startswith(staged)
@@ -143,7 +145,7 @@ def test_trusted_timing_checks_the_new_reference(tmp_path, bias_shift):
         )
         assert timing.outputs == []
         _, candidate = load_reference_function(
-            (staged.output_dir / "candidate.py").read_text()
+            (staged.output_dir / "candidate" / "candidate.py").read_text()
         )
         with torch.inference_mode():
             oracle, _, _ = layernorm_oracle(

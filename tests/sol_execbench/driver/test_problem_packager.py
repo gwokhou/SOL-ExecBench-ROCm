@@ -249,7 +249,7 @@ class TestInit:
             python_solution,
             config,
         )
-        kernel = pkg.output_dir / "kernel.py"
+        kernel = pkg.output_dir / "candidate" / "kernel.py"
         assert kernel.exists()
         assert "def run(x, y):" in kernel.read_text()
 
@@ -268,7 +268,7 @@ class TestInit:
             hip_solution,
             config,
         )
-        kernel = pkg.output_dir / "kernel.hip"
+        kernel = pkg.output_dir / "candidate" / "kernel.hip"
         assert kernel.exists()
         assert "HIP kernel" in kernel.read_text()
 
@@ -518,7 +518,7 @@ class TestCompile:
             config,
         )
         cmd, artifact_path = pkg.compile()
-        assert cmd == [sys.executable, "build_ext.py"]
+        assert cmd == [sys.executable, "-P", "build_ext.py"]
         assert artifact_path.endswith("benchmark_kernel.so")
 
     def test_build_ext_staged(
@@ -696,7 +696,7 @@ class TestExecute:
             config,
         )
         cmd = pkg.execute()
-        assert cmd == [sys.executable, "evaluation_orchestrator.py"]
+        assert cmd == [sys.executable, "-P", "evaluation_orchestrator.py"]
 
     def test_eval_driver_staged(
         self,
@@ -923,7 +923,7 @@ class TestExecute:
         # Simulate a compiled artifact.
         (pkg.output_dir / "benchmark_kernel.so").write_bytes(b"\x00")
         cmd = pkg.execute()
-        assert cmd == [sys.executable, "evaluation_orchestrator.py"]
+        assert cmd == [sys.executable, "-P", "evaluation_orchestrator.py"]
 
 
 class TestLocalGfxDetection:

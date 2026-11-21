@@ -80,16 +80,29 @@ rocm_arches = [
 if rocm_arches and "PYTORCH_ROCM_ARCH" not in ENVIRON:
     ENVIRON["PYTORCH_ROCM_ARCH"] = ";".join(dict.fromkeys(rocm_arches))
 
-# Collect HIP/C++ source files from current directory
-sources = [
-    str(p)
-    for p in HERE.iterdir()
-    if p.suffix in (".hip", ".cpp", ".cc", ".cxx", ".c") and p.is_file()
-]
+# Collect HIP/C++ source files deterministically from solution.sources
+CANDIDATE_ROOT = (
+    (HERE / "candidate").resolve() if (HERE / "candidate").is_dir() else HERE
+)
+_NATIVE_SOURCE_SUFFIXES = (".hip", ".cpp", ".cc", ".cxx", ".c")
+sources: list[str] = []
+seen_sources: set[Path] = set()
+for src in solution.sources:
+    rel_path = Path(src.path)
+    if rel_path.suffix not in _NATIVE_SOURCE_SUFFIXES:
+        continue
+    resolved = (CANDIDATE_ROOT / rel_path).resolve()
+    if not resolved.is_relative_to(CANDIDATE_ROOT) or not resolved.is_file():
+        raise FileNotFoundError(
+            f"Staged HIP/C++ source file not found: {src.path}",
+        )
+    if resolved not in seen_sources:
+        seen_sources.add(resolved)
+        sources.append(str(resolved))
 if not sources:
     raise RuntimeError("No HIP/C++ source files found in working directory")
 
-extra_include_paths = [str(HERE)]
+extra_include_paths = [str(CANDIDATE_ROOT)]
 
 ext.load(
     name="benchmark_kernel",

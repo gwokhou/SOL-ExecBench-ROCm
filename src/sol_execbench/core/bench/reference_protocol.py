@@ -17,6 +17,8 @@ cannot be replayed across measured invocations.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import os
 from collections.abc import Iterable, Sequence
@@ -42,7 +44,12 @@ REFERENCE_REQUEST_FD_ENV = "SOL_EXECBENCH_REFERENCE_REQUEST_FD"
 REFERENCE_RESPONSE_FD_ENV = "SOL_EXECBENCH_REFERENCE_RESPONSE_FD"
 REFERENCE_TOKEN_ENV = "SOL_EXECBENCH_REFERENCE_TOKEN"
 REFERENCE_PID_ENV = "SOL_EXECBENCH_REFERENCE_PID"
+REFERENCE_ATTESTATION_KEY_ENV = "SOL_EXECBENCH_REFERENCE_ATTESTATION_KEY"
+REFERENCE_ATTESTATION_FILE_ENV = "SOL_EXECBENCH_REFERENCE_ATTESTATION_FILE"
+REFERENCE_ATTESTATION_CONFIG_FILE = "reference_attestation_config.json"
+REFERENCE_ATTESTATION_RECEIPT_FILE = "reference_attestation_receipt.json"
 TRUSTED_DEFINITION_FILE = "reference_definition.json"
+_FP4_DTYPE_TAG = "float4_e2m1fn_x2"
 _MAX_HEADER_BYTES = 1 << 20
 MAX_REFERENCE_PAYLOAD_BYTES = 1 << 30
 MAX_REFERENCE_TENSOR_STORAGE_BYTES = (
@@ -88,8 +95,7 @@ class ReferenceTimingCase(ReferenceCase):
     access_patterns: list[AccessPatternSummary] = field(default_factory=list)
 
 
-def send_json(connection: Connection, value: dict[str, Any]) -> None:
-    """Send a strictly encoded JSON control frame."""
+def _encode_json_frame(value: dict[str, object]) -> bytes:
     encoded = json.dumps(
         value,
         sort_keys=True,
@@ -98,7 +104,12 @@ def send_json(connection: Connection, value: dict[str, Any]) -> None:
     ).encode()
     if len(encoded) > _MAX_HEADER_BYTES:
         raise ReferenceProtocolError("reference IPC JSON header is too large")
-    _send_bytes(connection, encoded, channel="control")
+    return encoded
+
+
+def send_json(connection: Connection, value: dict[str, Any]) -> None:
+    """Send a strictly encoded JSON control frame."""
+    _send_bytes(connection, _encode_json_frame(value), channel="control")
 
 
 def _send_bytes(
@@ -199,23 +210,33 @@ def _encode_values(
             value = value.contiguous()
         key = f"{prefix}_{index}"
         span = _storage_span(value)
+        is_fp4 = value.dtype == torch.float4_e2m1fn_x2
         if span:
             storage = value.as_strided(
                 (span,),
                 (1,),
                 storage_offset=value.storage_offset(),
             )
-            tensors[key] = storage.detach().cpu().contiguous()
+            if is_fp4:
+                tensors[key] = (
+                    storage.detach().contiguous().view(torch.uint8).cpu()
+                )
+            else:
+                tensors[key] = storage.detach().cpu().contiguous()
         else:
-            tensors[key] = torch.empty(0, dtype=value.dtype)
-        metadata.append(
-            {
-                "kind": "tensor",
-                "key": key,
-                "shape": list(value.shape),
-                "stride": list(value.stride()),
-            },
-        )
+            tensors[key] = torch.empty(
+                0,
+                dtype=torch.uint8 if is_fp4 else value.dtype,
+            )
+        tensor_meta: dict[str, object] = {
+            "kind": "tensor",
+            "key": key,
+            "shape": list(value.shape),
+            "stride": list(value.stride()),
+        }
+        if is_fp4:
+            tensor_meta["dtype"] = _FP4_DTYPE_TAG
+        metadata.append(tensor_meta)
     return metadata, tensors
 
 
@@ -247,7 +268,16 @@ def _decode_values(
             raise ReferenceProtocolError(
                 "reference IPC tensor metadata is invalid",
             )
-        storage = tensors[key].to(device=device)
+        raw_tensor = tensors[key]
+        dtype_tag = item.get("dtype")
+        if dtype_tag is not None:
+            if dtype_tag != _FP4_DTYPE_TAG or raw_tensor.dtype != torch.uint8:
+                raise ReferenceProtocolError(
+                    "reference IPC tensor dtype tag is invalid",
+                )
+            storage = raw_tensor.to(device=device).view(torch.float4_e2m1fn_x2)
+        else:
+            storage = raw_tensor.to(device=device)
         values.append(storage.as_strided(tuple(shape), tuple(stride), 0))
     return values
 
@@ -273,15 +303,13 @@ def _encoded_inputs_sha256(
     )
 
 
-def send_case(
-    connection: Connection,
+def _prepare_case_frames(
     case: ReferenceCase,
     *,
     reference_latency_ms: float | None = None,
     timing_failure: str | None = None,
     access_patterns: Sequence[AccessPatternSummary] = (),
-) -> None:
-    """Send a reference case using JSON metadata and safetensors payload bytes."""
+) -> tuple[bytes, bytes]:
     input_metadata, input_tensors = _encode_values(case.inputs, "input")
     output_metadata, output_tensors = _encode_values(case.outputs, "output")
     payload = save_safetensors_bytes({**input_tensors, **output_tensors})
@@ -289,8 +317,7 @@ def send_case(
         raise ReferenceProtocolError(
             "reference IPC tensor payload is too large",
         )
-    send_json(
-        connection,
+    header_frame = _encode_json_frame(
         {
             "ok": True,
             "protocol": WireProtocol.REFERENCE_IPC,
@@ -304,6 +331,25 @@ def send_case(
             ],
         },
     )
+    return header_frame, payload
+
+
+def send_case(
+    connection: Connection,
+    case: ReferenceCase,
+    *,
+    reference_latency_ms: float | None = None,
+    timing_failure: str | None = None,
+    access_patterns: Sequence[AccessPatternSummary] = (),
+) -> None:
+    """Send a reference case using JSON metadata and safetensors payload bytes."""
+    header_frame, payload = _prepare_case_frames(
+        case,
+        reference_latency_ms=reference_latency_ms,
+        timing_failure=timing_failure,
+        access_patterns=access_patterns,
+    )
+    _send_bytes(connection, header_frame, channel="control")
     _send_bytes(connection, payload, channel="tensor")
 
 
@@ -458,18 +504,19 @@ class ReferenceClient:
         """Ask the trusted worker to validate one timed result once."""
         if self._closed:
             raise ReferenceProtocolError("reference IPC client is closed")
-        send_json(
-            self._writer,
+        control_frame = _encode_json_frame(
             {
                 "protocol": WireProtocol.REFERENCE_IPC,
                 "token": self._token,
                 "operation": "timing_validation",
             },
         )
-        send_case(
-            self._writer,
+        case_header_frame, case_payload = _prepare_case_frames(
             ReferenceCase(inputs=[], outputs=outputs),
         )
+        _send_bytes(self._writer, control_frame, channel="control")
+        _send_bytes(self._writer, case_header_frame, channel="control")
+        _send_bytes(self._writer, case_payload, channel="tensor")
         _validate_success_header(receive_json(self._reader))
 
     def _request(self, operation: str, **values: Any) -> ReferenceTimingCase:
@@ -539,7 +586,68 @@ def connect_reference_worker(
     )
 
 
+def sign_reference_attestation(
+    payload: dict[str, object],
+    *,
+    key_hex: str,
+) -> dict[str, object]:
+    """Return an HMAC-SHA256 signed worker attestation receipt."""
+    canonical = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode()
+    digest = hmac.new(
+        bytes.fromhex(key_hex),
+        canonical,
+        hashlib.sha256,
+    ).hexdigest()
+    return {
+        "payload": payload,
+        "hmac_sha256": digest,
+    }
+
+
+def verify_reference_attestation(
+    envelope: object,
+    *,
+    key_hex: str,
+) -> dict[str, object]:
+    """Verify an HMAC-SHA256 worker attestation receipt and return its payload."""
+    if not isinstance(envelope, dict):
+        raise ReferenceProtocolError(
+            "reference worker attestation receipt must be a JSON object",
+        )
+    payload = envelope.get("payload")
+    signature = envelope.get("hmac_sha256")
+    if not isinstance(payload, dict) or not isinstance(signature, str):
+        raise ReferenceProtocolError(
+            "reference worker attestation receipt is malformed",
+        )
+    canonical = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode()
+    expected = hmac.new(
+        bytes.fromhex(key_hex),
+        canonical,
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(expected, signature):
+        raise ReferenceProtocolError(
+            "reference worker attestation signature mismatch",
+        )
+    return {str(k): v for k, v in payload.items()}
+
+
 __all__ = [
+    "REFERENCE_ATTESTATION_CONFIG_FILE",
+    "REFERENCE_ATTESTATION_FILE_ENV",
+    "REFERENCE_ATTESTATION_KEY_ENV",
+    "REFERENCE_ATTESTATION_RECEIPT_FILE",
     "REFERENCE_PID_ENV",
     "REFERENCE_REQUEST_FD_ENV",
     "REFERENCE_RESPONSE_FD_ENV",
@@ -556,4 +664,6 @@ __all__ = [
     "send_case",
     "send_failure",
     "send_json",
+    "sign_reference_attestation",
+    "verify_reference_attestation",
 ]

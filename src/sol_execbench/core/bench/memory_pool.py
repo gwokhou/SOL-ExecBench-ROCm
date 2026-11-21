@@ -118,7 +118,18 @@ class ShiftingMemoryPoolAllocator:
 
         # Pool only needs storage_span + (iters-1)*stride extra elements.
         pool_numel = storage_span + (total_iterations - 1) * stride_numel
-        pool = torch.empty(pool_numel, dtype=tensor.dtype, device=tensor.device)
+        if tensor.dtype == torch.float4_e2m1fn_x2:
+            pool = torch.empty(
+                pool_numel,
+                dtype=torch.uint8,
+                device=tensor.device,
+            ).view(torch.float4_e2m1fn_x2)
+        else:
+            pool = torch.empty(
+                pool_numel,
+                dtype=tensor.dtype,
+                device=tensor.device,
+            )
 
         # Flat 1D view of the physical storage this tensor spans.
         source = tensor.as_strided((storage_span,), (1,))
@@ -155,9 +166,18 @@ class ShiftingMemoryPoolAllocator:
                 continue
 
             start = idx * entry["stride_numel"]
-            entry["pool"].narrow(0, start, entry["storage_span"]).copy_(
-                entry["source"],
+            target_slice = entry["pool"].narrow(
+                0,
+                start,
+                entry["storage_span"],
             )
+            if entry["storage_span"] > 0:
+                if entry["pool"].dtype == torch.float4_e2m1fn_x2:
+                    target_slice.view(torch.uint8).copy_(
+                        entry["source"].view(torch.uint8),
+                    )
+                else:
+                    target_slice.copy_(entry["source"])
             result.append(
                 entry["pool"].as_strided(
                     entry["shape"],
@@ -168,7 +188,16 @@ class ShiftingMemoryPoolAllocator:
 
         for entry in self._output_entries:
             start = idx * entry["stride_numel"]
-            entry["pool"].narrow(0, start, entry["storage_span"]).zero_()
+            target_slice = entry["pool"].narrow(
+                0,
+                start,
+                entry["storage_span"],
+            )
+            if entry["storage_span"] > 0:
+                if entry["pool"].dtype == torch.float4_e2m1fn_x2:
+                    target_slice.view(torch.uint8).zero_()
+                else:
+                    target_slice.zero_()
             result.append(
                 entry["pool"].as_strided(
                     entry["shape"],

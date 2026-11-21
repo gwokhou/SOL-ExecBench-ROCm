@@ -34,6 +34,7 @@ import math
 import os
 import subprocess
 import sys
+import sysconfig
 from pathlib import Path
 
 import pytest
@@ -667,12 +668,13 @@ def test_thread_injection_detected(tmp_path):
 
 
 @pytest.mark.xdist_group("serial")
+@pytest.mark.skipif(
+    torch.cuda.is_available()
+    and not (Path(sysconfig.get_paths()["include"]) / "Python.h").is_file(),
+    reason="Python.h development headers required for Inductor/Triton GPU JIT",
+)
 def test_torch_compile_no_reward_hack(tmp_path):
-    """@torch.compile must not trigger thread injection false positive.
-
-    Candidate compilation is synchronous, while the thread monitor remains
-    strict for every candidate-created worker during timing.
-    """
+    """@torch.compile must not trigger thread injection false positive."""
     kernel = (
         "import torch\n"
         "import torch.nn.functional as F\n"

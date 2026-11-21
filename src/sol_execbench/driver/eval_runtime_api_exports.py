@@ -9,7 +9,6 @@ from sol_execbench.core.bench.correctness import compute_error_stats
 from sol_execbench.core.bench.eval_runtime import (
     emit_trace_jsonl,
     load_staged_problem,
-    load_user_function,
     measure_latency,
     run_reward_hack_check,
 )
@@ -41,6 +40,9 @@ from sol_execbench.core.data.solution import Solution
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.platform.runtime import pin_cuda_device
+from sol_execbench.driver.candidate_loader import (
+    load_staged_user_function as load_user_function,
+)
 from sol_execbench.driver.scope_replay import evaluate_driver_workloads
 
 __all__ = [

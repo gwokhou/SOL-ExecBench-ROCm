@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import os
 import statistics
+from dataclasses import dataclass, field
 from multiprocessing.connection import Connection
 from pathlib import Path
 from typing import Any, TextIO
@@ -46,6 +47,10 @@ from sol_execbench.core.bench.output_collection import call_and_collect_outputs
 from sol_execbench.core.bench.performance_model.access_evidence import (
     summarize_integer_inputs,
 )
+from sol_execbench.core.bench.performance_model.replay_evidence import (
+    REPLAY_EVIDENCE_ITERATIONS,
+    REPLAY_WARMUP_RUNS,
+)
 from sol_execbench.core.bench.reference_protocol import (
     TRUSTED_DEFINITION_FILE,
     ReferenceCase,
@@ -56,9 +61,11 @@ from sol_execbench.core.bench.reference_protocol import (
     send_case,
     send_failure,
     send_json,
+    sign_reference_attestation,
 )
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype
+from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.data.workload_validation import (
     validate_problem_contract,
@@ -84,6 +91,26 @@ class InputGenerationError(RuntimeError):
         self.failure_class = failure_class
 
 
+@dataclass(slots=True, kw_only=True)
+class _WorkloadAttestationState:
+    correctness_rounds: set[int] = field(default_factory=set)
+    timing_case_issued: bool = False
+    reference_latency_ms: float = 0.0
+    timing_failure: str | None = None
+    timed_validations_passed: int = 0
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "correctness_rounds_completed": len(self.correctness_rounds),
+            "all_correctness_rounds": sorted(self.correctness_rounds)
+            == list(range(10)),
+            "timing_case_issued": self.timing_case_issued,
+            "reference_latency_ms": self.reference_latency_ms,
+            "timing_failure": self.timing_failure,
+            "timed_validations_passed": self.timed_validations_passed,
+        }
+
+
 class ReferenceService:
     """Own all trusted state and enforce the one-case timing protocol.
 
@@ -101,6 +128,7 @@ class ReferenceService:
         device: str,
         input_nonce: str,
         definition_path: Path | None = None,
+        attestation: tuple[str, Path] | None = None,
     ) -> None:
         """Initialize trusted reference execution for a staged problem."""
         try:
@@ -159,6 +187,11 @@ class ReferenceService:
             ]
             | None
         ) = None
+        self._attestation = attestation
+        self._workload_attestation = {
+            workload.uuid: _WorkloadAttestationState()
+            for workload in self.workloads
+        }
 
     def handle(
         self,
@@ -186,6 +219,13 @@ class ReferenceService:
         latency, failure = (
             self._timing(inputs) if operation == "timing" else (0.0, None)
         )
+        state = self._workload_attestation[workload.uuid]
+        if operation == "correctness":
+            state.correctness_rounds.add(round_index)
+        elif operation == "timing":
+            state.timing_case_issued = True
+            state.reference_latency_ms = float(latency)
+            state.timing_failure = failure
         return (
             operation,
             ReferenceCase(inputs=inputs, outputs=response_outputs),
@@ -193,8 +233,34 @@ class ReferenceService:
             failure,
         )
 
+    def write_attestation(self) -> None:
+        """Persist an HMAC-signed receipt of verified workload executions."""
+        if self._attestation is None:
+            return
+        key_hex, receipt_path = self._attestation
+        payload: dict[str, object] = {
+            "definition": self.definition.name,
+            "workloads": {
+                uuid: state.to_dict()
+                for uuid, state in self._workload_attestation.items()
+            },
+            "pending_timing_validation": (
+                self._pending_timing_validation is not None
+            ),
+            "config": {
+                "trials": self.config.trials,
+                "warmup_runs": self.config.warmup_runs,
+                "iterations": self.config.iterations,
+            },
+        }
+        atomic_write_json_value(
+            receipt_path,
+            sign_reference_attestation(payload, key_hex=key_hex),
+        )
+
     def close(self) -> None:
         """Release optional worker-owned observers after the channel closes."""
+        self.write_attestation()
 
     def _request_context(
         self,
@@ -310,6 +376,7 @@ class ReferenceService:
             raise ReferenceRequestError(
                 "timed output differs from the trusted reference",
             )
+        self._workload_attestation[workload.uuid].timed_validations_passed += 1
 
     def _variation_index(
         self,
@@ -325,7 +392,11 @@ class ReferenceService:
             1,
         ):
             raise ReferenceRequestError("reference trial_index is invalid")
-        iteration_count = self.config.warmup_runs + self.config.iterations
+        iteration_count = max(
+            self.config.warmup_runs + self.config.iterations,
+            REPLAY_WARMUP_RUNS + REPLAY_EVIDENCE_ITERATIONS,
+            2,
+        )
         if not isinstance(iteration_index, int) or not 0 <= iteration_index < (
             iteration_count
         ):
@@ -424,6 +495,7 @@ def _serve_connection(
         try:
             request = _validated_request(receive_json(reader), token=token)
             if request.get("operation") == "shutdown":
+                service.write_attestation()
                 send_json(
                     writer,
                     {"ok": True, "protocol": WireProtocol.REFERENCE_IPC},
@@ -497,12 +569,22 @@ def serve_reference_worker(
     device: str,
     ready_stream: TextIO,
     service_type: type[ReferenceService] = ReferenceService,
+    attestation: tuple[str, Path] | None = None,
 ) -> None:
     """Serve one authenticated candidate worker over inherited private pipes."""
-    service = service_type(
-        Path(staging_dir),
-        device=device,
-        input_nonce=input_nonce,
+    service = (
+        service_type(
+            Path(staging_dir),
+            device=device,
+            input_nonce=input_nonce,
+            attestation=attestation,
+        )
+        if attestation is not None
+        else service_type(
+            Path(staging_dir),
+            device=device,
+            input_nonce=input_nonce,
+        )
     )
     ready_stream.write("READY\n")
     ready_stream.flush()

@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
@@ -150,8 +151,9 @@ _STATIC_RULES = (
         severity=SourceReviewSeverity.BLOCK,
         pattern=re.compile(
             r"(\bopen\s*\(|\bPath\s*\(|\bread_text\s*\(|\bwrite_text\s*\(|"
+            r"\bio\.(open|FileIO|BufferedWriter|TextIOWrapper)\b|"
             r"\bbase64\b|\bmarshal\.loads\b|\bpickle\.loads\b|\bctypes\.CDLL\b|"
-            r"\bctypes\.cdll\b|\bdlopen\b|\btorch\.ops\.load_library\b|"
+            r"\bctypes\.cdll\b|\bdlopen\b|\bdlsym\b|\btorch\.ops\.load_library\b|"
             r"\bload_inline\s*\(|\bcpp_extension\.load\s*\(|\bsubprocess\b|"
             r"\b__import__\s*\(|\bimportlib\.(import_module|util)\b|"
             r"\bgetattr\s*\(\s*os\s*,\s*['\"](system|popen|spawn[a-zA-Z_]*|exec[a-zA-Z_]*|"
@@ -162,10 +164,34 @@ _STATIC_RULES = (
             r"\b__builtins__\b|"
             r"\b(mmap|fcntl)\b|"
             r"\btypes\.(FunctionType|CodeType|MethodType)\b|"
-            r"\b(system|popen|fork)\s*\(|"
+            r"\b(system|popen|fork|syscall|_exit|quick_exit|dprintf|fopen|freopen|write)\s*\(|"
+            r"\b(exit|quit|SystemExit)\s*\(|\braise\s+SystemExit\b|"
+            r"\b(PyImport_[A-Za-z0-9_]*|PyObject_[A-Za-z0-9_]*|"
+            r"PyRun_[A-Za-z0-9_]*|PyEval_[A-Za-z0-9_]*)\b|"
+            r"\b(?:std::)?ofstream\b|"
+            r"(?:^|\n)\s*#\s*define\b[^\n]*##|"
             r"\bpty\.spawn\s*\(|\bsocket\b|\burllib\b|\brequests\b)",
         ),
         message="file I/O, embedded payload decoding, dynamic native loading, or process/network access is not allowed in submitted sources",
+    ),
+    _SourceRule(
+        rule="runtime_monkey_patch",
+        severity=SourceReviewSeverity.BLOCK,
+        pattern=re.compile(
+            r"(\bsetattr\s*\(\s*torch\b|\btorch(?:\.[A-Za-z0-9_]+)+\s*=(?!=))",
+        ),
+        message="torch attributes must not be monkey-patched",
+        suffixes=(".py",),
+    ),
+    _SourceRule(
+        rule="lazy_output_interception",
+        severity=SourceReviewSeverity.BLOCK,
+        pattern=re.compile(
+            r"(\b(__torch_function__|__torch_dispatch__|_make_subclass|as_subclass)\b|"
+            r"\bclass\s+[A-Za-z_][A-Za-z0-9_]*\s*\([^)]*\bTensor\b)",
+        ),
+        message="Tensor subclassing or dispatch interception can defer computation outside timing",
+        suffixes=(".py",),
     ),
 )
 
@@ -194,14 +220,17 @@ _PROCESS_PREFIXES = ("spawn", "exec")
 
 
 _RISKY_IMPORT_ROOTS = {
+    "_io",
     "base64",
     "builtins",
     "ctypes",
     "fcntl",
+    "io",
     "marshal",
     "gc",
     "inspect",
     "mmap",
+    "pathlib",
     "pickle",
     "pty",
     "requests",
@@ -212,6 +241,20 @@ _RISKY_IMPORT_ROOTS = {
     "solar",
     "urllib",
 }
+
+CANDIDATE_PROTECTED_MODULE_NAMES = frozenset(
+    sys.stdlib_module_names
+) | frozenset(
+    {
+        "torch",
+        "triton",
+        "safetensors",
+        "sol_execbench",
+        "solar",
+    }
+)
+
+_RISKY_EXIT_CALLS = frozenset({"exit", "quit", "SystemExit"})
 
 
 _PARALLEL_IMPORT_ROOTS = {
