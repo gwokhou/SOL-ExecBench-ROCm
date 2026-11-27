@@ -16,6 +16,8 @@
 
 """Strong-typed data definitions for solution implementations."""
 
+from __future__ import annotations
+
 from functools import cached_property
 from pathlib import Path
 from typing import Literal

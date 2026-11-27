@@ -99,7 +99,7 @@ def _resolve_elapsed_time() -> Any:
         import torch.cuda
 
         return torch.cuda.Event.elapsed_time
-    except AttributeError, RuntimeError:
+    except (AttributeError, RuntimeError):
         return None
 
 
@@ -107,7 +107,7 @@ def _safe_getattr(owner_fn: Callable[[], object], attr: str) -> object:
     try:
         owner = owner_fn()
         return getattr(owner, attr) if owner is not None else None
-    except AttributeError, RuntimeError:
+    except (AttributeError, RuntimeError):
         return None
 
 
@@ -116,7 +116,7 @@ def _cuda_module() -> object:
         import torch.cuda
 
         return torch.cuda
-    except AttributeError, RuntimeError:
+    except (AttributeError, RuntimeError):
         return None
 
 

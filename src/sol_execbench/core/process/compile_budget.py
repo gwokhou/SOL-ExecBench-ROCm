@@ -65,7 +65,7 @@ def compile_job_limit(requested: int = DEFAULT_COMPILE_JOBS) -> int:
                     max(1, (int(memory) - _MEMORY_RESERVE) // _MEMORY_PER_JOB)
                 )
             memory_known = True
-        except OSError, ValueError:
+        except (OSError, ValueError):
             limits.append(1)
     if not cpu_known or not memory_known:
         limits.append(1)

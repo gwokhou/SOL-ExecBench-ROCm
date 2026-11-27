@@ -158,7 +158,7 @@ def _metadata_workload_id(profile_result: Rocprofv3ProfileResult) -> str | None:
             if artifact.path.stat().st_size > _PROFILE_SUMMARY_MAX_PARSE_BYTES:
                 continue
             payload = json.loads(artifact.path.read_text(encoding="utf-8"))
-        except OSError, json.JSONDecodeError, UnicodeDecodeError:
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
             continue
         if isinstance(payload, dict):
             value = payload.get("workload_id") or payload.get("workload")

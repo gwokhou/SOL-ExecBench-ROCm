@@ -1,10 +1,8 @@
 """Pure-CPU unit and integration tests for the Phase 1 3-operator MVP."""
 
 from __future__ import annotations
-import __future__
 
 import csv
-import importlib.util
 import json
 import subprocess
 import sys
@@ -46,13 +44,6 @@ from scripts.mvp_v1.counter_capture import (
     parse_rocprof_mvp_passes,
 )
 from scripts.mvp_v1.kernels import KernelBackend, make_skinny_gemm_runner
-from scripts.mvp_v1.py312_compat import (
-    _PEP758CompatFinder,
-    _PEP758CompatSourceLoader,
-    install_py312_pep758_import_hook,
-    main as py312_compat_main,
-    rewrite_pep758_except_clauses,
-)
 from scripts.mvp_v1.report import compare_summaries_markdown
 from scripts.mvp_v1.triton_kernels import (
     _build_moe_tile_schedule,
@@ -767,60 +758,20 @@ def test_campaign_counter_circuit_breaker_and_topology_report(
     assert "MI308X" in report_md
 
 
-def test_py312_pep758_rewriter_preserves_ast_across_repo(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
+def test_repo_sources_parse_natively_as_python_3_12() -> None:
     import ast
 
     repo_root = Path(__file__).resolve().parents[2]
-    rewritten_files = 0
+    checked_files = 0
     for sub in ("scripts/mvp_v1", "src/sol_execbench", "src/solar"):
         for py_file in sorted((repo_root / sub).rglob("*.py")):
             if "_vendor" in py_file.parts:
                 continue
             original = py_file.read_text(encoding="utf-8")
-            rewritten = rewrite_pep758_except_clauses(original)
-            assert rewritten.count("\n") == original.count("\n")
-            parsed_312 = ast.parse(
-                rewritten, filename=str(py_file), feature_version=(3, 12)
-            )
-            if rewritten != original:
-                rewritten_files += 1
-                assert ast.dump(parsed_312) == ast.dump(ast.parse(original))
-    assert rewritten_files >= 30
-
-    sample_script = tmp_path / "pep758_probe.py"
-    sample_script.write_text(
-        "class Box:\n"
-        "    def copy(self) -> Box:\n"
-        "        return self\n\n"
-        "OUT = 0\n"
-        "try:\n"
-        "    raise KeyError('x')\n"
-        "except ValueError, KeyError:\n"
-        "    OUT = 7\n"
-        "assert isinstance(Box().copy(), Box)\n",
-        encoding="utf-8",
-    )
-    loader = _PEP758CompatSourceLoader("pep758_probe", str(sample_script))
-    compiled = loader.source_to_code(
-        sample_script.read_text(encoding="utf-8"), str(sample_script)
-    )
-    assert compiled.co_flags & __future__.annotations.compiler_flag
-    spec = importlib.util.spec_from_loader("pep758_probe", loader)
-    assert spec is not None
-    mod = importlib.util.module_from_spec(spec)
-    loader.exec_module(mod)
-    assert mod.OUT == 7
-
-    cleaned_meta = [
-        f for f in sys.meta_path if not isinstance(f, _PEP758CompatFinder)
-    ]
-    monkeypatch.setattr(sys, "meta_path", cleaned_meta)
-    assert install_py312_pep758_import_hook(force=True) is True
-    assert install_py312_pep758_import_hook(force=True) is False
-    assert py312_compat_main([str(sample_script)]) == 0
+            ast.parse(original, filename=str(py_file), feature_version=(3, 12))
+            checked_files += 1
+    assert checked_files >= 600
+    assert not (repo_root / "scripts" / "mvp_v1" / "py312_compat.py").exists()
 
 
 def test_skinny_gemm_fp8_small_m_pad16_and_dequant_fallbacks(

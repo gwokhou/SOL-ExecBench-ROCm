@@ -123,7 +123,7 @@ def _archive_workload_uuid(scope_path: Path) -> str | None:
     sibling = scope_path / "workload.json"
     try:
         document = json.loads(sibling.read_text())
-    except OSError, ValueError:
+    except (OSError, ValueError):
         return None
     value = (
         document.get("workload_uuid") if isinstance(document, Mapping) else None

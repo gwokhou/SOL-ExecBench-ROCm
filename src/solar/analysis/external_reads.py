@@ -212,7 +212,7 @@ def _full_contraction_reads(layer: NodeDict) -> bool:
         ):
             return False
         return argument("groups", 8 if aten else 6, 1) == 1
-    except SemanticValueDecodeError, TypeError, ValueError:
+    except (SemanticValueDecodeError, TypeError, ValueError):
         return False
 
 
@@ -312,7 +312,7 @@ def _pool_window_reads_cover_input(layer: NodeDict) -> bool:
             argument("dilation", 4, 1), spatial, positive=True
         )
         ceil_mode = argument("ceil_mode", 5, False)
-    except SemanticValueDecodeError, TypeError, ValueError:
+    except (SemanticValueDecodeError, TypeError, ValueError):
         return False
     if stride_dims is None or padding is None or dilation is None:
         return False
@@ -365,7 +365,7 @@ def _conv2d_window_reads_cover_input(layer: NodeDict) -> bool:
         output_padding = _decode_window_sizes(
             argument("output_padding", 7, [0, 0]), spatial, positive=False
         )
-    except SemanticValueDecodeError, TypeError, ValueError:
+    except (SemanticValueDecodeError, TypeError, ValueError):
         return False
     if stride_dims is None or padding is None or dilation is None:
         return False

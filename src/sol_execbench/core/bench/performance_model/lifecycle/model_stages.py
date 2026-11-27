@@ -470,7 +470,7 @@ class PublicationHandler:
                 solar_verifier=self._solar_verifier,
                 blob_resolver=self._blob_resolver,
             )
-        except OSError, ValueError:
+        except (OSError, ValueError):
             return False
         return True
 
@@ -557,6 +557,6 @@ class ReleaseHandler:
                 semantic_loader=self._semantic_loader,
                 solar_verifier=self._solar_verifier,
             )
-        except OSError, ValueError:
+        except (OSError, ValueError):
             return False
         return True

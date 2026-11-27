@@ -171,7 +171,7 @@ def test_outer_timeout_cleans_nested_mapper_session(source, tmp_path):
 def _live_pid(pid: int) -> bool:
     try:
         return Path(f"/proc/{pid}/stat").read_text().split()[2] != "Z"
-    except FileNotFoundError, ProcessLookupError:
+    except (FileNotFoundError, ProcessLookupError):
         return False
 
 

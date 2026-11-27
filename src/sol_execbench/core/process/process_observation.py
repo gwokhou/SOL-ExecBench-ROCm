@@ -168,7 +168,7 @@ def _linux_session_members(session_id: int) -> list[tuple[int, int]]:
                 int(fields[2]),
                 int(fields[3]),
             )
-        except OSError, IndexError, ValueError:
+        except (OSError, IndexError, ValueError):
             continue
         if state != "Z" and session == session_id:
             members.append((int(entry.name), process_group))
@@ -200,7 +200,7 @@ def _darwin_session_members(session_id: int) -> list[tuple[int, int]]:
             continue
         try:
             session = os.getsid(pid)
-        except PermissionError, ProcessLookupError:
+        except (PermissionError, ProcessLookupError):
             continue
         if session == session_id and info.pbi_status != _DARWIN_ZOMBIE_STATUS:
             members.append((int(pid), int(info.pbi_pgid)))

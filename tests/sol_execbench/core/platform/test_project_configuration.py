@@ -145,7 +145,7 @@ def test_python_support_is_pinned_to_3_14() -> None:
 
     assert data["project"]["requires-python"] == ">=3.14,<3.15,!=3.14.1"
     assert PYTHON_VERSION.read_text().strip() == "3.14"
-    assert data["tool"]["ruff"]["target-version"] == "py314"
+    assert data["tool"]["ruff"]["target-version"] == "py312"
     assert data["tool"]["uv"]["environments"] == [
         "sys_platform == 'linux' and platform_machine == 'x86_64'",
     ]
@@ -231,6 +231,7 @@ def test_quality_workflow_splits_parallel_responsibilities() -> None:
     )
     assert "ruff format --check ." in quality_commands
     assert "ty check" in quality_commands
+    assert "scripts/check_dataclass_policy.py" in quality_commands
     assert "tests/sol_execbench" in package_commands
     assert "tests/tools" in package_commands
     assert "tests/solar" not in package_commands

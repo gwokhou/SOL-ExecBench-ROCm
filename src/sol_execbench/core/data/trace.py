@@ -16,6 +16,8 @@
 
 """Strong-typed data definitions for traces and evaluations."""
 
+from __future__ import annotations
+
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 

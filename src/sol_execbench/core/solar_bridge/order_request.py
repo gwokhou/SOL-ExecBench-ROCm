@@ -3,6 +3,8 @@
 
 """Pinned original Python oracle for CPU-only contraction search workers."""
 
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Annotated, cast
 

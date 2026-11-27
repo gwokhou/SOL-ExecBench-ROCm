@@ -153,7 +153,7 @@ def _collection_gpu_identity_matches_plan(context: StageRunContext) -> bool:
             context.held_out_corpus_path,
             corpus_root=context.corpus_root,
         )
-    except OSError, ValueError:
+    except (OSError, ValueError):
         return False
     return observed == context.plan.gpu_identity
 
@@ -164,7 +164,7 @@ def _case_reuse_bundle_is_valid(context: StageRunContext) -> bool:
         return False
     try:
         load_and_verify_case_reuse_bundle(path)
-    except OSError, ValueError:
+    except (OSError, ValueError):
         return False
     return True
 

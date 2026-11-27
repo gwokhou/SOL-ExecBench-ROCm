@@ -60,7 +60,7 @@ def _resolve_from_import(
     relative = "." * node.level + (node.module or "")
     try:
         return importlib.util.resolve_name(relative, package)
-    except ImportError, ValueError:
+    except (ImportError, ValueError):
         return None
 
 

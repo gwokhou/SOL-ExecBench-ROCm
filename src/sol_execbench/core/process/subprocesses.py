@@ -362,14 +362,14 @@ def _signal_unreaped_process_group(
     try:
         if os.getsid(process.pid) != process.pid:
             return False
-    except PermissionError, ProcessLookupError:
+    except (PermissionError, ProcessLookupError):
         return False
     groups = {process.pid, *session_member_process_groups(process.pid)}
     signaled = False
     for pgid in sorted(groups):
         try:
             os.killpg(pgid, signal_number)
-        except PermissionError, ProcessLookupError:
+        except (PermissionError, ProcessLookupError):
             continue
         signaled = True
     return signaled
@@ -437,7 +437,7 @@ def _extra_session_groups(
     try:
         if os.getsid(process.pid) != process.pid:
             return set()
-    except PermissionError, ProcessLookupError:
+    except (PermissionError, ProcessLookupError):
         return set()
     return session_member_process_groups(process.pid) - {process.pid}
 

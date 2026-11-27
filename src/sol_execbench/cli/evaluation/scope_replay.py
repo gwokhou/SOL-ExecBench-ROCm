@@ -200,7 +200,7 @@ def _collect_and_qualify(
         )
     except HIPScopeError as error:
         return _reject(intent, str(error), hashes)
-    except OSError, ValueError, RuntimeError, subprocess.TimeoutExpired:
+    except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired):
         return _reject(intent, EvaluateScopeReason.INVALID, hashes)
 
 

@@ -3,6 +3,8 @@
 
 """Public scan orchestration request over the profile-independent grid contract."""
 
+from __future__ import annotations
+
 from pydantic import model_validator
 
 from solar.analysis.demand_contracts import ComputationScenario

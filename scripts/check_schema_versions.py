@@ -495,7 +495,7 @@ def audit_paths(paths: Iterable[Path]) -> list[str]:
     for path in paths:
         try:
             content = (ROOT / path).read_text(encoding="utf-8")
-        except OSError, UnicodeDecodeError:
+        except (OSError, UnicodeDecodeError):
             continue
         path_findings, path_families = audit_text(path, content)
         findings.extend(path_findings)
@@ -524,7 +524,7 @@ def registry_usage_findings(paths: Iterable[Path]) -> list[str]:
             continue
         try:
             contents.append((ROOT / path).read_text(encoding="utf-8"))
-        except OSError, UnicodeDecodeError:
+        except (OSError, UnicodeDecodeError):
             continue
     corpus = "\n".join(contents)
     findings = [

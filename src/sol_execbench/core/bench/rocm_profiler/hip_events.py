@@ -3,6 +3,8 @@
 
 """Diagnostic HIP barrier records; timestamp order alone is never causal."""
 
+from __future__ import annotations
+
 from collections import defaultdict
 from enum import StrEnum
 

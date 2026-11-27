@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Typed observations and scoped HIP event dispatch links."""
 
+from __future__ import annotations
+
 from enum import StrEnum
 from typing import Annotated, Literal
 

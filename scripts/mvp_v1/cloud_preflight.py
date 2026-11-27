@@ -40,28 +40,16 @@ _GZIP_MAGIC = b"\x1f\x8b"
 _ERROR_PAYLOAD_PREFIXES = (b"<", b"{", b"[")
 
 _TWIN_SUBPROCESS_SCRIPT = """
-import __future__, ast, importlib.abc, importlib.machinery, importlib.util, json, pathlib, sys, tempfile
+import ast, importlib.abc, importlib.machinery, importlib.util, json, pathlib, sys, tempfile
 
 repo_root = pathlib.Path(sys.argv[1]).resolve()
 target_id = sys.argv[2]
-compat_path = repo_root / "scripts" / "mvp_v1" / "py312_compat.py"
-compat_spec = importlib.util.spec_from_file_location("_py312_bootstrap", compat_path)
-compat_mod = importlib.util.module_from_spec(compat_spec)
-compat_spec.loader.exec_module(compat_mod)
-rewrite_except = compat_mod.rewrite_pep758_except_clauses
 
 class _UncachedPy312Loader(importlib.machinery.SourceFileLoader):
     def get_code(self, fullname):
         source = pathlib.Path(self.path).read_text(encoding="utf-8")
-        rewritten = rewrite_except(source)
-        ast.parse(rewritten, filename=self.path, feature_version=(3, 12))
-        return compile(
-            rewritten,
-            self.path,
-            "exec",
-            flags=__future__.annotations.compiler_flag,
-            dont_inherit=True,
-        )
+        ast.parse(source, filename=self.path, feature_version=(3, 12))
+        return compile(source, self.path, "exec", dont_inherit=True)
 
 class _UncachedPy312Finder(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path, target=None):

@@ -42,7 +42,7 @@ def process_group_rss(group: int) -> int:
             fields = stat[stat.rfind(")") + 2 :].split()
             if int(fields[2]) == group or int(fields[3]) == group:
                 pages += int((path / "statm").read_text().split()[1])
-        except FileNotFoundError, ProcessLookupError:
+        except (FileNotFoundError, ProcessLookupError):
             continue
     return pages * os.sysconf("SC_PAGE_SIZE")
 
@@ -106,7 +106,7 @@ def _watch_budget(
             else:
                 stop.wait(_POLL_SECONDS)
                 continue
-        except OSError, ValueError, IndexError:
+        except (OSError, ValueError, IndexError):
             reason = "resource_observation_failed"
         atomic_write_json_value(failure, {"reason": reason})
         extra_groups = session_member_process_groups(group) - {group}

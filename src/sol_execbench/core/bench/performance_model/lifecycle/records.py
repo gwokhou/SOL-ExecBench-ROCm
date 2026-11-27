@@ -183,7 +183,7 @@ def _load_design_or_none(
 ) -> DiagnosticDesignManifest | None:
     try:
         return _load_design(context)
-    except OSError, ValueError:
+    except (OSError, ValueError):
         return None
 
 
@@ -605,7 +605,7 @@ def _load_receipt(
         return _RECEIPT_ADAPTER.validate_json(
             path.read_text(encoding="utf-8"),
         )
-    except OSError, ValueError:
+    except (OSError, ValueError):
         return None
 
 

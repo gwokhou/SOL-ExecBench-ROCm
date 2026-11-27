@@ -16,6 +16,8 @@
 
 """Validated models describing solution source and compilation metadata."""
 
+from __future__ import annotations
+
 from enum import StrEnum
 from pathlib import Path
 

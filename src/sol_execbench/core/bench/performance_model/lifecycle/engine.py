@@ -576,7 +576,7 @@ def _reverify_past_stages(
         )
         try:
             prepared = handlers[state.stage].prepare(context, current)
-        except OSError, ValueError:
+        except (OSError, ValueError):
             prepared = ()
             inputs_match = False
         else:

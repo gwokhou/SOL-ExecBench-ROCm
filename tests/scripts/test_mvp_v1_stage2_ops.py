@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-import subprocess
 import sys
 import types
 from pathlib import Path
@@ -340,31 +338,6 @@ def test_stage2_vendor_adapters_prepack_zero_copy_and_reject_corrupt(
     ):
         assert bad.fn is None
         assert bad.implementation_name.startswith("unavailable:")
-
-
-def test_py312_compat_module_emits_no_runpy_warning(tmp_path: Path) -> None:
-    probe = tmp_path / "ok_probe.py"
-    probe.write_text("VALUE = 1 + 2\n", encoding="utf-8")
-    root = Path(__file__).resolve().parents[2]
-    env = dict(os.environ)
-    env["PYTHONPATH"] = f"{root / 'src'}:{root}"
-    proc = subprocess.run(
-        [
-            sys.executable,
-            "-W",
-            "error",
-            "-m",
-            "scripts.mvp_v1.py312_compat",
-            str(probe),
-        ],
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-        env=env,
-    )
-    assert proc.returncode == 0, proc.stderr + proc.stdout
-    assert "RuntimeWarning" not in proc.stderr
 
 
 def test_stage3b_vllm034_and_aiter_adapter_signatures(monkeypatch) -> None:

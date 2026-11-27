@@ -53,7 +53,7 @@ def _parse_kfd_node_properties(path: Path) -> tuple[str, str] | None:
             return None
         domain = int(values["domain"], 0)
         location_id = int(values["location_id"], 0)
-    except KeyError, ValueError:
+    except (KeyError, ValueError):
         return None
     bdf = (
         f"{domain:04x}:{(location_id >> 8) & 0xFF:02x}:"

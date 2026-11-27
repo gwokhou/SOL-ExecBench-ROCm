@@ -74,7 +74,7 @@ def qualify_hip_trace_scope(
         )
     except HIPScopeError:
         raise
-    except OSError, ValueError, IndexError, KeyError, RecursionError:
+    except (OSError, ValueError, IndexError, KeyError, RecursionError):
         raise HIPScopeError(HIPScopeReason.INVALID) from None
 
 

@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Typed independent SDK ledger and bounded eager-workload qualification."""
 
+from __future__ import annotations
+
 from enum import StrEnum
 from typing import Annotated, Literal
 

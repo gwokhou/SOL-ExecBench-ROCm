@@ -56,7 +56,7 @@ def read_hip_event_causality(
                 return [], [f"{path.name}: {HIPLinkReason.UNSUPPORTED}"]
             results.append(correlate_hip_events(trace))
         return results, []
-    except OSError, ValueError, IndexError, RecursionError, ValidationError:
+    except (OSError, ValueError, IndexError, RecursionError, ValidationError):
         return [], [f"{path.name}: {HIPLinkReason.INVALID}"]
 
 

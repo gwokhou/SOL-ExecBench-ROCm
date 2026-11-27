@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import contextlib
 import json
 import subprocess
@@ -42,7 +41,6 @@ from scripts.mvp_v1.kernels import (
     ref_fused_rmsnorm_rope,
     ref_skinny_gemm,
 )
-from scripts.mvp_v1.py312_compat import _PEP758CompatSourceLoader
 from scripts.mvp_v1.vendor_adapters import (
     _self_validate,
     try_make_aiter_gemm_runner,
@@ -373,11 +371,6 @@ def test_p1_1_vllm_honest_fallback_names_and_ty_contracts(
     assert fb_pad.implementation_name == "vllm_torch_scaled_mm_pad16_fallback"
 
     assert _parse_float(MappingProxyType({"value": "1850 MHz"})) == 1850.0
-    loader = _PEP758CompatSourceLoader("m_ast", "m_ast.py")
-    code = loader.source_to_code(ast.parse("X = 3\n"), "m_ast.py")
-    ns: dict[str, Any] = {}
-    exec(code, ns)  # noqa: S102 -- unit test for AST code compilation
-    assert ns["X"] == 3
 
     summary_p = tmp_path / "summary.json"
     report_p = tmp_path / "report.md"

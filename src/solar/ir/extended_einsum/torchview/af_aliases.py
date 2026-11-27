@@ -181,7 +181,7 @@ def _shape_product(shape: list[int]) -> int | None:
     try:
         for size in shape:
             product *= int(size)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
     return product
 

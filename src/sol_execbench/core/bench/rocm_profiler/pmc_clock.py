@@ -462,7 +462,7 @@ def pmc_clock_window(
             with ExitStack() as leases:
                 try:
                     lease = leases.enter_context(_lease_window(control))
-                except ClockOwnershipError, ClockRestoreError:
+                except (ClockOwnershipError, ClockRestoreError):
                     raise
                 except Exception:
                     owned = control.receipt.ownership == ClockOwnership.OWNED

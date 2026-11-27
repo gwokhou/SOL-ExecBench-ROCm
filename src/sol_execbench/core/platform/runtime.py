@@ -445,7 +445,7 @@ def hardware_from_device(device: str) -> str:
                 for line in handle:
                     if line.startswith("model name"):
                         return line.split(":", 1)[1].strip()
-        except OSError, UnicodeError:
+        except (OSError, UnicodeError):
             pass
         return platform.processor() or platform.machine() or "CPU"
     if parsed_device.type == "mps":

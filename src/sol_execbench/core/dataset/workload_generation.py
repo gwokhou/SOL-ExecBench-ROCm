@@ -287,7 +287,7 @@ def _resource_scale_is_feasible(
             )
             for axes in axes_rows
         )
-    except KeyError, ValueError:
+    except (KeyError, ValueError):
         return False
     return all(
         _requirements_fit(item, target, maximum_peak) for item in requirements

@@ -108,7 +108,7 @@ def _advance_view_access(
                 return derived if derived.shape == shapes[step_slot] else None
             return view if view.shape == shapes[step_slot] else None
         derived_all = derive_accesses(view, semantic, shapes)
-    except UnsupportedAccessError, ValueError, KeyError, TypeError:
+    except (UnsupportedAccessError, ValueError, KeyError, TypeError):
         return None
     if step_slot >= len(derived_all):
         return None

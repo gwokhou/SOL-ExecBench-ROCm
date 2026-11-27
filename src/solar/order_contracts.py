@@ -3,6 +3,8 @@
 
 """Public contraction-search request over an exactly pinned verified source."""
 
+from __future__ import annotations
+
 from pydantic import model_validator
 
 from solar.analysis.demand_contracts import ComputationScenario

@@ -122,7 +122,7 @@ class GraphLoader(BoundComponent):
             destination = output_dir / source.name
             if source.resolve() != destination.resolve():
                 destination.write_bytes(payload)
-        except OSError, UnicodeError:
+        except (OSError, UnicodeError):
             if self.debug:
                 print(f"Debug: failed to copy {source.name}")
 
