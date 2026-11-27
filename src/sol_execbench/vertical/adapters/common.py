@@ -48,12 +48,6 @@ def _as_int(value: object) -> int:
     return int(value)
 
 
-def _as_float(value: object) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise TypeError(f"Expected float, got {type(value).__name__}")
-    return float(value)
-
-
 @dataclass(frozen=True, slots=True, kw_only=True)
 class PreparedRunner:
     """Resolved operator callable with setup-time pre-packed candidate args."""

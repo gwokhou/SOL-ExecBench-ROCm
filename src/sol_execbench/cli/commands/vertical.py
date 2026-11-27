@@ -10,7 +10,7 @@ from pathlib import Path
 
 import click
 
-from sol_execbench.cli.protocol import CliResult, artifact
+from sol_execbench.cli.protocol import CliExitCode, CliResult, artifact
 from sol_execbench.vertical.cloud_preflight import (
     build_oneshot_cloud_script,
     probe_remote_connectivity,
@@ -137,7 +137,12 @@ def preflight_twin_cli(target: str) -> CliResult:
         f"Twin passed for {result.target_id}: "
         f"{result.checked_modules} modules, {result.smoke_rows} smoke rows"
     )
-    return CliResult(data=payload)
+    return CliResult(
+        data=payload,
+        exit_code=(
+            CliExitCode.SUCCESS if result.passed else CliExitCode.RESULT_FAILED
+        ),
+    )
 
 
 @vertical_preflight_cli.command("probe")
@@ -166,7 +171,7 @@ def preflight_probe_cli(
     return CliResult(data=payload)
 
 
-@vertical_preflight_cli.command("oneshot")
+@vertical_preflight_cli.command("bundle")
 @click.option(
     "--output",
     required=True,
@@ -180,10 +185,10 @@ def preflight_probe_cli(
 )
 @click.option(
     "--remote-out-dir",
-    default="/tmp/mvp_v1_cloud",
+    default="/tmp/mvp_cloud_out",
     show_default=True,
 )
-def preflight_oneshot_cli(
+def preflight_bundle_cli(
     output: Path,
     mode: str,
     remote_out_dir: str,
@@ -218,7 +223,14 @@ def preflight_verify_cli(
         f"Verified {receipt.target_id}: {receipt.row_count} rows, "
         f"all_passed={receipt.all_passed}"
     )
-    return CliResult(data=payload)
+    return CliResult(
+        data=payload,
+        exit_code=(
+            CliExitCode.SUCCESS
+            if receipt.all_passed
+            else CliExitCode.RESULT_FAILED
+        ),
+    )
 
 
 __all__ = ["vertical_cli"]

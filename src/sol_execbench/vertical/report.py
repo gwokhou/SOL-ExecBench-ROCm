@@ -463,6 +463,8 @@ def _load_json_comparison_source(
     for raw_row in raw_rows:
         if not isinstance(raw_row, dict):
             raise ValueError("Comparison summary row must be a JSON object")
+        if "workload_id" not in raw_row:
+            raise ValueError("Comparison summary row missing workload_id")
         impl = str(raw_row.get("implementation", ""))
         unavail = impl.startswith("unavailable")
         emp_val = _as_optional_float(raw_row.get("sol_pct_empirical"))
@@ -471,7 +473,7 @@ def _load_json_comparison_source(
         spec_val = _as_optional_float(raw_row.get("sol_pct_spec"))
         rows.append(
             _ComparisonRow(
-                workload_id=str(raw_row.get("workload_id", "")),
+                workload_id=str(raw_row.get("workload_id")),
                 implementation=impl,
                 median_ms=(
                     None if unavail or med_val is None else round(med_val, 4)
