@@ -5,10 +5,19 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import cache
-from typing import Any
+from typing import Protocol, cast
 
 import torch
+
+
+class TritonKernel(Protocol):
+    """Grid-indexable Triton JIT kernel launcher protocol."""
+
+    def __getitem__(self, grid: tuple[int, ...]) -> Callable[..., object]:
+        """Bind a Triton launch grid and return the kernel launcher."""
+        ...
 
 
 def select_gqa_num_splits(
@@ -32,7 +41,7 @@ def select_gqa_num_splits(
 
 
 @cache
-def _load_splitk_gqa_stage1() -> Any:
+def _load_splitk_gqa_stage1() -> TritonKernel:
     """Compile and cache grouped Split-KV GQA Stage 1 kernel."""
     import triton
     import triton.language as tl
@@ -107,7 +116,7 @@ def _load_splitk_gqa_stage1() -> Any:
 
 
 @cache
-def _load_splitk_gqa_reduce() -> Any:
+def _load_splitk_gqa_reduce() -> TritonKernel:
     """Compile and cache Split-KV GQA Stage 2 LSE reduction kernel."""
     import triton
     import triton.language as tl
@@ -297,7 +306,7 @@ def _build_moe_tile_schedule(
 
 
 @cache
-def _load_moe_gate_up_kernel() -> Any:
+def _load_moe_gate_up_kernel() -> TritonKernel:
     """Compile and cache fused SwiGLU gate/up MoE kernel."""
     import triton
     import triton.language as tl
@@ -361,11 +370,11 @@ def _load_moe_gate_up_kernel() -> Any:
             mask=mask_m[:, None] & mask_n[None, :],
         )
 
-    return _moe_gate_up_swiglu_kernel
+    return cast(TritonKernel, _moe_gate_up_swiglu_kernel)
 
 
 @cache
-def _load_moe_down_kernel() -> Any:
+def _load_moe_down_kernel() -> TritonKernel:
     """Compile and cache weighted MoE down-projection kernel."""
     import triton
     import triton.language as tl
@@ -423,7 +432,7 @@ def _load_moe_down_kernel() -> Any:
             mask=mask_m[:, None] & mask_n[None, :],
         )
 
-    return _moe_down_project_kernel
+    return cast(TritonKernel, _moe_down_project_kernel)
 
 
 def allocate_fused_moe_workspace(

@@ -12,7 +12,9 @@ from enum import StrEnum
 import torch
 
 from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype
-from solar.rocm.architecture import ArchitectureProfile
+from sol_execbench.core.solar_bridge.formal_device import (
+    load_rocm_architecture_ceiling_spec,
+)
 
 
 class MVPOperator(StrEnum):
@@ -135,14 +137,9 @@ _TARGET_ALIASES = {
 
 
 def _rocm_profile_to_ceiling(profile_name: str) -> HardwareCeiling:
-    """Project an AMD ``ArchitectureProfile`` without requiring formal audits."""
-    profile = ArchitectureProfile.load(profile_name)
-    fp8_dtype_name = (
-        "float8_e4m3fnuz"
-        if "float8_e4m3fnuz" in profile.precision_aliases
-        else "float8_e4m3fn"
-    )
-    raw_cus = int(profile.compute_units) or None
+    """Project an AMD ROCm profile through the SOLAR bridge."""
+    profile = load_rocm_architecture_ceiling_spec(profile_name)
+    raw_cus = profile.compute_units or None
     expected_cus = (
         raw_cus // 2
         if raw_cus is not None and profile.gfx_target.startswith("gfx12")
@@ -154,11 +151,11 @@ def _rocm_profile_to_ceiling(profile_name: str) -> HardwareCeiling:
         vendor=VendorBackend.AMD_ROCM,
         architecture=profile.gfx_target,
         hbm_bandwidth_bytes_per_s=profile.memory_bandwidth_bytes_per_second,
-        peak_bf16_flops_per_s=float(profile.peak_ops_per_second["bf16"]),
-        peak_fp8_flops_per_s=float(profile.peak_ops_per_second["fp8"]),
+        peak_bf16_flops_per_s=profile.peak_bf16_ops_per_second,
+        peak_fp8_flops_per_s=profile.peak_fp8_ops_per_second,
         l2_bytes=profile.l2_bytes,
         llc_bytes=profile.last_level_cache_bytes or profile.l2_bytes,
-        fp8_dtype_name=fp8_dtype_name,
+        fp8_dtype_name=profile.fp8_dtype_name,
         expected_compute_units=expected_cus,
     )
 

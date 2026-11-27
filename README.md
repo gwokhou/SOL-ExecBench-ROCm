@@ -25,29 +25,29 @@ Read the full 34-workload table, analytical Roofline equations, and 15-case `roc
 uv sync --all-groups
 
 # 2. Validate Python 3.12 compatibility, FlashInfer-Trace schemas, and CPU smoke suite
-uv run python -m scripts.mvp_v1.cloud_preflight twin --target MI300X
+uv run sol-execbench vertical preflight twin --target MI300X
 
 # 3. Run the anti-distortion 3-tier vertical benchmark on a ROCm GPU (or --device cpu for smoke)
 for tier in portable vllm aiter; do
-  uv run python -m scripts.mvp_v1.cloud_runner \
+  uv run sol-execbench vertical run \
     --mode full --device cuda:0 --target-override MI300X \
     --backend "${tier}" --no-collect-counters --lock-clocks \
     --output-dir "data/outputs/mi300x_v01/${tier}"
 done
 
 # 4. Generate the side-by-side vertical bottleneck table
-uv run python -m scripts.mvp_v1.cloud_runner --compare \
+uv run sol-execbench vertical compare \
   data/outputs/mi300x_v01/portable/summary.json \
   data/outputs/mi300x_v01/vllm/summary.json \
   data/outputs/mi300x_v01/aiter/summary.json
 
 # 5. Verify locally generated or downloaded cloud result bundles under gitignored data/outputs/ (SHA-256 + Trace schema gate)
-uv run python -m scripts.mvp_v1.cloud_preflight verify \
+uv run sol-execbench vertical preflight verify \
   data/outputs/mi300x_stage3b_final/vllm.tar.gz \
   --expected-sha256 be999975a263eb5d665f454816e6be116d9d55adf6e51de1b9d25be733222896
 ```
 
-Anti-distortion timing guarantees ([`anti_distortion.py`](scripts/mvp_v1/anti_distortion.py), [`counter_capture.py`](scripts/mvp_v1/counter_capture.py), [`gfx942_v1.yaml`](src/sol_execbench/data/rocprofv3_counters/gfx942_v1.yaml)):
+Anti-distortion timing guarantees ([`anti_distortion.py`](src/sol_execbench/vertical/anti_distortion.py), [`counter_capture.py`](src/sol_execbench/vertical/counter_capture.py), [`gfx942_v1.yaml`](src/sol_execbench/data/rocprofv3_counters/gfx942_v1.yaml)):
 - Dynamic `RotatingBufferPool` replicas and `>= 2x` LLC (`512 MiB` on `MI300X`) `LLCRotatingFlusher` invalidation before every warmup and timed launch;
 - Setup-time pre-packing (`w_t.t()`, weight `B-preshuffle`, block tables, and token CSR expansion) excluded from `torch.cuda.Event` timing windows;
 - Full materialization, FP8 `isfinite`, and `FlashInfer-Trace` `ToleranceSpec` validation plus marker-scoped (`MVP_MEASURE`) `rocprofv3` hardware counters.
@@ -89,7 +89,7 @@ See [`RELEASE/README.md`](RELEASE/README.md), [release scoring workflow](docs/us
 
 ## Development
 
-Only Linux x86-64 with Python 3.14 is supported locally (`uv sync --all-groups`), while cloud ROCm containers match their pre-baked Python/PyTorch ABI via [`cloud_preflight.py`](scripts/mvp_v1/cloud_preflight.py).
+Only Linux x86-64 with Python 3.14 is supported locally (`uv sync --all-groups`), while cloud ROCm containers match their pre-baked Python/PyTorch ABI via [`cloud_preflight.py`](src/sol_execbench/vertical/cloud_preflight.py).
 
 ```bash
 uv run --with ruff ruff check .

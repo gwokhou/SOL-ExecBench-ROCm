@@ -29,6 +29,41 @@
     "src/sol_execbench/core/solar_bridge/stage_worker.py": {
       "line": 80.0,
       "branch": 50.0
+    },
+    "src/sol_execbench/vertical/analytical_roofline.py": {
+      "line": 85.0,
+      "branch": 75.0
+    },
+    "src/sol_execbench/vertical/cloud_runner.py": {
+      "line": 85.0,
+      "branch": 65.0
+    },
+    "src/sol_execbench/vertical/report.py": {
+      "line": 85.0,
+      "branch": 70.0
+    },
+    "src/sol_execbench/vertical/workloads/cases.py": {
+      "line": 90.0,
+      "branch": 85.0
+    },
+    "src/sol_execbench/vertical/workloads/specs.py": {
+      "line": 90.0,
+      "branch": 85.0
+    }
+  },
+  "groups": {
+    "vertical adapters": {
+      "paths": [
+        "src/sol_execbench/vertical/adapters/common.py",
+        "src/sol_execbench/vertical/adapters/gemm.py",
+        "src/sol_execbench/vertical/adapters/gqa.py",
+        "src/sol_execbench/vertical/adapters/mla.py",
+        "src/sol_execbench/vertical/adapters/moe.py",
+        "src/sol_execbench/vertical/adapters/rmsnorm_rope.py",
+        "src/sol_execbench/vertical/adapters/swiglu.py"
+      ],
+      "line": 80.0,
+      "branch": 60.0
     }
   }
 }

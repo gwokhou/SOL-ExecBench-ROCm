@@ -11,18 +11,9 @@ import re
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
 
 import torch
 
-from scripts.mvp_v1.analytical_roofline import EmpiricalCeiling, HardwareCeiling
-from scripts.mvp_v1.anti_distortion import (
-    DVFSWindowReceipt,
-    IsolatedTimingStats,
-    RuntimeEnvironmentProbe,
-)
-from scripts.mvp_v1.counter_capture import CounterCaptureSummary
-from scripts.mvp_v1.workloads import RuntimeCase
 from sol_execbench.core.data.json_utils import (
     atomic_write_json_value,
     atomic_write_jsonl_values,
@@ -38,6 +29,17 @@ from sol_execbench.core.data.trace import (
     Trace,
 )
 from sol_execbench.core.timestamps import utc_timestamp
+from sol_execbench.vertical.analytical_roofline import (
+    EmpiricalCeiling,
+    HardwareCeiling,
+)
+from sol_execbench.vertical.anti_distortion import (
+    DVFSWindowReceipt,
+    IsolatedTimingStats,
+    RuntimeEnvironmentProbe,
+)
+from sol_execbench.vertical.counter_capture import CounterCaptureSummary
+from sol_execbench.vertical.workloads import RuntimeCase
 
 _DISPATCH_GAP_RATIO = 1.25
 _LOW_EMP_SOL_PCT = 35.0
@@ -355,7 +357,7 @@ def write_mvp_outputs(
 ) -> dict[str, Path]:
     """Atomically write summary.json, summary.csv, traces.jsonl, and report.md."""
     output_dir.mkdir(parents=True, exist_ok=True)
-    summary_payload: dict[str, Any] = {
+    summary_payload: dict[str, object] = {
         "created_at": utc_timestamp(),
         "backend": backend_name,
         "target": asdict(ceiling),
@@ -420,49 +422,91 @@ def _parse_opt_float(raw: str, decimals: int) -> float | None:
     return round(float(cleaned), decimals)
 
 
-def _load_json_comparison_source(payload: dict[str, Any]) -> dict[str, Any]:
-    rows: list[dict[str, Any]] = []
-    for row in payload.get("rows", []):
-        impl = str(row.get("implementation", ""))
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _ComparisonRow:
+    """Normalized workload metrics extracted from JSON or Markdown reports."""
+
+    workload_id: str
+    implementation: str
+    median_ms: float | None
+    sol_pct_spec: float | None
+    sol_pct_empirical: float | None
+    traffic_amplification: float | None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _ComparisonSource:
+    """One loaded tier summary/report used for vertical stack comparison."""
+
+    target_id: str
+    backend: str
+    rows: list[_ComparisonRow]
+
+
+def _as_optional_float(value: object) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        return float(value)
+    raise TypeError(f"Expected numeric value, got {type(value).__name__}")
+
+
+def _load_json_comparison_source(
+    payload: dict[str, object],
+) -> _ComparisonSource:
+    rows: list[_ComparisonRow] = []
+    raw_rows = payload.get("rows", [])
+    if not isinstance(raw_rows, list):
+        raise ValueError("Comparison summary rows must be a list")
+    for raw_row in raw_rows:
+        if not isinstance(raw_row, dict):
+            raise ValueError("Comparison summary row must be a JSON object")
+        impl = str(raw_row.get("implementation", ""))
         unavail = impl.startswith("unavailable")
-        emp_raw = row.get("sol_pct_empirical")
-        amp_raw = row.get("traffic_amplification")
+        emp_val = _as_optional_float(raw_row.get("sol_pct_empirical"))
+        amp_val = _as_optional_float(raw_row.get("traffic_amplification"))
+        med_val = _as_optional_float(raw_row.get("median_ms"))
+        spec_val = _as_optional_float(raw_row.get("sol_pct_spec"))
         rows.append(
-            {
-                "workload_id": str(row["workload_id"]),
-                "implementation": impl,
-                "median_ms": None
-                if unavail
-                else round(float(row["median_ms"]), 4),
-                "sol_pct_spec": None
-                if unavail
-                else round(float(row["sol_pct_spec"]), 1),
-                "sol_pct_empirical": (
-                    None
-                    if unavail or emp_raw is None
-                    else round(float(emp_raw), 1)
+            _ComparisonRow(
+                workload_id=str(raw_row.get("workload_id", "")),
+                implementation=impl,
+                median_ms=(
+                    None if unavail or med_val is None else round(med_val, 4)
                 ),
-                "traffic_amplification": (
-                    None
-                    if unavail or amp_raw is None
-                    else round(float(amp_raw), 2)
+                sol_pct_spec=(
+                    None if unavail or spec_val is None else round(spec_val, 1)
                 ),
-            }
+                sol_pct_empirical=(
+                    None if unavail or emp_val is None else round(emp_val, 1)
+                ),
+                traffic_amplification=(
+                    None if unavail or amp_val is None else round(amp_val, 2)
+                ),
+            )
         )
-    return {
-        "target_id": str(payload["target"]["target_id"]),
-        "backend": str(payload.get("backend") or "portable"),
-        "rows": rows,
-    }
+    target = payload.get("target")
+    if not isinstance(target, dict) or "target_id" not in target:
+        raise ValueError("Comparison summary missing target.target_id")
+    return _ComparisonSource(
+        target_id=str(target.get("target_id", "")),
+        backend=str(payload.get("backend") or "portable"),
+        rows=rows,
+    )
 
 
-def _load_comparison_source(path: Path) -> dict[str, Any]:
+def _load_comparison_source(path: Path) -> _ComparisonSource:
     text = path.read_text(encoding="utf-8")
     if path.suffix.lower() != ".md":
-        return _load_json_comparison_source(json.loads(text))
+        parsed = json.loads(text)
+        if not isinstance(parsed, dict):
+            raise ValueError(f"Comparison JSON at {path} must be an object")
+        return _load_json_comparison_source(parsed)
     target_id = path.stem
     backend = "portable"
-    rows: list[dict[str, Any]] = []
+    rows: list[_ComparisonRow] = []
     for raw_line in text.splitlines():
         line = raw_line.strip()
         if not rows and (m := _REPORT_TITLE_TARGET_RE.match(line)):
@@ -490,20 +534,20 @@ def _load_comparison_source(path: Path) -> dict[str, Any]:
             None if unavail or len(cells) < 9 else _parse_opt_float(cells[8], 2)
         )
         rows.append(
-            {
-                "workload_id": wid,
-                "implementation": impl,
-                "median_ms": med,
-                "sol_pct_spec": None if unavail else _parse_pct_cell(cells[4]),
-                "sol_pct_empirical": None
-                if unavail
-                else _parse_pct_cell(cells[5]),
-                "traffic_amplification": amp,
-            }
+            _ComparisonRow(
+                workload_id=wid,
+                implementation=impl,
+                median_ms=med,
+                sol_pct_spec=None if unavail else _parse_pct_cell(cells[4]),
+                sol_pct_empirical=(
+                    None if unavail else _parse_pct_cell(cells[5])
+                ),
+                traffic_amplification=amp,
+            )
         )
     if not rows:
         raise ValueError(f"No workload rows parsed from Markdown report {path}")
-    return {"target_id": target_id, "backend": backend, "rows": rows}
+    return _ComparisonSource(target_id=target_id, backend=backend, rows=rows)
 
 
 def _disambiguate_labels(raw_labels: list[str]) -> list[str]:
@@ -521,20 +565,20 @@ def _disambiguate_labels(raw_labels: list[str]) -> list[str]:
     return out
 
 
-def _format_tier_cell(row: dict[str, Any] | None) -> str:
-    if row is None or row["median_ms"] is None:
+def _format_tier_cell(row: _ComparisonRow | None) -> str:
+    if row is None or row.median_ms is None:
         return "unavailable"
-    emp = row["sol_pct_empirical"]
-    amp = row["traffic_amplification"]
+    emp = row.sol_pct_empirical
+    amp = row.traffic_amplification
     emp_str = f"{emp:.1f}%" if emp is not None else "-"
     amp_str = f"{amp:.2f}" if amp is not None else "-"
-    return f"{row['median_ms']:.4f} / {emp_str} / {amp_str}"
+    return f"{row.median_ms:.4f} / {emp_str} / {amp_str}"
 
 
 def _find_dispatch_pair_indices(
-    sources: list[dict[str, Any]],
+    sources: list[_ComparisonSource],
 ) -> tuple[int, int] | None:
-    backends = [str(s["backend"]) for s in sources]
+    backends = [s.backend for s in sources]
     vllm_idx = next((i for i, b in enumerate(backends) if b == "vllm"), None)
     if vllm_idx is None and len(sources) == 3:
         vllm_idx = 1
@@ -549,13 +593,13 @@ def _find_dispatch_pair_indices(
 
 
 def _diagnose_workload_tiers(
-    sources: list[dict[str, Any]],
+    sources: list[_ComparisonSource],
     col_labels: list[str],
-    tier_rows: list[dict[str, Any] | None],
+    tier_rows: list[_ComparisonRow | None],
 ) -> str:
     tags: list[str] = []
     for label, row in zip(col_labels, tier_rows, strict=True):
-        if row is None or row["median_ms"] is None:
+        if row is None or row.median_ms is None:
             tags.append(f"TIER_UNAVAILABLE({label})")
     dispatch_pair = _find_dispatch_pair_indices(sources)
     if dispatch_pair is not None:
@@ -564,24 +608,24 @@ def _diagnose_workload_tiers(
         if (
             r_mid is not None
             and r_top is not None
-            and r_mid["median_ms"] is not None
-            and r_top["median_ms"] is not None
-            and r_top["median_ms"] > 0
+            and r_mid.median_ms is not None
+            and r_top.median_ms is not None
+            and r_top.median_ms > 0
         ):
-            ratio = r_mid["median_ms"] / r_top["median_ms"]
+            ratio = r_mid.median_ms / r_top.median_ms
             if ratio >= _DISPATCH_GAP_RATIO:
                 tags.append(f"DISPATCH_GAP ({ratio:.2f}x)")
     top_row = next(
         (
             r
             for r in reversed(tier_rows)
-            if r is not None and r["median_ms"] is not None
+            if r is not None and r.median_ms is not None
         ),
         None,
     )
     if top_row is not None:
-        emp = top_row["sol_pct_empirical"]
-        amp = top_row["traffic_amplification"] or 0.0
+        emp = top_row.sol_pct_empirical
+        amp = top_row.traffic_amplification or 0.0
         if emp is not None and emp < _LOW_EMP_SOL_PCT:
             tags.append(
                 "LOW_EMP_SOL+HIGH_AMP"
@@ -605,15 +649,13 @@ def compare_summaries_markdown(
     if labels is not None and len(labels) != len(paths):
         raise ValueError("labels length must match paths length")
     sources = [_load_comparison_source(p) for p in paths]
-    targets = [str(s["target_id"]) for s in sources]
+    targets = [s.target_id for s in sources]
     same_target = len(set(targets)) == 1
     if labels is not None:
         col_labels = list(labels)
     else:
         raw_labels = [
-            str(s["backend"])
-            if same_target
-            else f"{s['target_id']} ({s['backend']})"
+            s.backend if same_target else f"{s.target_id} ({s.backend})"
             for s in sources
         ]
         col_labels = _disambiguate_labels(raw_labels)
@@ -631,24 +673,19 @@ def compare_summaries_markdown(
         f"| Workload | {header_cols} | Gain (top/base) | Diagnosis |",
         f"| --- | {align_cols} | ---: | --- |",
     ]
-    maps = [{r["workload_id"]: r for r in s["rows"]} for s in sources]
+    maps = [{r.workload_id: r for r in s.rows} for s in sources]
     seen_wids: list[str] = []
     seen_set: set[str] = set()
     for src in sources:
-        for r in src["rows"]:
-            wid = str(r["workload_id"])
-            if wid not in seen_set:
-                seen_set.add(wid)
-                seen_wids.append(wid)
+        for r in src.rows:
+            if r.workload_id not in seen_set:
+                seen_set.add(r.workload_id)
+                seen_wids.append(r.workload_id)
     for wid in seen_wids:
         tier_rows = [m.get(wid) for m in maps]
         cells = " | ".join(_format_tier_cell(r) for r in tier_rows)
-        base_ms = (
-            tier_rows[0]["median_ms"] if tier_rows[0] is not None else None
-        )
-        top_ms = (
-            tier_rows[-1]["median_ms"] if tier_rows[-1] is not None else None
-        )
+        base_ms = tier_rows[0].median_ms if tier_rows[0] is not None else None
+        top_ms = tier_rows[-1].median_ms if tier_rows[-1] is not None else None
         gain = (
             f"{base_ms / top_ms:.2f}x"
             if base_ms is not None and top_ms is not None and top_ms > 0

@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PYTHONPATH="${REPO_ROOT}/src:${REPO_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"
 
 if [ -n "${PYTHON_BIN:-}" ]; then
@@ -39,7 +39,7 @@ if torch.cuda.is_available():
     print("device[0]:", p.name, "gfx:", getattr(p, "gcnArchName", "-"), "CUs/SMs:", getattr(p, "multi_processor_count", "-"), "VRAM_GiB:", round(p.total_memory / (1024 ** 3), 2))
 '
 
-"${PY}" -m scripts.mvp_v1.cloud_runner \
+"${PY}" -m sol_execbench.vertical.cloud_runner \
     --mode "${MVP_MODE}" \
     --device "${MVP_DEVICE}" \
     --backend "${MVP_BACKEND}" \
@@ -57,4 +57,4 @@ echo "=== Cloud Capture Complete ==="
 echo "Report:  ${OUT_DIR}/report.md"
 echo "Bundle:  ${TAR_PATH}"
 echo "SHA256:  ${TAR_SHA256}"
-echo "Compare: python -m scripts.mvp_v1.cloud_runner --compare <portable/summary.json> <vllm/summary.json> [aiter/summary.json]"
+echo "Compare: python -m sol_execbench.vertical.cloud_runner --compare <portable/summary.json> <vllm/summary.json> [aiter/summary.json]"

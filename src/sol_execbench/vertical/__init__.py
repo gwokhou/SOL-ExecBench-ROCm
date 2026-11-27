@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Lightweight ROCm vertical 3-tier analytical Roofline MVP."""
+"""ROCm vertical 3-tier analytical Roofline SOL diagnosis suite."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from importlib import import_module
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from scripts.mvp_v1.analytical_roofline import (
+    from sol_execbench.vertical.analytical_roofline import (
         AnalyticalBound,
         EmpiricalCeiling,
         HardwareCeiling,
@@ -47,7 +47,7 @@ _LAZY_EXPORTS = frozenset(
 def __getattr__(name: str) -> object:
     """Lazily load analytical Roofline symbols without eager torch imports."""
     if name in _LAZY_EXPORTS:
-        module = import_module("scripts.mvp_v1.analytical_roofline")
+        module = import_module("sol_execbench.vertical.analytical_roofline")
         value = getattr(module, name)
         globals()[name] = value
         return value

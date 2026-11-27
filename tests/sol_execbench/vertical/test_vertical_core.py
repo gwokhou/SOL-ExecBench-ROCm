@@ -13,56 +13,6 @@ from typing import Any, cast
 import pytest
 import torch
 
-from scripts.mvp_v1 import (
-    MVPOperator,
-    PrecisionMode,
-    VendorBackend,
-    bound_fused_moe,
-    bound_gqa_paged_decode,
-    bound_skinny_gemm,
-    load_hardware_ceiling,
-)
-from scripts.mvp_v1.analytical_roofline import detect_hardware_ceiling
-from scripts.mvp_v1.anti_distortion import (
-    LLCRotatingFlusher,
-    RotatingBufferPool,
-    _extract_amd_metrics,
-    acquire_dvfs_telemetry_window,
-    recommended_llc_flush_bytes,
-    validate_materialized_outputs,
-)
-from scripts.mvp_v1.cloud_runner import (
-    main as runner_main,
-    run_benchmark_campaign,
-)
-from scripts.mvp_v1.counter_capture import (
-    PROFILE_RANGE_MARKER,
-    CounterCaptureSummary,
-    _execute_rocm_groups,
-    _filter_pass_csv_to_marker,
-    collect_hardware_counters,
-    parse_rocprof_mvp_passes,
-)
-from scripts.mvp_v1.kernels import KernelBackend, make_skinny_gemm_runner
-from scripts.mvp_v1.report import compare_summaries_markdown
-from scripts.mvp_v1.triton_kernels import (
-    _build_moe_tile_schedule,
-    select_gqa_num_splits,
-)
-from scripts.mvp_v1.vendor_adapters import (
-    PreparedRunner,
-    try_make_aiter_gemm_runner,
-    try_make_aiter_gqa_runner,
-    try_make_aiter_moe_runner,
-    try_make_vllm_gemm_runner,
-    try_make_vllm_gqa_runner,
-    try_make_vllm_moe_runner,
-)
-from scripts.mvp_v1.workloads import (
-    SweepMode,
-    build_workload_specs,
-    materialize_trace_corpus,
-)
 from sol_execbench.core.bench.performance_model.counter_metrics import (
     counter_memory_bytes,
 )
@@ -82,16 +32,71 @@ from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.data.workload_validation import (
     validate_problem_contract,
 )
-from solar.rocm.architecture import ArchitectureProfile
+from sol_execbench.core.solar_bridge.formal_device import (
+    load_rocm_architecture_ceiling_spec,
+)
+from sol_execbench.vertical import (
+    MVPOperator,
+    PrecisionMode,
+    VendorBackend,
+    bound_fused_moe,
+    bound_gqa_paged_decode,
+    bound_skinny_gemm,
+    load_hardware_ceiling,
+)
+from sol_execbench.vertical.adapters import (
+    PreparedRunner,
+    try_make_aiter_gemm_runner,
+    try_make_aiter_gqa_runner,
+    try_make_aiter_moe_runner,
+    try_make_vllm_gemm_runner,
+    try_make_vllm_gqa_runner,
+    try_make_vllm_moe_runner,
+)
+from sol_execbench.vertical.analytical_roofline import detect_hardware_ceiling
+from sol_execbench.vertical.anti_distortion import (
+    LLCRotatingFlusher,
+    RotatingBufferPool,
+    _extract_amd_metrics,
+    acquire_dvfs_telemetry_window,
+    recommended_llc_flush_bytes,
+    validate_materialized_outputs,
+)
+from sol_execbench.vertical.cloud_runner import (
+    main as runner_main,
+    run_benchmark_campaign,
+)
+from sol_execbench.vertical.counter_capture import (
+    PROFILE_RANGE_MARKER,
+    CounterCaptureSummary,
+    _execute_rocm_groups,
+    _filter_pass_csv_to_marker,
+    collect_hardware_counters,
+    parse_rocprof_mvp_passes,
+)
+from sol_execbench.vertical.kernels import (
+    KernelBackend,
+    make_skinny_gemm_runner,
+)
+from sol_execbench.vertical.report import compare_summaries_markdown
+from sol_execbench.vertical.triton_kernels import (
+    _build_moe_tile_schedule,
+    select_gqa_num_splits,
+)
+from sol_execbench.vertical.workloads import (
+    SweepMode,
+    build_workload_specs,
+    materialize_trace_corpus,
+)
 
 
 def test_mi300x_fnuz_fp8_profile_and_dtypes() -> None:
-    profile = ArchitectureProfile.load("MI300X")
-    assert profile.peak_ops_per_second["fp8"] == pytest.approx(2614.9e12)
-    assert profile.tensor_precision("float8_e4m3fnuz") == "fp8"
-    assert profile.tensor_precision("float8_e5m2fnuz") == "fp8"
-    with pytest.raises(ValueError, match="not supported"):
-        profile.tensor_precision("float8_e4m3fn")
+    profile = load_rocm_architecture_ceiling_spec("MI300X")
+    assert profile.peak_fp8_ops_per_second == pytest.approx(2614.9e12)
+    assert profile.fp8_dtype_name == "float8_e4m3fnuz"
+    ceiling = load_hardware_ceiling("MI300X")
+    assert ceiling.peak_fp8_flops_per_s == pytest.approx(2614.9e12)
+    assert ceiling.fp8_torch_dtype() is torch.float8_e4m3fnuz
 
     assert dtype_str_to_torch_dtype("float8_e4m3fnuz") is torch.float8_e4m3fnuz
     assert dtype_storage_bits("float8_e4m3fnuz") == 8
@@ -209,7 +214,9 @@ def test_anti_distortion_flush_ring_anti_dce_and_dvfs(monkeypatch) -> None:
     x = torch.ones((64, 64), dtype=torch.float32)
     pool = RotatingBufferPool([x], min_ring_bytes=128 * 1024, max_replicas=4)
     assert pool.ring_replicas == 4
-    ptrs = {pool.next_args()[0].data_ptr() for _ in range(4)}
+    ptrs = {
+        cast(torch.Tensor, pool.next_args()[0]).data_ptr() for _ in range(4)
+    }
     assert len(ptrs) == 4
 
     class _ProxyTensor:
@@ -220,21 +227,22 @@ def test_anti_distortion_flush_ring_anti_dce_and_dvfs(monkeypatch) -> None:
 
     unlock_calls: list[object] = []
     monkeypatch.setattr(
-        "scripts.mvp_v1.anti_distortion.observe_clock_devices",
+        "sol_execbench.vertical.anti_distortion.observe_clock_devices",
         lambda: (),
     )
     monkeypatch.setattr(
-        "scripts.mvp_v1.anti_distortion.set_peak_clocks",
+        "sol_execbench.vertical.anti_distortion.set_peak_clocks",
         lambda *_a: (_ for _ in ()).throw(PermissionError("no sudo")),
     )
     monkeypatch.setattr(
-        "scripts.mvp_v1.anti_distortion.unlock_clocks",
+        "sol_execbench.vertical.anti_distortion.unlock_clocks",
         lambda *a: (unlock_calls.append(a), True)[-1],
     )
     monkeypatch.setattr(
-        "scripts.mvp_v1.anti_distortion.sample_gpu_telemetry",
+        "sol_execbench.vertical.anti_distortion.sample_gpu_telemetry",
         lambda _dev, vendor: __import__(
-            "scripts.mvp_v1.anti_distortion", fromlist=["TelemetrySample"]
+            "sol_execbench.vertical.anti_distortion",
+            fromlist=["TelemetrySample"],
         ).TelemetrySample(vendor=vendor),
     )
     with acquire_dvfs_telemetry_window(
@@ -447,7 +455,7 @@ def test_execute_rocm_groups_splits_on_hardware_capability_limit(
         return subprocess.CompletedProcess(["rocprofv3"], 0, "", "")
 
     monkeypatch.setattr(
-        "scripts.mvp_v1.counter_capture._run_one_rocm_pass",
+        "sol_execbench.vertical.counter_capture._run_one_rocm_pass",
         _fake_pass,
     )
     csvs, err = _execute_rocm_groups(
@@ -501,14 +509,16 @@ def _assert_zero_copy_from_pool(
     recorded_ptrs.clear()
     assert runner.fn is not None
     runner.fn(*pool_args)
-    assert recorded_ptrs == [pool_args[arg_index].data_ptr()]
+    target_arg = pool_args[arg_index]
+    assert isinstance(target_arg, torch.Tensor)
+    assert recorded_ptrs == [target_arg.data_ptr()]
 
 
 def test_rocm_vendor_adapters_prepack_once_and_validate(monkeypatch) -> None:
     import types
 
     monkeypatch.setattr(
-        "scripts.mvp_v1.vendor_adapters._is_rocm_torch", lambda: True
+        "sol_execbench.vertical.adapters.common._is_rocm_torch", lambda: True
     )
     seen_ptrs: list[int] = []
     corrupt = {"flag": False}
@@ -584,6 +594,7 @@ def test_rocm_vendor_adapters_prepack_once_and_validate(monkeypatch) -> None:
         max_atol=1e-2,
     )
     assert gemm_vllm.implementation_name == "vllm_wvSplitK"
+    assert isinstance(gemm_vllm.candidate_args[1], torch.Tensor)
     assert gemm_vllm.candidate_args[1].is_contiguous()
     _assert_zero_copy_from_pool(gemm_vllm, 1, seen_ptrs)
 
@@ -624,6 +635,7 @@ def test_rocm_vendor_adapters_prepack_once_and_validate(monkeypatch) -> None:
     )
     assert moe_vllm.implementation_name == "vllm_fused_moe"
     assert moe_aiter.implementation_name == "aiter_fused_moe"
+    assert isinstance(moe_vllm.candidate_args[1], torch.Tensor)
     assert moe_vllm.candidate_args[1].shape == (4, 8, 8)
     _assert_zero_copy_from_pool(moe_vllm, 1, seen_ptrs)
     _assert_zero_copy_from_pool(moe_aiter, 1, seen_ptrs)
@@ -646,6 +658,7 @@ def test_rocm_vendor_adapters_prepack_once_and_validate(monkeypatch) -> None:
     )
     assert gqa_vllm.implementation_name == "vllm_paged_attention_rocm"
     assert gqa_aiter.implementation_name == "aiter_pa_fwd_asm"
+    assert isinstance(gqa_aiter.candidate_args[1], torch.Tensor)
     assert gqa_aiter.candidate_args[1].shape == (2, 2, 16, 16, 8)
     _assert_zero_copy_from_pool(gqa_vllm, 1, seen_ptrs)
     _assert_zero_copy_from_pool(gqa_aiter, 1, seen_ptrs)
@@ -735,7 +748,7 @@ def test_campaign_counter_circuit_breaker_and_topology_report(
         )
 
     monkeypatch.setattr(
-        "scripts.mvp_v1.cloud_runner.collect_hardware_counters",
+        "sol_execbench.vertical.cloud_runner.collect_hardware_counters",
         _fake_collect,
     )
     paths = run_benchmark_campaign(
@@ -761,9 +774,9 @@ def test_campaign_counter_circuit_breaker_and_topology_report(
 def test_repo_sources_parse_natively_as_python_3_12() -> None:
     import ast
 
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = Path(__file__).resolve().parents[3]
     checked_files = 0
-    for sub in ("scripts/mvp_v1", "src/sol_execbench", "src/solar"):
+    for sub in ("src/sol_execbench", "src/solar", "scripts"):
         for py_file in sorted((repo_root / sub).rglob("*.py")):
             if "_vendor" in py_file.parts:
                 continue
@@ -784,11 +797,11 @@ def test_skinny_gemm_fp8_small_m_pad16_and_dequant_fallbacks(
         unavailable_reason="mock",
     )
     monkeypatch.setattr(
-        "scripts.mvp_v1.kernels.try_make_aiter_gemm_runner",
+        "sol_execbench.vertical.kernels.try_make_aiter_gemm_runner",
         lambda *_a, **_kw: unavail,
     )
     monkeypatch.setattr(
-        "scripts.mvp_v1.kernels.try_make_vllm_gemm_runner",
+        "sol_execbench.vertical.kernels.try_make_vllm_gemm_runner",
         lambda *_a, **_kw: unavail,
     )
     x = torch.ones((4, 32), dtype=torch.bfloat16).to(torch.float8_e4m3fnuz)
@@ -821,7 +834,9 @@ def test_skinny_gemm_fp8_small_m_pad16_and_dequant_fallbacks(
     )
     assert res_native.implementation_name == "torch._scaled_mm"
     assert res_native.fn is not None
-    assert torch.allclose(res_native.fn(*res_native.candidate_args), expected)
+    out_native = res_native.fn(*res_native.candidate_args)
+    assert isinstance(out_native, torch.Tensor)
+    assert torch.allclose(out_native, expected)
 
     def _fake_scaled_mm_align16(
         a: torch.Tensor,
@@ -846,6 +861,7 @@ def test_skinny_gemm_fp8_small_m_pad16_and_dequant_fallbacks(
     assert res_pad16.implementation_name == "torch._scaled_mm_pad16"
     assert res_pad16.fn is not None
     out_pad16 = res_pad16.fn(*res_pad16.candidate_args)
+    assert isinstance(out_pad16, torch.Tensor)
     assert out_pad16.shape == (4, 64)
     assert out_pad16.is_contiguous()
     assert torch.allclose(out_pad16, expected)
@@ -865,4 +881,6 @@ def test_skinny_gemm_fp8_small_m_pad16_and_dequant_fallbacks(
     )
     assert res_deq.implementation_name == "bf16_dequant_matmul_fallback"
     assert res_deq.fn is not None
-    assert torch.allclose(res_deq.fn(*res_deq.candidate_args), expected)
+    out_deq = res_deq.fn(*res_deq.candidate_args)
+    assert isinstance(out_deq, torch.Tensor)
+    assert torch.allclose(out_deq, expected)

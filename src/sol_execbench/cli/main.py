@@ -69,6 +69,10 @@ class LazyGroup(click.Group):
                 "sol_execbench.cli.commands.official_score",
                 "score_cli",
             ),
+            "vertical": (
+                "sol_execbench.cli.commands.vertical",
+                "vertical_cli",
+            ),
         },
     )
 
@@ -255,6 +259,7 @@ def _command_name(args: list[str]) -> str:
         "diagnostics": 2,
         "solar": 2,
         "score": 2,
+        "vertical": 2,
     }
     depth = depths.get(domain, 1)
     return " ".join(values[:depth])

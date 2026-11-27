@@ -10,7 +10,7 @@ This file is the single source of truth for active repository direction, deferre
   - Stages 1–3B (`ffa928e0`, `9d4be7eb`, `a528f1e8`, `768944f9`) and Stage 4 (`70b39875`) are merged on `main` and tagged `v0.1`.
   - Evaluated on cloud `AMD Instinct MI300X VF` (`amddeveloperclou-vllm0271vllmomni`: Python `3.12.16`, `torch 2.13.0+rocm10.0.0`, `hip 7.15.26333`, `triton 3.8.0`, `vllm 0.34.0`, `aiter`, `rocprofv3`) across **6 core inference primitive families (8 `FlashInfer-Trace` Definitions, 10 Smoke / 34 Full Workloads)** comparing `portable` (`34/34`), `vllm` (`34/34`), and `aiter` (`30/34` across `7/8` Definitions), plus 15 marker-scoped `rocprofv3` `Amp` hardware counter captures.
   - `src/sol_execbench/data/rocprofv3_counters/gfx942_v1.yaml` counter spellings were confirmed on-device against `rocprofv3-avail -d 0 info --pmc` (479 counters) and verified `status=collected` across all 6 primitive families.
-  - Verified result bundles are retained locally under gitignored `data/outputs/mi300x_stage3b_final/{portable,vllm,aiter}.tar.gz` (SHA-256 and `FlashInfer-Trace` validated via `scripts.mvp_v1.cloud_preflight verify`). All temporary cloud instances were destroyed and verified HTTP `404` (`0` active instances).
+  - Verified result bundles are retained locally under gitignored `data/outputs/mi300x_stage3b_final/{portable,vllm,aiter}.tar.gz` (SHA-256 and `FlashInfer-Trace` validated via `sol-execbench vertical preflight verify`). All temporary cloud instances were destroyed and verified HTTP `404` (`0` active instances).
   - Stage 4 deliverables are published in [docs/v0.1_mi300x_sol_report.md](docs/v0.1_mi300x_sol_report.md) and [README.md](README.md); 43 untracked internal research drafts were archived into gitignored `data/archive/internal_drafts_2026_11/`.
 - **Scoped methodology**:
   - Input/output contracts reuse existing `FlashInfer-Trace` (`definition.json` + `workload.jsonl` + `solution.json` + `Trace`) with zero new custom artifact schema families.
@@ -35,7 +35,7 @@ No blocking in-repo tasks remain for `v0.1`. The following three external contri
    - Candidate signals from the MI300X 3-tier vertical diagnosis: skinny-`M` FP8 GEMM default dispatch gap (`vLLM` `_scaled_mm` vs. `AITER` pre-shuffled GEMM) and long-context `MLA`/`GQA`/small-batch `MoE` dispatch.
    - Gate: verify latest upstream `main`, active RFC/maintainer priorities, and end-to-end TTFT/TPOT impact before opening a minimal reproducer or patch.
 2. **`TODO-SPINOFF-2` — Zero-dependency single-file anti-distortion timing micro-module**
-   - Extract the `>=2x` LLC `RotatingBufferPool` / `LLCRotatingFlusher`, read-only telemetry window, and anti-DCE output checks currently coupled to `sol_execbench.core.*` in [scripts/mvp_v1/anti_distortion.py](scripts/mvp_v1/anti_distortion.py).
+   - Extract the `>=2x` LLC `RotatingBufferPool` / `LLCRotatingFlusher`, read-only telemetry window, and anti-DCE output checks currently coupled to `sol_execbench.core.*` in [src/sol_execbench/vertical/anti_distortion.py](src/sol_execbench/vertical/anti_distortion.py).
    - Gate: confirm real maintainer pain points and dependency boundaries in downstream repos (`vllm bench`, `ROCm/aiter`) before publishing a standalone module.
 3. **`TODO-UPSTREAM-3` — Lightweight correctness / precision-boundary Issues for `NVIDIA/SOL-ExecBench`**
    - Candidate signals: `E2` LayerNorm reference precision boundary, degenerate input distributions (all-ones weights / all-zeros bias), and tolerance blind spots.
@@ -86,7 +86,7 @@ uv run python scripts/check_production_reachability.py
 uv run python scripts/check_non_canonical_artifacts.py
 uv run python scripts/check_diagnostic_store_consistency.py
 uv run python scripts/check_python_reuse.py
-uv run python -m scripts.mvp_v1.cloud_preflight twin --target MI300X
+uv run sol-execbench vertical preflight twin --target MI300X
 uv run pytest tests/
 git diff --check
 ```

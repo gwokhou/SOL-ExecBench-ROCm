@@ -521,18 +521,16 @@ def _classification(relative_path: str, line: str) -> str | None:
         return (
             "candidate loader rejects CUDA/HIP stream and graph abuse spellings"
         )
-    if relative_path.startswith("scripts/mvp_v1/") and (
+    if relative_path.startswith("src/sol_execbench/vertical/") and (
         "ROCm or CUDA" in line or "cutlass_scaled_mm" in line
     ):
-        return (
-            "MVP v1 PyTorch ROCm device docstring and scaled_mm operator probe"
-        )
-    if relative_path.startswith("tests/scripts/test_mvp_v1") and (
+        return "Vertical SOL PyTorch ROCm device docstring and scaled_mm operator probe"
+    if relative_path.startswith("tests/sol_execbench/vertical/") and (
         "NVIDIA H20" in line
         or "cutlass_scaled_mm" in line
         or "_mock_cuda_device" in line
     ):
-        return "MVP v1 test fixtures for rejected NVIDIA SKUs and PyTorch ROCm mocks"
+        return "Vertical SOL test fixtures for rejected NVIDIA SKUs and PyTorch ROCm mocks"
     if (
         relative_path == "tests/sol_execbench/cli/commands/test_diagnostics.py"
         and "test_replay_snapshot_accepts_cuda_and_hip_device_aliases" in line

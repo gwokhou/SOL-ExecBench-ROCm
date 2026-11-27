@@ -58,6 +58,7 @@ def test_cli_contract_matches_public_tree() -> None:
         "diagnostics",
         "solar",
         "score",
+        "vertical",
     }
 
 

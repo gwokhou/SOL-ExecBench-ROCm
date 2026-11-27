@@ -22,17 +22,17 @@ from enum import StrEnum
 from pathlib import Path
 from urllib.parse import urlparse
 
-from scripts.mvp_v1.workloads import SweepMode
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.integrity import sha256_bytes, sha256_file
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
+from sol_execbench.vertical.workloads import SweepMode
 
 _BUNDLE_ROOTS = (
     "pyproject.toml",
     "README.md",
     "LICENSE",
     "src",
-    "scripts/mvp_v1",
+    "scripts/run_vertical_cloud.sh",
 )
 _SKIP_DIR_NAMES = frozenset({"__pycache__", ".pytest_cache", ".ruff_cache"})
 _SKIP_SUFFIXES = (".pyc", ".pyo")
@@ -63,11 +63,11 @@ class _UncachedPy312Finder(importlib.abc.MetaPathFinder):
 
 sys.meta_path.insert(0, _UncachedPy312Finder())
 
-from scripts.mvp_v1 import triton_ops_ext as _triton_ops_ext
-from scripts.mvp_v1 import vendor_adapters_ext as _vendor_adapters_ext
-from scripts.mvp_v1.cloud_runner import main as runner_main
+from sol_execbench.vertical import triton_ops_ext as _triton_ops_ext
+from sol_execbench.vertical import adapters as _vertical_adapters
+from sol_execbench.vertical.cloud_runner import main as runner_main
 
-del _triton_ops_ext, _vendor_adapters_ext
+del _triton_ops_ext, _vertical_adapters
 
 cdna3_path = repo_root / "scripts" / "internal" / "cdna3" / "run_cdna3_diagnostic_calibration.py"
 if cdna3_path.is_file():
@@ -144,7 +144,7 @@ MVP_BACKEND="${MVP_BACKEND:-auto}" \\
 MVP_COUNTERS_FLAG="${MVP_COUNTERS_FLAG:---collect-counters}" \\
 MVP_CLOCKS_FLAG="${MVP_CLOCKS_FLAG:---lock-clocks}" \\
 MVP_OUTPUT_DIR="${SMOKE_OUT}" \\
-bash "${WORKDIR}/scripts/mvp_v1/run_cloud_15min.sh" ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+bash "${WORKDIR}/scripts/run_vertical_cloud.sh" ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
 
 FINAL_OUT="${SMOKE_OUT}"
 if [ "${REQ_MODE}" != "smoke" ]; then
@@ -156,7 +156,7 @@ if [ "${REQ_MODE}" != "smoke" ]; then
     MVP_COUNTERS_FLAG="${MVP_COUNTERS_FLAG:---collect-counters}" \\
     MVP_CLOCKS_FLAG="${MVP_CLOCKS_FLAG:---lock-clocks}" \\
     MVP_OUTPUT_DIR="${OUT_BASE}" \\
-    bash "${WORKDIR}/scripts/mvp_v1/run_cloud_15min.sh" ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+    bash "${WORKDIR}/scripts/run_vertical_cloud.sh" ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
     FINAL_OUT="${OUT_BASE}"
 fi
 
@@ -219,7 +219,7 @@ class BundleVerificationReceipt:
 
 
 def _default_repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+    return Path(__file__).resolve().parents[3]
 
 
 def verify_python312_twin(
@@ -231,9 +231,13 @@ def verify_python312_twin(
     root = (repo_root or _default_repo_root()).resolve()
     env = dict(os.environ)
     env["PYTHONPATH"] = f"{root / 'src'}:{root}"
+    env.setdefault("OMP_NUM_THREADS", "1")
+    env.setdefault("OPENBLAS_NUM_THREADS", "1")
+    env["ROCR_VISIBLE_DEVICES"] = ""
+    env["HIP_VISIBLE_DEVICES"] = ""
     completed = run_in_process_group_bounded(
         [sys.executable, "-c", _TWIN_SUBPROCESS_SCRIPT, str(root), target_id],
-        timeout=60.0,
+        timeout=120.0,
         env=env,
     )
     if completed.returncode != 0:

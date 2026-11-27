@@ -10,7 +10,13 @@ from typing import Any, cast
 import pytest
 import torch
 
-from scripts.mvp_v1 import (
+from sol_execbench.core.bench.correctness import compute_error_stats
+from sol_execbench.core.data.definition import Definition
+from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.data.workload_validation import (
+    validate_problem_contract,
+)
+from sol_execbench.vertical import (
     MVPOperator,
     PrecisionMode,
     bound_fused_moe,
@@ -19,28 +25,9 @@ from scripts.mvp_v1 import (
     bound_swiglu_fp8_quant,
     load_hardware_ceiling,
 )
-from scripts.mvp_v1.anti_distortion import (
-    RotatingBufferPool,
-    time_kernel_isolated,
-    validate_materialized_outputs,
-)
-from scripts.mvp_v1.cloud_runner import _select_workload_specs
-from scripts.mvp_v1.kernels import (
-    KernelBackend,
-    ref_fused_moe,
-    ref_fused_rmsnorm_rope,
-    ref_mla_paged_decode,
-    ref_swiglu_fp8_quant,
-    run_fused_moe_grouped,
-    run_swiglu_fp8_quant_pytorch,
-)
-from scripts.mvp_v1.report import _format_sol_ms
-from scripts.mvp_v1.triton_ops_ext import supports_splitk_mla
-from scripts.mvp_v1.vendor_adapters import (
+from sol_execbench.vertical.adapters import (
     PreparedRunner,
     materialize_comparable_output,
-)
-from scripts.mvp_v1.vendor_adapters_ext import (
     try_make_aiter_fp8_moe_runner,
     try_make_aiter_mla_runner,
     try_make_aiter_rmsnorm_rope_runner,
@@ -50,17 +37,28 @@ from scripts.mvp_v1.vendor_adapters_ext import (
     try_make_vllm_rmsnorm_rope_runner,
     try_make_vllm_swiglu_quant_runner,
 )
-from scripts.mvp_v1.workloads import (
+from sol_execbench.vertical.anti_distortion import (
+    RotatingBufferPool,
+    time_kernel_isolated,
+    validate_materialized_outputs,
+)
+from sol_execbench.vertical.cloud_runner import _select_workload_specs
+from sol_execbench.vertical.kernels import (
+    KernelBackend,
+    ref_fused_moe,
+    ref_fused_rmsnorm_rope,
+    ref_mla_paged_decode,
+    ref_swiglu_fp8_quant,
+    run_fused_moe_grouped,
+    run_swiglu_fp8_quant_pytorch,
+)
+from sol_execbench.vertical.report import _format_sol_ms
+from sol_execbench.vertical.triton_ops_ext import supports_splitk_mla
+from sol_execbench.vertical.workloads import (
     SweepMode,
     build_runtime_case,
     build_workload_specs,
     materialize_trace_corpus,
-)
-from sol_execbench.core.bench.correctness import compute_error_stats
-from sol_execbench.core.data.definition import Definition
-from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.data.workload_validation import (
-    validate_problem_contract,
 )
 
 
@@ -76,7 +74,9 @@ def _assert_pool_ptr(
     recorded.clear()
     assert runner.fn is not None
     runner.fn(*args)
-    assert recorded == [args[arg_idx].data_ptr()]
+    target_arg = args[arg_idx]
+    assert isinstance(target_arg, torch.Tensor)
+    assert recorded == [target_arg.data_ptr()]
 
 
 def test_stage2_analytical_roofline_bounds() -> None:
@@ -150,7 +150,10 @@ def test_stage2_cpu_reference_and_pytorch_runners_pass_accuracy() -> None:
         validate_materialized_outputs(out, "cpu")
         if spec.operator is MVPOperator.SWIGLU_FP8_QUANT:
             assert isinstance(out, tuple)
+            assert isinstance(out, tuple)
             assert len(out) == 2
+            assert isinstance(out[0], torch.Tensor)
+            assert isinstance(out[1], torch.Tensor)
             assert out[0].dtype is torch.float8_e4m3fnuz
             assert out[1].dtype is torch.float32
         cand_tensor = materialize_comparable_output(out)
@@ -171,7 +174,7 @@ def test_stage2_vendor_adapters_prepack_zero_copy_and_reject_corrupt(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        "scripts.mvp_v1.vendor_adapters._is_rocm_torch", lambda: True
+        "sol_execbench.vertical.adapters.common._is_rocm_torch", lambda: True
     )
     ptrs: list[int] = []
     corrupt = {"flag": False}
@@ -280,6 +283,7 @@ def test_stage2_vendor_adapters_prepack_zero_copy_and_reject_corrupt(
     )
     assert mla_v.implementation_name == "vllm_mla_decode_fwd"
     assert mla_a.implementation_name == "aiter_mla_decode_fwd"
+    assert isinstance(mla_v.candidate_args[1], torch.Tensor)
     assert mla_v.candidate_args[1].shape == (2, 16, 1, 80)
     _assert_pool_ptr(mla_v, 1, ptrs)
     _assert_pool_ptr(mla_a, 1, ptrs)
@@ -296,6 +300,7 @@ def test_stage2_vendor_adapters_prepack_zero_copy_and_reject_corrupt(
     )
     assert nr_v.implementation_name == "vllm_fused_qk_norm_rope"
     assert nr_a.implementation_name == "aiter_fused_qk_norm_rope"
+    assert isinstance(nr_v.candidate_args[3], torch.Tensor)
     assert nr_v.candidate_args[3].dtype is torch.bfloat16
     _assert_pool_ptr(nr_v, 3, ptrs)
     _assert_pool_ptr(nr_a, 3, ptrs)
@@ -342,7 +347,7 @@ def test_stage2_vendor_adapters_prepack_zero_copy_and_reject_corrupt(
 
 def test_stage3b_vllm034_and_aiter_adapter_signatures(monkeypatch) -> None:
     monkeypatch.setattr(
-        "scripts.mvp_v1.vendor_adapters._is_rocm_torch", lambda: True
+        "sol_execbench.vertical.adapters.common._is_rocm_torch", lambda: True
     )
     # 1. vLLM 0.34 FusedMoEQuantConfig FP8 MoE
     tok = torch.randn((4, 16), dtype=torch.bfloat16).to(torch.float8_e4m3fnuz)
@@ -460,7 +465,7 @@ def test_stage3b_norm_rope_zero_clone_and_swiglu_scaled_quant(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        "scripts.mvp_v1.vendor_adapters._is_rocm_torch", lambda: True
+        "sol_execbench.vertical.adapters.common._is_rocm_torch", lambda: True
     )
     x = torch.randn((4, 4, 32), dtype=torch.bfloat16)
     res = torch.randn((4, 4, 32), dtype=torch.bfloat16)

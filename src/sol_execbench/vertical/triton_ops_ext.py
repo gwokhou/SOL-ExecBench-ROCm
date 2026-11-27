@@ -6,18 +6,19 @@
 from __future__ import annotations
 
 from functools import cache
-from typing import Any
+from typing import cast
 
 import torch
 
-from scripts.mvp_v1.triton_kernels import (
+from sol_execbench.vertical.triton_kernels import (
+    TritonKernel,
     _load_splitk_gqa_reduce,
     select_gqa_num_splits,
 )
 
 
 @cache
-def _load_mla_splitk_stage1() -> Any:
+def _load_mla_splitk_stage1() -> TritonKernel:
     """Compile and cache Split-KV Absorbed MLA Paged Decode Stage 1 kernel."""
     import triton
     import triton.language as tl
@@ -91,7 +92,7 @@ def _load_mla_splitk_stage1() -> Any:
         tl.store(part_out_ptr + o_off, acc / l_i[:, None])
         tl.store(part_lse_ptr + lse_off, m_i + tl.log(l_i))
 
-    return _mla_splitk_stage1
+    return cast(TritonKernel, _mla_splitk_stage1)
 
 
 def supports_splitk_mla(
@@ -202,7 +203,7 @@ def run_mla_paged_decode_splitk(
 
 
 @cache
-def _load_rmsnorm_rope_kernel() -> Any:
+def _load_rmsnorm_rope_kernel() -> TritonKernel:
     """Compile and cache single-pass Fused Add-RMSNorm + NeoX RoPE kernel."""
     import triton
     import triton.language as tl
@@ -243,7 +244,7 @@ def _load_rmsnorm_rope_kernel() -> Any:
             out_ptr + tok_off + d2 + offs, (v * cos_v + u * sin_v).to(out_dt)
         )
 
-    return _fused_rmsnorm_rope_kernel
+    return cast(TritonKernel, _fused_rmsnorm_rope_kernel)
 
 
 def run_fused_rmsnorm_rope_triton(
@@ -271,7 +272,7 @@ def run_fused_rmsnorm_rope_triton(
 
 
 @cache
-def _load_swiglu_fp8_quant_kernel() -> Any:
+def _load_swiglu_fp8_quant_kernel() -> TritonKernel:
     """Compile and cache row-wise Fused SwiGLU + Dynamic FP8 Quant kernel."""
     import triton
     import triton.language as tl
@@ -320,7 +321,7 @@ def _load_swiglu_fp8_quant_kernel() -> Any:
                 mask=mask,
             )
 
-    return _swiglu_fp8_quant_kernel
+    return cast(TritonKernel, _swiglu_fp8_quant_kernel)
 
 
 def run_swiglu_fp8_quant_triton(

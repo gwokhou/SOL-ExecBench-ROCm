@@ -171,6 +171,7 @@ def test_private_service_retains_rejected_actual_output_once(
 def test_cpu_subprocess_uses_original_gate_and_exact_call_counts(
     tmp_path, mode, activity, layernorm_reference
 ):
+    cuda_was_initialized = torch.cuda.is_initialized()
     case_session = (
         _session(JudgeTask.LAYERNORM, JudgeFamily.L1)
         if layernorm_reference is LayerNormReference.CENTERED_FP64_V1
@@ -243,7 +244,7 @@ def test_cpu_subprocess_uses_original_gate_and_exact_call_counts(
                 row["original_numeric_passed"]
                 for row in offline["observations"]
             )
-    assert not torch.cuda.is_initialized()
+    assert torch.cuda.is_initialized() is cuda_was_initialized
 
 
 def test_activity_stop_retains_every_unreached_denominator(

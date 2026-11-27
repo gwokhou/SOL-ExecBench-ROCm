@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import gc
+from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 
@@ -106,6 +107,48 @@ def solar_architecture_for_configuration(
             f"{hardware.visible_memory_bytes or 'unknown-memory'}"
         )
     return architecture
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ROCmArchitectureCeilingSpec:
+    """Typed hardware ceiling projection from a packaged SOLAR ROCm profile."""
+
+    name: str
+    gfx_target: str
+    memory_bandwidth_bytes_per_second: float
+    peak_bf16_ops_per_second: float
+    peak_fp8_ops_per_second: float
+    l2_bytes: int
+    last_level_cache_bytes: int | None
+    compute_units: int
+    fp8_dtype_name: str
+
+
+def load_rocm_architecture_ceiling_spec(
+    profile_name: str,
+) -> ROCmArchitectureCeilingSpec:
+    """Load hardware roofline ceilings from a packaged SOLAR ROCm profile."""
+    from solar.rocm.architecture import ArchitectureProfile
+
+    profile = ArchitectureProfile.load(profile_name)
+    fp8_dtype_name = (
+        "float8_e4m3fnuz"
+        if "float8_e4m3fnuz" in profile.precision_aliases
+        else "float8_e4m3fn"
+    )
+    return ROCmArchitectureCeilingSpec(
+        name=profile.name,
+        gfx_target=profile.gfx_target,
+        memory_bandwidth_bytes_per_second=(
+            profile.memory_bandwidth_bytes_per_second
+        ),
+        peak_bf16_ops_per_second=float(profile.peak_ops_per_second["bf16"]),
+        peak_fp8_ops_per_second=float(profile.peak_ops_per_second["fp8"]),
+        l2_bytes=profile.l2_bytes,
+        last_level_cache_bytes=profile.last_level_cache_bytes,
+        compute_units=int(profile.compute_units),
+        fp8_dtype_name=fp8_dtype_name,
+    )
 
 
 def nominal_hardware_profile(
@@ -211,8 +254,10 @@ def device_execution_policy(
 __all__ = [
     "FORMAL_ARCHITECTURE",
     "FORMAL_GFX_TARGET",
+    "ROCmArchitectureCeilingSpec",
     "formal_architecture_profile_hash",
     "formal_producer_readiness",
+    "load_rocm_architecture_ceiling_spec",
     "nominal_hardware_profile",
     "release_formal_device_memory",
     "require_formal_device",

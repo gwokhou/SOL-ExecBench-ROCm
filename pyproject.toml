@@ -241,7 +241,7 @@ ban-relative-imports = "all"
 "scripts/check_schema_versions.py" = ["TID251"]
 
 [tool.ty.src]
-include = ["src", "scripts/mvp_v1", "tests"]
+include = ["src", "tests"]
 exclude = ["src/solar/_vendor"]
 
 [tool.ty.analysis]
@@ -263,9 +263,9 @@ missing-type-argument = "ignore"
 
 [[tool.ty.overrides]]
 include = [
-    "scripts/mvp_v1/kernels.py",
-    "scripts/mvp_v1/triton_kernels.py",
-    "scripts/mvp_v1/triton_ops_ext.py",
+    "src/sol_execbench/vertical/kernels.py",
+    "src/sol_execbench/vertical/triton_kernels.py",
+    "src/sol_execbench/vertical/triton_ops_ext.py",
 ]
 
 [tool.ty.overrides.rules]

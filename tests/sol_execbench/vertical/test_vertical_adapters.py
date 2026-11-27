@@ -1,4 +1,4 @@
-"""Focused unit tests for Part I (scripts/mvp_v1) P0 and P1 review fixes."""
+"""Focused unit tests for ROCm vertical SOL adapter P0 and P1 review fixes."""
 
 from __future__ import annotations
 
@@ -14,52 +14,50 @@ from typing import Any, cast
 import pytest
 import torch
 
-from scripts.mvp_v1 import (
+from sol_execbench.core.bench.clock_ownership import ClockDevice
+from sol_execbench.vertical import (
     PrecisionMode,
     VendorBackend,
     bound_fused_moe,
     load_hardware_ceiling,
 )
-from scripts.mvp_v1.anti_distortion import (
+from sol_execbench.vertical.adapters import (
+    try_make_aiter_fp8_moe_runner,
+    try_make_aiter_gemm_runner,
+    try_make_aiter_gqa_runner,
+    try_make_aiter_rmsnorm_rope_runner,
+    try_make_vllm_gemm_runner,
+    try_make_vllm_gqa_runner,
+    try_make_vllm_rmsnorm_rope_runner,
+)
+from sol_execbench.vertical.adapters.common import _self_validate
+from sol_execbench.vertical.anti_distortion import (
     _parse_float,
     _sample_amd_telemetry,
     acquire_dvfs_telemetry_window,
     time_kernel_isolated,
 )
-from scripts.mvp_v1.cloud_preflight import _validate_bundle_payload
-from scripts.mvp_v1.cloud_runner import run_single_op_replay
-from scripts.mvp_v1.counter_capture import (
+from sol_execbench.vertical.cloud_preflight import _validate_bundle_payload
+from sol_execbench.vertical.cloud_runner import run_single_op_replay
+from sol_execbench.vertical.counter_capture import (
     PROFILE_RANGE_MARKER,
     _execute_rocm_groups,
     _filter_pass_csv_to_marker,
     collect_hardware_counters,
 )
-from scripts.mvp_v1.kernels import (
+from sol_execbench.vertical.kernels import (
     KernelBackend,
     make_skinny_gemm_runner,
     ref_fused_moe,
     ref_fused_rmsnorm_rope,
     ref_skinny_gemm,
 )
-from scripts.mvp_v1.vendor_adapters import (
-    _self_validate,
-    try_make_aiter_gemm_runner,
-    try_make_aiter_gqa_runner,
-    try_make_vllm_gemm_runner,
-    try_make_vllm_gqa_runner,
-)
-from scripts.mvp_v1.vendor_adapters_ext import (
-    try_make_aiter_fp8_moe_runner,
-    try_make_aiter_rmsnorm_rope_runner,
-    try_make_vllm_rmsnorm_rope_runner,
-)
-from scripts.mvp_v1.workloads import SweepMode
-from sol_execbench.core.bench.clock_ownership import ClockDevice
+from sol_execbench.vertical.workloads import SweepMode
 
 
 def test_p0_1_rocm_pa_256_partition_scratch_and_fallbacks(monkeypatch) -> None:
     monkeypatch.setattr(
-        "scripts.mvp_v1.vendor_adapters._is_rocm_torch", lambda: True
+        "sol_execbench.vertical.adapters.common._is_rocm_torch", lambda: True
     )
     q = torch.ones((2, 4, 16), dtype=torch.bfloat16)
     k = torch.ones((128, 16, 2, 16), dtype=torch.bfloat16)
@@ -162,7 +160,7 @@ def test_p0_2_self_validate_clones_and_rmsnorm_rope_inplace_safety(
     assert torch.equal(ref_args[0], x_orig)
 
     monkeypatch.setattr(
-        "scripts.mvp_v1.vendor_adapters._is_rocm_torch", lambda: True
+        "sol_execbench.vertical.adapters.common._is_rocm_torch", lambda: True
     )
     x = torch.randn((4, 4, 32), dtype=torch.bfloat16)
     res = torch.randn((4, 4, 32), dtype=torch.bfloat16)
@@ -193,10 +191,10 @@ def test_p0_2_self_validate_clones_and_rmsnorm_rope_inplace_safety(
 
     for runner in (
         try_make_vllm_rmsnorm_rope_runner(
-            proto, ref_fn=ref_fused_rmsnorm_rope, max_atol=2e-2
+            list(proto), ref_fn=ref_fused_rmsnorm_rope, max_atol=2e-2
         ),
         try_make_aiter_rmsnorm_rope_runner(
-            proto, ref_fn=ref_fused_rmsnorm_rope, max_atol=2e-2
+            list(proto), ref_fn=ref_fused_rmsnorm_rope, max_atol=2e-2
         ),
     ):
         assert runner.fn is not None
@@ -212,6 +210,7 @@ def test_p0_2_self_validate_clones_and_rmsnorm_rope_inplace_safety(
         )
         assert len(stats.samples_ms) == 20
         out_after = runner.fn(*runner.candidate_args)
+        assert isinstance(out_after, torch.Tensor)
         assert torch.allclose(out_after, expected, atol=2e-2)
 
 
@@ -219,7 +218,7 @@ def test_p0_2_vllm_rope_cos_sin_dtype_and_aiter_fp8_moe_bf16(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        "scripts.mvp_v1.vendor_adapters._is_rocm_torch", lambda: True
+        "sol_execbench.vertical.adapters.common._is_rocm_torch", lambda: True
     )
     x = torch.randn((4, 2, 16), dtype=torch.bfloat16)
     res = torch.randn((4, 2, 16), dtype=torch.bfloat16)
@@ -256,6 +255,7 @@ def test_p0_2_vllm_rope_cos_sin_dtype_and_aiter_fp8_moe_bf16(
         [x, res, w, cs_f32], ref_fn=ref_fused_rmsnorm_rope, max_atol=2e-2
     )
     assert rope_runner.implementation_name == "vllm_rmsnorm_rope"
+    assert isinstance(rope_runner.candidate_args[3], torch.Tensor)
     assert rope_runner.candidate_args[3].dtype is torch.bfloat16
 
     tok = torch.zeros((2, 8), dtype=torch.float8_e4m3fnuz)
@@ -282,6 +282,7 @@ def test_p0_2_vllm_rope_cos_sin_dtype_and_aiter_fp8_moe_bf16(
             moe_args, ref_fn=ref_fused_moe, max_atol=1e-1
         )
         assert res_moe.implementation_name == "aiter_fp8_fused_moe"
+        assert isinstance(res_moe.candidate_args[0], torch.Tensor)
         assert res_moe.candidate_args[0].dtype is required_dt
 
 
@@ -290,7 +291,7 @@ def test_p1_1_vllm_honest_fallback_names_and_ty_contracts(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        "scripts.mvp_v1.vendor_adapters._is_rocm_torch", lambda: True
+        "sol_execbench.vertical.adapters.common._is_rocm_torch", lambda: True
     )
     x_bf = torch.ones((4, 16), dtype=torch.bfloat16)
     w_bf = torch.full((16, 8), 0.5, dtype=torch.bfloat16)
@@ -305,7 +306,7 @@ def test_p1_1_vllm_honest_fallback_names_and_ty_contracts(
     )
     monkeypatch.delitem(sys.modules, "vllm._custom_ops", raising=False)
     monkeypatch.setattr(
-        "scripts.mvp_v1.vendor_adapters._import_vllm_custom_ops",
+        "sol_execbench.vertical.adapters.common._import_vllm_custom_ops",
         lambda: (types.SimpleNamespace(), None),
     )
     unavail_bf = try_make_vllm_gemm_runner(
@@ -329,7 +330,7 @@ def test_p1_1_vllm_honest_fallback_names_and_ty_contracts(
     # Loaded _custom_ops without custom GEMM names Torch fallbacks honestly.
     empty_ops = types.SimpleNamespace()
     monkeypatch.setattr(
-        "scripts.mvp_v1.vendor_adapters._import_vllm_custom_ops",
+        "sol_execbench.vertical.adapters.common._import_vllm_custom_ops",
         lambda: (types.SimpleNamespace(_custom_ops=empty_ops), empty_ops),
     )
     fb_bf = try_make_vllm_gemm_runner(
@@ -401,11 +402,11 @@ def test_p1_2_rocprof_fail_closed_missing_marker_and_pid_prefix(
         _filter_pass_csv_to_marker(raw_csv, missing_dir)
 
     monkeypatch.setattr(
-        "scripts.mvp_v1.counter_capture._resolve_rocprofv3_binary",
+        "sol_execbench.vertical.counter_capture._resolve_rocprofv3_binary",
         lambda: Path("/opt/rocm/bin/rocprofv3"),
     )
     monkeypatch.setattr(
-        "scripts.mvp_v1.counter_capture._query_rocm_available_counters",
+        "sol_execbench.vertical.counter_capture._query_rocm_available_counters",
         lambda _bin, _env: frozenset({"SQ_WAVES"}),
     )
 
@@ -425,7 +426,7 @@ def test_p1_2_rocprof_fail_closed_missing_marker_and_pid_prefix(
         return subprocess.CompletedProcess(["rocprofv3"], 0, "", "")
 
     monkeypatch.setattr(
-        "scripts.mvp_v1.counter_capture._run_one_rocm_pass",
+        "sol_execbench.vertical.counter_capture._run_one_rocm_pass",
         _pass_without_marker,
     )
     failed = collect_hardware_counters(
@@ -465,7 +466,7 @@ def test_p1_2_rocprof_fail_closed_missing_marker_and_pid_prefix(
         return subprocess.CompletedProcess(["rocprofv3"], 0, "", "")
 
     monkeypatch.setattr(
-        "scripts.mvp_v1.counter_capture._run_one_rocm_pass",
+        "sol_execbench.vertical.counter_capture._run_one_rocm_pass",
         _pass_multi_pid,
     )
     csvs, err = _execute_rocm_groups(
@@ -498,10 +499,12 @@ def test_p1_3_non_unit_fp8_scales_and_moe_fp8_activation_bytes(
     )
     assert cpu_runner.implementation_name == "cpu_fp8_ref"
     assert cpu_runner.fn is not None
-    assert torch.allclose(cpu_runner.fn(*cpu_runner.candidate_args), expected)
+    cpu_out = cpu_runner.fn(*cpu_runner.candidate_args)
+    assert isinstance(cpu_out, torch.Tensor)
+    assert torch.allclose(cpu_out, expected)
 
     monkeypatch.setattr(
-        "scripts.mvp_v1.vendor_adapters._is_rocm_torch", lambda: True
+        "sol_execbench.vertical.adapters.common._is_rocm_torch", lambda: True
     )
     # Unscaled vendor op must FAIL _self_validate when sa * sb == 0.75 != 1.0!
     unscaled_ops = types.SimpleNamespace(
@@ -520,7 +523,7 @@ def test_p1_3_non_unit_fp8_scales_and_moe_fp8_activation_bytes(
         lambda *_a, **_kw: (_ for _ in ()).throw(RuntimeError("disabled")),
     )
     monkeypatch.setattr(
-        "scripts.mvp_v1.vendor_adapters._import_vllm_custom_ops",
+        "sol_execbench.vertical.adapters.common._import_vllm_custom_ops",
         lambda: (types.SimpleNamespace(_custom_ops=unscaled_ops), unscaled_ops),
     )
     rejected = try_make_vllm_gemm_runner(
@@ -534,7 +537,7 @@ def test_p1_3_non_unit_fp8_scales_and_moe_fp8_activation_bytes(
     assert rejected.fn is None
 
     monkeypatch.setattr(
-        "scripts.mvp_v1.vendor_adapters._import_vllm_custom_ops",
+        "sol_execbench.vertical.adapters.common._import_vllm_custom_ops",
         lambda: (types.SimpleNamespace(_custom_ops=scaled_ops), scaled_ops),
     )
     accepted_v = try_make_vllm_gemm_runner(
@@ -547,7 +550,9 @@ def test_p1_3_non_unit_fp8_scales_and_moe_fp8_activation_bytes(
     )
     assert accepted_v.implementation_name == "vllm_fp8_scaled_mm"
     assert accepted_v.fn is not None
-    assert torch.allclose(accepted_v.fn(*accepted_v.candidate_args), expected)
+    out_v = accepted_v.fn(*accepted_v.candidate_args)
+    assert isinstance(out_v, torch.Tensor)
+    assert torch.allclose(out_v, expected)
 
     monkeypatch.setitem(
         sys.modules,
@@ -571,7 +576,9 @@ def test_p1_3_non_unit_fp8_scales_and_moe_fp8_activation_bytes(
     )
     assert accepted_a.implementation_name == "aiter_gemm_a8w8"
     assert accepted_a.fn is not None
-    assert torch.allclose(accepted_a.fn(*accepted_a.candidate_args), expected)
+    out_a = accepted_a.fn(*accepted_a.candidate_args)
+    assert isinstance(out_a, torch.Tensor)
+    assert torch.allclose(out_a, expected)
 
     mi300x = load_hardware_ceiling("MI300X")
     m, h, inter, e, k = 8, 2048, 1024, 64, 6
@@ -592,13 +599,14 @@ def test_p1_4_clock_unlock_on_partial_lock_uuid_telemetry_and_device_ctx(
     unlock_calls: list[str | None] = []
     monkeypatch.delenv("GPU_LOCK_UUID", raising=False)
     monkeypatch.setattr(
-        "scripts.mvp_v1.anti_distortion.observe_clock_devices",
+        "sol_execbench.vertical.anti_distortion.observe_clock_devices",
         lambda: (ClockDevice(bdf="0000:c1:00.0", uuid=test_uuid),),
     )
     monkeypatch.setattr(
-        "scripts.mvp_v1.anti_distortion.sample_gpu_telemetry",
+        "sol_execbench.vertical.anti_distortion.sample_gpu_telemetry",
         lambda _dev, vendor: __import__(
-            "scripts.mvp_v1.anti_distortion", fromlist=["TelemetrySample"]
+            "sol_execbench.vertical.anti_distortion",
+            fromlist=["TelemetrySample"],
         ).TelemetrySample(vendor=vendor),
     )
 
@@ -611,10 +619,10 @@ def test_p1_4_clock_unlock_on_partial_lock_uuid_telemetry_and_device_ctx(
         raise RuntimeError("unlock error must be suppressed")
 
     monkeypatch.setattr(
-        "scripts.mvp_v1.anti_distortion.set_peak_clocks", _failing_lock
+        "sol_execbench.vertical.anti_distortion.set_peak_clocks", _failing_lock
     )
     monkeypatch.setattr(
-        "scripts.mvp_v1.anti_distortion.unlock_clocks", _throwing_unlock
+        "sol_execbench.vertical.anti_distortion.unlock_clocks", _throwing_unlock
     )
     with acquire_dvfs_telemetry_window(
         "cuda:0", VendorBackend.AMD_ROCM, lock_clocks=True
@@ -627,18 +635,18 @@ def test_p1_4_clock_unlock_on_partial_lock_uuid_telemetry_and_device_ctx(
     monkeypatch.setenv("GPU_LOCK_UUID", test_uuid)
     seen_level_uuids: list[str | None] = []
     monkeypatch.setattr(
-        "scripts.mvp_v1.anti_distortion.observe_clock_levels",
+        "sol_execbench.vertical.anti_distortion.observe_clock_levels",
         lambda uuid=None: (seen_level_uuids.append(uuid), ("STABLE_PEAK",))[-1],
     )
     monkeypatch.setattr(
-        "scripts.mvp_v1.anti_distortion.detect_concurrent_gpu_processes",
+        "sol_execbench.vertical.anti_distortion.detect_concurrent_gpu_processes",
         lambda: [
             {"pid": 11, "device": "0", "name": "neighbor"},
             {"pid": 22, "device": "2", "name": "target_proc"},
         ],
     )
     monkeypatch.setattr(
-        "scripts.mvp_v1.anti_distortion._amd_smi_candidates",
+        "sol_execbench.vertical.anti_distortion._amd_smi_candidates",
         lambda: ["amd-smi"],
     )
     seen_selectors: list[str] = []
@@ -664,7 +672,8 @@ def test_p1_4_clock_unlock_on_partial_lock_uuid_telemetry_and_device_ctx(
         return subprocess.CompletedProcess(cmd, 0, json.dumps(payload), "")
 
     monkeypatch.setattr(
-        "scripts.mvp_v1.anti_distortion.run_in_process_group_bounded", _fake_smi
+        "sol_execbench.vertical.anti_distortion.run_in_process_group_bounded",
+        _fake_smi,
     )
     sample = _sample_amd_telemetry("cuda:0")
     assert seen_level_uuids == [test_uuid]
@@ -699,18 +708,19 @@ def test_p1_4_clock_unlock_on_partial_lock_uuid_telemetry_and_device_ctx(
     monkeypatch.setattr(torch.cuda, "synchronize", lambda *_a: None)
     monkeypatch.setattr(torch.cuda, "Event", _FakeEvent)
     monkeypatch.setattr(
-        "scripts.mvp_v1.anti_distortion._device_free_bytes", lambda _d: None
+        "sol_execbench.vertical.anti_distortion._device_free_bytes",
+        lambda _d: None,
     )
     monkeypatch.setattr(
-        "scripts.mvp_v1.anti_distortion.recommended_llc_flush_bytes",
+        "sol_execbench.vertical.anti_distortion.recommended_llc_flush_bytes",
         lambda *_a, **_kw: 4096,
     )
     monkeypatch.setattr(
-        "scripts.mvp_v1.anti_distortion.LLCRotatingFlusher",
+        "sol_execbench.vertical.anti_distortion.LLCRotatingFlusher",
         lambda _d, _b: types.SimpleNamespace(flush=lambda: None),
     )
     monkeypatch.setattr(
-        "scripts.mvp_v1.anti_distortion.validate_materialized_outputs",
+        "sol_execbench.vertical.anti_distortion.validate_materialized_outputs",
         lambda _o, _d: None,
     )
     t_stats = time_kernel_isolated(
@@ -726,14 +736,14 @@ def test_p1_4_clock_unlock_on_partial_lock_uuid_telemetry_and_device_ctx(
 
     entered_devices.clear()
     monkeypatch.setattr(
-        "scripts.mvp_v1.cloud_runner.build_runtime_case",
+        "sol_execbench.vertical.cloud_runner.build_runtime_case",
         lambda *_a, **_kw: types.SimpleNamespace(
             candidate_fn=lambda a: a + 1.0,
             candidate_args=[torch.ones((4,), dtype=torch.float32)],
         ),
     )
     monkeypatch.setattr(
-        "scripts.mvp_v1.cloud_runner.LLCRotatingFlusher",
+        "sol_execbench.vertical.cloud_runner.LLCRotatingFlusher",
         lambda _d, _b: types.SimpleNamespace(flush=lambda: None),
     )
     monkeypatch.setattr(torch.cuda.nvtx, "range_push", lambda _m: None)

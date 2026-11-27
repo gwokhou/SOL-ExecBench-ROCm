@@ -16,13 +16,18 @@ from pathlib import Path
 
 import pytest
 
-from scripts.mvp_v1.analytical_roofline import (
+from sol_execbench.core.data.trace import Trace
+from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
+from sol_execbench.vertical.analytical_roofline import (
     EmpiricalCeiling,
     VendorBackend,
     load_hardware_ceiling,
 )
-from scripts.mvp_v1.anti_distortion import DVFSWindowReceipt, TelemetrySample
-from scripts.mvp_v1.cloud_preflight import (
+from sol_execbench.vertical.anti_distortion import (
+    DVFSWindowReceipt,
+    TelemetrySample,
+)
+from sol_execbench.vertical.cloud_preflight import (
     ConnectivityVerdict,
     build_oneshot_cloud_script,
     list_local_ssh_fingerprints,
@@ -31,19 +36,17 @@ from scripts.mvp_v1.cloud_preflight import (
     validate_downloaded_bundle,
     verify_python312_twin,
 )
-from scripts.mvp_v1.cloud_runner import (
+from sol_execbench.vertical.cloud_runner import (
     main as runner_main,
     run_benchmark_campaign,
 )
-from scripts.mvp_v1.kernels import KernelBackend
-from scripts.mvp_v1.report import (
+from sol_execbench.vertical.kernels import KernelBackend
+from sol_execbench.vertical.report import (
     WorkloadMeasurementRow,
     compare_summaries_markdown,
     write_mvp_outputs,
 )
-from scripts.mvp_v1.workloads import SweepMode
-from sol_execbench.core.data.trace import Trace
-from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
+from sol_execbench.vertical.workloads import SweepMode
 
 
 @contextmanager

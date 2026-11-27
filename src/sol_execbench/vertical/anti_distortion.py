@@ -16,15 +16,10 @@ from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 import torch
 
-from scripts.mvp_v1.analytical_roofline import (
-    EmpiricalCeiling,
-    HardwareCeiling,
-    VendorBackend,
-)
 from sol_execbench.core.bench.clock_lock import (
     observe_clock_levels,
     set_peak_clocks,
@@ -42,6 +37,11 @@ from sol_execbench.core.bench.timing_isolation import (
 from sol_execbench.core.platform.amd_smi import AMDSMIListPayload
 from sol_execbench.core.platform.runtime import resolve_rocm_tool_command
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
+from sol_execbench.vertical.analytical_roofline import (
+    EmpiricalCeiling,
+    HardwareCeiling,
+    VendorBackend,
+)
 
 _MIB = 1024 * 1024
 _DEFAULT_DATACENTER_FLUSH_MIN_BYTES = 256 * _MIB
@@ -206,7 +206,7 @@ class RotatingBufferPool:
 
     def __init__(
         self,
-        prototype_args: list[Any],
+        prototype_args: list[object],
         *,
         min_ring_bytes: int,
         min_replicas: int = 2,
@@ -226,7 +226,7 @@ class RotatingBufferPool:
             if tensor_bytes > 0
             else 1
         )
-        self._rings: list[list[Any]] = [
+        self._rings: list[list[object]] = [
             [
                 arg.detach().clone() if isinstance(arg, torch.Tensor) else arg
                 for arg in prototype_args
@@ -240,7 +240,7 @@ class RotatingBufferPool:
         """Number of disjoint input replicas in the rotation ring."""
         return len(self._rings)
 
-    def next_args(self) -> list[Any]:
+    def next_args(self) -> list[object]:
         """Return the next physically separate input set."""
         args = self._rings[self._idx % len(self._rings)]
         self._idx += 1
@@ -473,7 +473,7 @@ def acquire_dvfs_telemetry_window(
         )
 
 
-def _flatten_tensors(value: Any) -> list[torch.Tensor]:
+def _flatten_tensors(value: object) -> list[torch.Tensor]:
     if isinstance(value, torch.Tensor):
         return [value]
     if isinstance(value, (list, tuple)):
@@ -481,7 +481,7 @@ def _flatten_tensors(value: Any) -> list[torch.Tensor]:
     return []
 
 
-def validate_materialized_outputs(output: Any, device: str) -> None:
+def validate_materialized_outputs(output: object, device: str) -> None:
     """Reject lazy proxies, host offloading, empty results, or NaN/Inf."""
     tensors = _flatten_tensors(output)
     if not tensors:
@@ -511,7 +511,7 @@ def validate_materialized_outputs(output: Any, device: str) -> None:
 
 
 def _build_timing_pool(
-    prototype_args: list[Any],
+    prototype_args: list[object],
     *,
     device: str,
     flush_bytes: int,
@@ -535,14 +535,14 @@ def _build_timing_pool(
 
 
 def time_kernel_isolated(
-    fn: Callable[..., Any],
-    prototype_args: list[Any],
+    fn: Callable[..., object],
+    prototype_args: list[object],
     *,
     device: str,
     llc_bytes: int,
     warmup: int = 5,
     rep: int = 20,
-    validate_first: Callable[[Any, list[Any]], None] | None = None,
+    validate_first: Callable[[object, list[object]], None] | None = None,
 ) -> IsolatedTimingStats:
     """Measure median/p90 kernel latency with LLC flush and anti-DCE guards."""
     free_bytes = _device_free_bytes(device)

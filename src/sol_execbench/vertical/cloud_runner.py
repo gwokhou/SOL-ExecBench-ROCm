@@ -13,12 +13,15 @@ from pathlib import Path
 
 import torch
 
-from scripts.mvp_v1.analytical_roofline import (
+from sol_execbench.core.bench.correctness import compute_error_stats
+from sol_execbench.core.data.trace import Correctness, Trace
+from sol_execbench.vertical.adapters import materialize_comparable_output
+from sol_execbench.vertical.analytical_roofline import (
     EmpiricalCeiling,
     HardwareCeiling,
     detect_hardware_ceiling,
 )
-from scripts.mvp_v1.anti_distortion import (
+from sol_execbench.vertical.anti_distortion import (
     LLCRotatingFlusher,
     RotatingBufferPool,
     acquire_dvfs_telemetry_window,
@@ -27,13 +30,13 @@ from scripts.mvp_v1.anti_distortion import (
     recommended_llc_flush_bytes,
     time_kernel_isolated,
 )
-from scripts.mvp_v1.counter_capture import (
+from sol_execbench.vertical.counter_capture import (
     PROFILE_RANGE_MARKER,
     CounterCaptureSummary,
     collect_hardware_counters,
 )
-from scripts.mvp_v1.kernels import KernelBackend
-from scripts.mvp_v1.report import (
+from sol_execbench.vertical.kernels import KernelBackend
+from sol_execbench.vertical.report import (
     WorkloadMeasurementRow,
     build_measurement_row,
     build_trace_record,
@@ -42,8 +45,7 @@ from scripts.mvp_v1.report import (
     compare_summaries_markdown,
     write_mvp_outputs,
 )
-from scripts.mvp_v1.vendor_adapters import materialize_comparable_output
-from scripts.mvp_v1.workloads import (
+from sol_execbench.vertical.workloads import (
     RuntimeCase,
     SweepMode,
     WorkloadSpec,
@@ -51,8 +53,6 @@ from scripts.mvp_v1.workloads import (
     build_workload_specs,
     materialize_trace_corpus,
 )
-from sol_execbench.core.bench.correctness import compute_error_stats
-from sol_execbench.core.data.trace import Correctness, Trace
 
 
 def resolve_device(requested: str) -> str:
@@ -77,7 +77,7 @@ def _capture_counters_for_spec(
     replay_cmd = [
         sys.executable,
         "-m",
-        "scripts.mvp_v1.cloud_runner",
+        "sol_execbench.vertical.cloud_runner",
         "--mode",
         mode.value,
         "--device",

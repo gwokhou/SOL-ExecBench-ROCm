@@ -15,7 +15,6 @@ from dataclasses import dataclass, replace
 from importlib.resources import as_file, files
 from pathlib import Path
 
-from scripts.mvp_v1.analytical_roofline import VendorBackend
 from sol_execbench.core.bench.performance_model.counter_metrics import (
     counter_memory_bytes,
 )
@@ -37,6 +36,7 @@ from sol_execbench.core.process.environment import (
     ENV_ROCR_VISIBLE_DEVICES,
 )
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
+from sol_execbench.vertical.analytical_roofline import VendorBackend
 
 PROFILE_RANGE_MARKER = "MVP_MEASURE"
 _TIMEOUT_SECONDS = 120.0

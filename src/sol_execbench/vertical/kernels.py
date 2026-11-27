@@ -9,11 +9,27 @@ import math
 from collections.abc import Callable
 from enum import StrEnum
 from functools import cache
-from typing import Any
 
 import torch
 
-from scripts.mvp_v1.triton_kernels import (
+from sol_execbench.vertical.adapters import (
+    PreparedRunner,
+    try_make_aiter_gemm_runner,
+    try_make_aiter_gqa_runner,
+    try_make_aiter_mla_runner,
+    try_make_aiter_moe_runner,
+    try_make_aiter_rmsnorm_rope_runner,
+    try_make_aiter_swiglu_quant_runner,
+    try_make_vllm_gemm_runner,
+    try_make_vllm_gqa_runner,
+    try_make_vllm_mla_runner,
+    try_make_vllm_moe_runner,
+    try_make_vllm_rmsnorm_rope_runner,
+    try_make_vllm_swiglu_quant_runner,
+)
+from sol_execbench.vertical.adapters.common import _as_int, _as_tensor
+from sol_execbench.vertical.triton_kernels import (
+    TritonKernel,
     allocate_fused_moe_workspace,
     allocate_splitk_gqa_workspace,
     run_fused_moe_triton,
@@ -21,29 +37,12 @@ from scripts.mvp_v1.triton_kernels import (
     select_gqa_num_splits,
     supports_splitk_gqa,
 )
-from scripts.mvp_v1.triton_ops_ext import (
+from sol_execbench.vertical.triton_ops_ext import (
     allocate_splitk_mla_workspace,
     run_fused_rmsnorm_rope_triton,
     run_mla_paged_decode_splitk,
     run_swiglu_fp8_quant_triton,
     supports_splitk_mla,
-)
-from scripts.mvp_v1.vendor_adapters import (
-    PreparedRunner,
-    try_make_aiter_gemm_runner,
-    try_make_aiter_gqa_runner,
-    try_make_aiter_moe_runner,
-    try_make_vllm_gemm_runner,
-    try_make_vllm_gqa_runner,
-    try_make_vllm_moe_runner,
-)
-from scripts.mvp_v1.vendor_adapters_ext import (
-    try_make_aiter_mla_runner,
-    try_make_aiter_rmsnorm_rope_runner,
-    try_make_aiter_swiglu_quant_runner,
-    try_make_vllm_mla_runner,
-    try_make_vllm_rmsnorm_rope_runner,
-    try_make_vllm_swiglu_quant_runner,
 )
 
 
@@ -57,7 +56,7 @@ class KernelBackend(StrEnum):
     PYTORCH = "pytorch"
 
 
-def _cpu_unavailable(prototype_args: list[Any]) -> PreparedRunner:
+def _cpu_unavailable(prototype_args: list[object]) -> PreparedRunner:
     return PreparedRunner(
         fn=None,
         implementation_name="unavailable:cpu_device",
@@ -67,7 +66,7 @@ def _cpu_unavailable(prototype_args: list[Any]) -> PreparedRunner:
 
 
 def _dispatch_vendor_tiers(
-    prototype_args: list[Any],
+    prototype_args: list[object],
     *,
     device: str,
     backend: KernelBackend,
@@ -118,7 +117,7 @@ def ref_skinny_gemm(
 
 def _probe_fp8_candidate(
     cand_fn: Callable[..., torch.Tensor],
-    prototype_args: list[Any],
+    prototype_args: list[object],
     expected_shape: tuple[int, int],
 ) -> bool:
     try:
@@ -149,12 +148,12 @@ def _make_dequant_fp8_gemm(
 
 
 def _select_gpu_fp8_gemm_runner(
-    prototype_args: list[Any],
+    prototype_args: list[object],
     *,
     scale_a: torch.Tensor,
     scale_b: torch.Tensor,
 ) -> tuple[Callable[..., torch.Tensor], str]:
-    x0, w_t0 = prototype_args
+    x0, w_t0 = _as_tensor(prototype_args[0]), _as_tensor(prototype_args[1])
     m, k = int(x0.shape[0]), int(x0.shape[1])
     expected_shape = (m, int(w_t0.shape[1]))
 
@@ -198,7 +197,7 @@ def _select_gpu_fp8_gemm_runner(
 
 def make_skinny_gemm_runner(
     *,
-    prototype_args: list[Any],
+    prototype_args: list[object],
     fp8: bool,
     device: str,
     backend: KernelBackend = KernelBackend.AUTO,
@@ -333,7 +332,7 @@ def run_fused_moe_grouped(
 
 def make_fused_moe_runner(
     *,
-    prototype_args: list[Any],
+    prototype_args: list[object],
     device: str,
     backend: KernelBackend = KernelBackend.AUTO,
     max_atol: float = 5e-2,
@@ -360,12 +359,12 @@ def make_fused_moe_runner(
             candidate_args=prototype_args,
         )
 
-    tokens, gate_w, _up, _down, _logits, top_k = prototype_args
-    workspace = allocate_fused_moe_workspace(
-        tokens, gate_w.shape[2], int(top_k)
-    )
+    tokens = _as_tensor(prototype_args[0])
+    gate_w = _as_tensor(prototype_args[1])
+    top_k = _as_int(prototype_args[5])
+    workspace = allocate_fused_moe_workspace(tokens, gate_w.shape[2], top_k)
 
-    def _run_triton_moe(*args: Any) -> torch.Tensor:
+    def _run_triton_moe(*args: object) -> torch.Tensor:
         return run_fused_moe_triton(*args, workspace=workspace)
 
     try:
@@ -416,7 +415,7 @@ def ref_gqa_paged_decode(
 
 
 @cache
-def _load_triton_paged_decode_kernel() -> Any:
+def _load_triton_paged_decode_kernel() -> TritonKernel:
     """Compile and cache the portable Triton NHD GQA Paged Decode kernel."""
     import triton
     import triton.language as tl
@@ -512,9 +511,11 @@ def run_gqa_paged_decode_triton(
 
 
 def _try_splitk_gqa(
-    prototype_args: list[Any],
+    prototype_args: list[object],
 ) -> tuple[Callable[..., torch.Tensor], str] | None:
-    q, k_cache, _v, _indptr, kv_indices, _last_len = prototype_args
+    q = _as_tensor(prototype_args[0])
+    k_cache = _as_tensor(prototype_args[1])
+    kv_indices = _as_tensor(prototype_args[4])
     if not supports_splitk_gqa(q, k_cache):
         return None
     num_cus = (
@@ -530,7 +531,7 @@ def _try_splitk_gqa(
     )
     workspace = allocate_splitk_gqa_workspace(q, num_splits)
 
-    def _run_splitk(*args: Any) -> torch.Tensor:
+    def _run_splitk(*args: object) -> torch.Tensor:
         return run_gqa_paged_decode_splitk(*args, workspace=workspace)
 
     try:
@@ -542,7 +543,7 @@ def _try_splitk_gqa(
 
 def make_gqa_paged_decode_runner(
     *,
-    prototype_args: list[Any],
+    prototype_args: list[object],
     device: str,
     backend: KernelBackend = KernelBackend.AUTO,
     max_atol: float = 2e-2,
@@ -619,7 +620,7 @@ def ref_mla_paged_decode(
 
 def make_mla_paged_decode_runner(
     *,
-    prototype_args: list[Any],
+    prototype_args: list[object],
     device: str,
     backend: KernelBackend = KernelBackend.AUTO,
     max_atol: float = 2e-2,
@@ -644,8 +645,11 @@ def make_mla_paged_decode_runner(
             implementation_name="pytorch_mla_ref",
             candidate_args=prototype_args,
         )
-    q, kv_cache, _indptr, kv_indices, _last_len, d_ckv = prototype_args
-    if supports_splitk_mla(q, kv_cache, int(d_ckv)):
+    q = _as_tensor(prototype_args[0])
+    kv_cache = _as_tensor(prototype_args[1])
+    kv_indices = _as_tensor(prototype_args[3])
+    d_ckv = _as_int(prototype_args[5])
+    if supports_splitk_mla(q, kv_cache, d_ckv):
         num_cus = (
             int(
                 torch.cuda.get_device_properties(q.device).multi_processor_count
@@ -661,7 +665,7 @@ def make_mla_paged_decode_runner(
         )
         workspace = allocate_splitk_mla_workspace(q, int(d_ckv), num_splits)
 
-        def _run_splitk(*args: Any) -> torch.Tensor:
+        def _run_splitk(*args: object) -> torch.Tensor:
             return run_mla_paged_decode_splitk(*args, workspace=workspace)
 
         try:
@@ -707,7 +711,7 @@ def ref_fused_rmsnorm_rope(
 
 def make_fused_rmsnorm_rope_runner(
     *,
-    prototype_args: list[Any],
+    prototype_args: list[object],
     device: str,
     backend: KernelBackend = KernelBackend.AUTO,
     max_atol: float = 2e-2,
@@ -774,7 +778,7 @@ def run_swiglu_fp8_quant_pytorch(
 
 def make_swiglu_fp8_quant_runner(
     *,
-    prototype_args: list[Any],
+    prototype_args: list[object],
     device: str,
     fp8_dtype: torch.dtype,
     backend: KernelBackend = KernelBackend.AUTO,
