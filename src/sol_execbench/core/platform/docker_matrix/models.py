@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal, TypedDict
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -146,6 +146,30 @@ class DockerPreflightObservation(BaseModelWithDocstrings):
     """Observed GPU visibility environment values."""
 
 
+class DockerPreflightPreviewPayload(TypedDict):
+    """Shell-consumable JSON payload for Docker preflight classification."""
+
+    schema_version: PlatformArtifactSchema
+    artifact_kind: PlatformPreflightArtifactKind
+    target_id: str
+    validation_scope: str
+    image_repository: str
+    image_tag: str
+    image_digest: str | None
+    build_args: dict[str, str]
+    status: str
+    reason_code: str
+    reason: str
+    benchmark_allowed: bool
+    probes_allowed: bool
+    smoke_allowed: bool
+    score_authority: bool
+    paper_parity_authority: bool
+    leaderboard_authority: bool
+    container_user_space_validated: bool
+    native_host_validated: bool
+
+
 class DockerPreflightResult(BaseModelWithDocstrings):
     """Matrix-compatible classification for one Docker preflight observation."""
 
@@ -158,7 +182,7 @@ class DockerPreflightResult(BaseModelWithDocstrings):
     build_args: dict[str, str]
     """Docker build args associated with the selected Target."""
 
-    def to_preview_payload(self) -> dict[str, Any]:
+    def to_preview_payload(self) -> DockerPreflightPreviewPayload:
         """Return shell-consumable JSON for preflight classification."""
         entry_payload = self.entry.model_dump(mode="json")
         decision_payload = self.decision.model_dump(mode="json")

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import ConfigDict
 
@@ -102,7 +102,7 @@ class DependencyPreflightResult(BaseModelWithDocstrings):
     policy: PytorchDependencyPolicy
     """Selected Target dependency policy used for classification."""
 
-    def to_preview_payload(self) -> dict[str, Any]:
+    def to_preview_payload(self) -> dict[str, object]:
         """Return shell-consumable JSON for dependency preflight classification."""
         entry_payload = self.entry.model_dump(mode="json")
         decision_payload = self.decision.model_dump(mode="json")

@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from enum import StrEnum
 from importlib import resources
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import ConfigDict, Field
 
@@ -110,7 +110,7 @@ def _normalize_gfx_token(gfx_target: str) -> str:
     return gfx_target.split(":", maxsplit=1)[0].strip().lower()
 
 
-def _require_keys(payload: dict[str, Any]) -> None:
+def _require_keys(payload: dict[str, object]) -> None:
     unknown = sorted(set(payload.keys()) - _ALLOWED_BUDGET_KEYS)
     if unknown:
         raise ValueError(
@@ -126,7 +126,7 @@ def _require_keys(payload: dict[str, Any]) -> None:
 
 
 def arch_capability_budget_from_dict(
-    payload: dict[str, Any],
+    payload: dict[str, object],
     *,
     source: str | None = None,
     expected_architecture: str | None = None,

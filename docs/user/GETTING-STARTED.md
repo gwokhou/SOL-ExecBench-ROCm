@@ -2,9 +2,10 @@
 
 ## Install
 
-Requirements are Python 3.12 and `uv`. Live evaluation additionally requires a
-ROCm-capable AMD GPU, a ROCm PyTorch build and access to `/dev/kfd` and
-`/dev/dri`.
+Requirements are Python 3.14 locally (`uv sync --all-groups`, while all
+first-party Python sources remain compatible with Python 3.12+ for cloud ROCm
+containers) and `uv`. Live evaluation additionally requires a ROCm-capable AMD
+GPU, a ROCm PyTorch build and access to `/dev/kfd` and `/dev/dri`.
 
 ```bash
 git clone https://github.com/gwokhou/SOL-ExecBench-ROCm.git
@@ -89,6 +90,20 @@ uv run sol-execbench evaluate tests/sol_execbench/samples/nemotron_rms_norm \
 For native solutions, `--static-evidence auto --decision auto` requests static
 artifacts and resource hints. These sidecars are diagnostic and never replace
 Trace JSONL or change correctness/scoring authority.
+
+## Vertical 3-tier SOL diagnosis (`sol-execbench vertical`)
+
+Run a CPU-safe local smoke sweep or verify the Python 3.12 container twin
+preflight for the 6-family ROCm inference suite (`FP8 GEMM`, `GQA`, `MLA`,
+`MoE`, `RMSNorm+RoPE`, `SwiGLU+FP8`):
+
+```bash
+uv run sol-execbench vertical run --mode smoke --device cpu --target-override MI300X --output-dir out/vertical-smoke
+uv run sol-execbench vertical preflight twin --target MI300X
+```
+
+See [docs/v0.1_mi300x_sol_report.md](../v0.1_mi300x_sol_report.md) for the
+MI300X 3-tier (`portable` / `vLLM` / `AITER`) methodology and results.
 
 ## Pinned corpus
 

@@ -9,7 +9,6 @@ import ast
 import shlex
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import yaml
 
@@ -20,7 +19,7 @@ class AKATask:
 
     aka_root: Path
     task_path: str
-    config: dict[str, Any]
+    config: dict[str, object]
 
     @property
     def root(self) -> Path:
@@ -35,9 +34,10 @@ class AKATask:
     @property
     def target_kernel_functions(self) -> tuple[str, ...]:
         """Return the kernel functions targeted by the task."""
-        return tuple(
-            str(s) for s in (self.config.get("target_kernel_functions") or [])
-        )
+        raw = self.config.get("target_kernel_functions")
+        if not isinstance(raw, list):
+            return ()
+        return tuple(str(s) for s in raw)
 
 
 def read_task(aka_root: str | Path, task_path: str) -> AKATask:
@@ -66,7 +66,8 @@ def functional_reference_path(task: AKATask) -> Path:
 
 def correctness_runner_path(task: AKATask) -> Path:
     """Resolve the Python file named by a task's correctness command."""
-    commands = task.config.get("correctness_command") or []
+    raw_commands = task.config.get("correctness_command")
+    commands = raw_commands if isinstance(raw_commands, list) else []
     for command in commands:
         try:
             tokens = shlex.split(str(command))
@@ -86,7 +87,9 @@ def correctness_runner_path(task: AKATask) -> Path:
 
 
 def _py_func_file_from_config(task: AKATask) -> Path | None:
-    for command in task.config.get("correctness_command") or []:
+    raw_commands = task.config.get("correctness_command")
+    commands = raw_commands if isinstance(raw_commands, list) else []
+    for command in commands:
         try:
             tokens = shlex.split(str(command))
         except ValueError:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, Protocol
+from typing import Literal, Protocol
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -30,7 +30,7 @@ RuntimeFailureCategory = Literal[
 class ModelDumpable(Protocol):
     """Minimal Pydantic-compatible serialization protocol."""
 
-    def model_dump(self, *, mode: str) -> dict[str, Any]:
+    def model_dump(self, *, mode: str) -> dict[str, object]:
         """Serialize the model using the requested Pydantic mode."""
         ...
 

@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, model_validator
 
@@ -168,7 +168,7 @@ class Definition(CurrentSchemaModel):
         return _get_axes_values(self, input_shapes)
 
     def get_axes_values_from_inputs(
-        self, inputs: Iterable[Any]
+        self, inputs: Iterable[object]
     ) -> dict[str, int]:
         """Get concrete variable axis values directly from input values."""
         return _get_axes_values_from_inputs(self, inputs)

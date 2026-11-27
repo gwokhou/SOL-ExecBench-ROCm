@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 from enum import StrEnum
-from typing import Any, ClassVar, Literal
+from typing import ClassVar, Literal
 
 from pydantic import Field, field_validator, model_validator
 
@@ -306,7 +306,7 @@ class ReleaseBundle(CurrentSchemaMixin, ReleaseModel):
         return self
 
 
-def release_model_payload(model: ReleaseModel) -> dict[str, Any]:
+def release_model_payload(model: ReleaseModel) -> dict[str, object]:
     """Return a JSON-ready release payload without lossy conversions."""
     return model.model_dump(mode="json")
 

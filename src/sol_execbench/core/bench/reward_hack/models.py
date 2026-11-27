@@ -29,7 +29,6 @@ import re
 import sys
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
 
 
 class RewardHackError(RuntimeError):
@@ -78,7 +77,7 @@ class SourceReview:
             for issue in self.issues
         )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """Return a JSON-serializable review payload."""
         return {
             "blocked": self.blocked,

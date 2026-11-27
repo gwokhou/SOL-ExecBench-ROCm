@@ -9,7 +9,9 @@ uv run --with ruff ruff format .
 uv run ty check
 uv run python scripts/check_coupling.py
 uv run python scripts/check_readability.py
+uv run python scripts/check_dataclass_policy.py
 uv run python scripts/check_production_reachability.py
+uv run sol-execbench vertical preflight twin --target MI300X
 uv run pytest tests/ -q
 ```
 
@@ -50,6 +52,7 @@ uv run sol-execbench evaluate tests/sol_execbench/samples/custom_inputs_matmul \
 | `src/sol_execbench/core/scoring` | formula, aggregation and release authority |
 | `src/sol_execbench/core/solar_bridge` | only benchmark-to-SOLAR adapter |
 | `src/sol_execbench/driver` | staging and generated process templates |
+| `src/sol_execbench/vertical` | `v0.1` 6-family vertical 3-tier ROCm SOL diagnosis suite (`sol-execbench vertical`) |
 | `src/solar/graph` | operator graph extraction |
 | `src/solar/ir/extended_einsum` | strict executable extended-einsum conversion |
 | `src/solar/verification` | conversion proof |

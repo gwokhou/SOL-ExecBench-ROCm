@@ -182,7 +182,12 @@ def build_trace_record(
     clocks_locked: bool,
 ) -> Trace:
     """Emit a standard FlashInfer-Trace ``Trace`` record without custom schemas."""
-    matched_ratio = float((correctness.extra or {}).get("matched_ratio", 0.0))
+    raw_matched = (correctness.extra or {}).get("matched_ratio", 0.0)
+    matched_ratio = (
+        float(raw_matched)
+        if isinstance(raw_matched, (int, float, str))
+        else 0.0
+    )
     enriched = correctness.model_copy(
         update={
             "check_results": [

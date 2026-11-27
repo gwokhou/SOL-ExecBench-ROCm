@@ -5,8 +5,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from pydantic import ConfigDict, Field
 
 from sol_execbench.core.data.base_model import (
@@ -90,7 +88,7 @@ class AKACorpusEntrySchema(_AKAModel):
     exclusion_reason_code: str = ""
     workload_uuids: list[str] = Field(min_length=1)
     aka_artifacts: list[AKAArtifactBindingSchema]
-    golden: dict[str, Any]
+    golden: dict[str, object]
 
 
 class AKAMaterializedProblemSchema(_AKAModel):
@@ -193,7 +191,7 @@ class AKAMaterializationManifestSchema(CurrentSchemaModel):
     selection_policy: AKASelectionPolicySchema
     problems: list[AKAMaterializedSelectionSchema]
     workload_decisions: list[AKAWorkloadDecisionSchema]
-    coverage: dict[str, Any]
+    coverage: dict[str, object]
 
 
 __all__ = ["AKACorpusManifestSchema", "AKAMaterializationManifestSchema"]

@@ -151,6 +151,7 @@ src/
       solar_bridge/      sole benchmark-to-SOLAR adapter
       evaluator_contract.py
     driver/              staging and generated process templates
+    vertical/            v0.1 6-family vertical 3-tier ROCm SOL diagnosis suite
   solar/
     graph/               operator graph extraction
     ir/

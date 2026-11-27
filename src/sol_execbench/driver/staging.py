@@ -8,7 +8,6 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
-from typing import Any
 
 from sol_execbench.core.bench.reference_protocol import TRUSTED_DEFINITION_FILE
 from sol_execbench.core.bench.reward_hack.models import (
@@ -50,7 +49,7 @@ def _candidate_reference_stub(definition: Definition) -> str:
 def stage_definition_files(definition: Definition, output_dir: Path) -> None:
     """Write a worker-only definition and a candidate-visible redacted copy."""
     stage_trusted_definition_file(definition, output_dir)
-    candidate_definition: dict[str, Any] = definition.model_dump(mode="json")
+    candidate_definition: dict[str, object] = definition.model_dump(mode="json")
     candidate_definition["reference"] = _candidate_reference_stub(definition)
     (output_dir / "definition.json").write_text(
         json.dumps(candidate_definition),

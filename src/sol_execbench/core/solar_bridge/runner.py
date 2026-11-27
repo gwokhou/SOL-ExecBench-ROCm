@@ -11,7 +11,6 @@ import sys
 import tempfile
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 from sol_execbench.core.data.json_utils import (
     atomic_write_json_value,
@@ -101,13 +100,13 @@ def run_solar_stage_worker(
 
 
 def _run_worker_payload(
-    request: Mapping[str, Any],
+    request: Mapping[str, object],
     *,
     module: str,
     timeout_seconds: float,
     observation_path: Path | None = None,
     resource_budget: WorkerResourceBudget | None = None,
-) -> tuple[Mapping[str, Any] | None, tuple[str, str] | None]:
+) -> tuple[Mapping[str, object] | None, tuple[str, str] | None]:
     with tempfile.TemporaryDirectory(
         prefix="sol-execbench-solar-worker-",
     ) as temp:

@@ -3,7 +3,7 @@
 
 """Strict current schema for rocprofv3 overhead calibration artifacts."""
 
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import Field
 
@@ -46,7 +46,7 @@ class Rocprofv3OverheadCalibration(CurrentSchemaModel):
     profiler_executable_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     clock_locked: bool
     clock_setup: CalibrationClockSetup
-    gpu_isolation: dict[str, Any]
+    gpu_isolation: dict[str, object]
     baseline_sample_count: int = Field(gt=0)
     profiler_sample_count: int = Field(gt=0)
     source_revision: str | None = None

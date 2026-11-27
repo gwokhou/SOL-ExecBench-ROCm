@@ -18,15 +18,13 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import torch
 
 from sol_execbench.core.data.definition import Definition
 
 
 def normalize_outputs(
-    out: Any,
+    out: object,
     *,
     device: torch.device,
     output_names: list[str],
@@ -34,7 +32,7 @@ def normalize_outputs(
 ) -> dict[str, torch.Tensor]:
     """Normalize supported return forms to named output tensors."""
 
-    def to_tensor(name: str, v: Any) -> torch.Tensor:
+    def to_tensor(name: str, v: object) -> torch.Tensor:
         if isinstance(v, torch.Tensor):
             if v.device != device:
                 if v.dtype == torch.float4_e2m1fn_x2:
@@ -51,7 +49,9 @@ def normalize_outputs(
 
     if isinstance(out, dict):
         return {
-            k: to_tensor(k, v) for k, v in out.items() if k in output_dtypes
+            k: to_tensor(k, v)
+            for k, v in out.items()
+            if isinstance(k, str) and k in output_dtypes
         }
 
     if isinstance(out, torch.Tensor):

@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -68,7 +68,7 @@ class CalibrationProbeIdentity(StrictArtifactModel):
     pcie_topology: PCIeTopologyIdentity | None = None
     total_memory_bytes: int = Field(gt=0)
     compiler_version: str = Field(min_length=1)
-    isa: dict[str, Any]
+    isa: dict[str, object]
 
     @model_validator(mode="after")
     def _topology_terminates_at_gpu(self) -> CalibrationProbeIdentity:
@@ -82,7 +82,7 @@ class CalibrationProbeIdentity(StrictArtifactModel):
 
 def calibration_probe_identity_payload(
     identity: CalibrationProbeIdentity,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Return the hash payload while preserving endpoint-only evidence IDs."""
     payload = identity.model_dump(mode="json")
     if identity.pcie_topology is None:

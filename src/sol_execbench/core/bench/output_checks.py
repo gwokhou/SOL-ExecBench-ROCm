@@ -43,7 +43,12 @@ def _numeric_elementwise(
     round_index: int,
 ) -> tuple[NumericCheckResult, Correctness]:
     metrics, exceeds = compute_error_stats(output, reference, check)
-    matched_ratio = float((metrics.extra or {}).get("matched_ratio", 0.0))
+    raw_matched = (metrics.extra or {}).get("matched_ratio", 0.0)
+    matched_ratio = (
+        float(raw_matched)
+        if isinstance(raw_matched, (int, float, str))
+        else 0.0
+    )
     result = NumericCheckResult(
         output=check.output,
         round_index=round_index,

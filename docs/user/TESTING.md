@@ -15,6 +15,7 @@ ROCm machine. Use `-n 0` when debugging subprocess/native-extension tests.
 uv run pytest tests/solar -q -n 0
 uv run pytest tests/sol_execbench/core -q -n 0
 uv run pytest tests/sol_execbench/cli -q -n 0
+uv run pytest tests/sol_execbench/vertical -q -n 0
 uv run pytest tests/sol_execbench/driver/test_problem_packager.py -q -n 0
 uv run pytest tests/sol_execbench/core/bench/test_reference_protocol.py -q -n 0
 ```
@@ -33,8 +34,10 @@ uv run --with ruff ruff check .
 uv run ty check
 uv run python scripts/check_coupling.py
 uv run python scripts/check_readability.py
+uv run python scripts/check_dataclass_policy.py
 uv run python scripts/check_production_reachability.py
 uv run python scripts/check_current_docs.py
+uv run sol-execbench vertical preflight twin --target MI300X
 ```
 
 These gates scan both `sol_execbench` and `solar`, including package-direction

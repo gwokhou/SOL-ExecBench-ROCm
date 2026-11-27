@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import Field
 
@@ -56,7 +56,7 @@ class ToolProbeResult(BaseModelWithDocstrings):
     """Bounded stderr tail for diagnostics."""
     timeout_seconds: float | None = None
     """Timeout applied to the probe."""
-    parsed: dict[str, Any] = Field(default_factory=dict)
+    parsed: dict[str, object] = Field(default_factory=dict)
     """Conservative parsed fields derived from probe output."""
 
 

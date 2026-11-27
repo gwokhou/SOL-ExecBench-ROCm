@@ -12,7 +12,7 @@ import subprocess
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal, TypedDict
 
 from pydantic import Field
 
@@ -293,10 +293,18 @@ def _successful_profile_result(
     )
 
 
+class ProfileResultMetadata(TypedDict):
+    """Derived fields shared by every Rocprofv3ProfileResult."""
+
+    output_format: str
+    profiler_data_artifacts: bool
+    output_directory_listing: tuple[str, ...]
+
+
 def profile_result_metadata(
     request: Rocprofv3ProfileRequest,
     artifacts: Sequence[Rocprofv3ProfileArtifact] = (),
-) -> dict[str, Any]:
+) -> ProfileResultMetadata:
     """Fields every Rocprofv3ProfileResult derives from the request + artifacts.
 
     Collapses the ``output_format`` / ``profiler_data_artifacts`` /

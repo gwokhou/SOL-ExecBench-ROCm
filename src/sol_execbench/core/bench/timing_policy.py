@@ -13,7 +13,6 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
 
 from sol_execbench.core.data.solution import (
     NATIVE_ROCM_LANGUAGES,
@@ -62,7 +61,7 @@ class TimingPolicy:
     fallback_applied: bool
     reason: str
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """Return a JSON-serializable policy payload."""
         return {
             "source_type": self.source_type,

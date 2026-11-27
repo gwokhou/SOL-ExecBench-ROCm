@@ -7,6 +7,9 @@ requirements.
 
 ## Public contracts and workflows
 
+- [v0.1 MI300X vertical SOL report](v0.1_mi300x_sol_report.md) documents the
+  active `sol-execbench vertical` 3-tier (`portable` vs. `vLLM` vs. `AITER`)
+  ROCm inference SOL diagnosis suite across 6 primitive families (34 workloads).
 - [Definition](user/definition.md), [Workload](user/workload.md),
   [Solution](user/solution.md), and [Trace](user/trace.md) define the accepted
   benchmark inputs and canonical result.

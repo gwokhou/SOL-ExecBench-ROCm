@@ -10,7 +10,6 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from sol_execbench.core.platform.source_state import (
     GitSourceState,
@@ -79,7 +78,7 @@ def verify_release_source_state(
 
 
 def release_execution_identity_from_payload(
-    payload: Mapping[str, Any],
+    payload: Mapping[str, object],
     *,
     expected_source_revision: str,
 ) -> ReleaseExecutionIdentity:

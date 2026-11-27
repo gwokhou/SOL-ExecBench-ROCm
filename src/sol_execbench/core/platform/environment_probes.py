@@ -8,7 +8,6 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
-from typing import Any
 
 from sol_execbench.core.platform.environment_models import (
     DEFAULT_PROBE_TIMEOUT_SECONDS,
@@ -140,12 +139,12 @@ def collect_pytorch_rocm_summary() -> PytorchRocmSummary:
         )
 
 
-def parse_probe_output(output: str) -> dict[str, Any]:
+def parse_probe_output(output: str) -> dict[str, object]:
     """Extract stable facts from a bounded tool probe output."""
     # ROCm 7.2 emits generic labels such as ``gfx12`` in addition to concrete
     # ISA targets.  Only the latter identify a device architecture.
     gfx_targets = sorted(set(re.findall(r"\bgfx[0-9a-fA-F]{3,}\b", output)))
-    parsed: dict[str, Any] = {}
+    parsed: dict[str, object] = {}
     if gfx_targets:
         parsed["gfx_targets"] = gfx_targets
     marketing_names = []

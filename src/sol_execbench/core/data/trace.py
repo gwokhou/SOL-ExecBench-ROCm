@@ -19,7 +19,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, field_validator, model_validator
 
@@ -109,7 +109,7 @@ class Correctness(BaseModelWithDocstrings):
     """True when the solution or reference output contains NaN values."""
     has_inf: bool = Field(default=False)
     """True when the solution or reference output contains Inf values (but no NaN)."""
-    extra: dict[str, Any] | None = Field(default=None)
+    extra: dict[str, object] | None = Field(default=None)
     """Extra metrics for correctness evaluation."""
     check_results: list[OutputCheckResult] = Field(default_factory=list)
     """Typed per-check metrics for every executed correctness round."""

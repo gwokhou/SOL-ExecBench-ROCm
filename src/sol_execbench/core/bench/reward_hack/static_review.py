@@ -28,7 +28,6 @@ import ast
 import re
 from collections.abc import Iterable
 from pathlib import PurePosixPath
-from typing import Any
 
 import torch
 
@@ -64,7 +63,7 @@ from sol_execbench.core.bench.reward_hack.models import (
 
 
 def review_solution_sources(
-    solution: Any,
+    solution: object,
     *,
     output_dtypes: dict[str, torch.dtype] | None = None,
 ) -> SourceReview:

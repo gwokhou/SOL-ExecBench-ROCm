@@ -8,7 +8,6 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from pydantic import ValidationError
 
@@ -52,7 +51,7 @@ class OfficialScoreResult:
     release_bundle_sha256: str
     suite: SuiteScore
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """Return a JSON-compatible official score result."""
         return {
             "status": "official",

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from importlib.resources import files
 from pathlib import Path
-from typing import Any
+from typing import TypedDict
 
 from sol_execbench.core.platform.compatibility import (
     MatrixClaimBoundary,
@@ -192,6 +192,28 @@ def _selection_entry_for_preview(
     return preview_selection.entry, preview_selection.decision
 
 
+class DockerTargetSelectionPayload(TypedDict):
+    """Shell-consumable JSON payload for Docker Target selection."""
+
+    target_id: str
+    validation_scope: str
+    image_repository: str
+    image_tag: str
+    image_digest: str | None
+    build_args: dict[str, str]
+    status: str
+    reason_code: str
+    reason: str
+    benchmark_allowed: bool
+    probes_allowed: bool
+    smoke_allowed: bool
+    score_authority: bool
+    paper_parity_authority: bool
+    leaderboard_authority: bool
+    container_user_space_validated: bool
+    native_host_validated: bool
+
+
 def preview_docker_target_selection(
     target_id: str | None = None,
     *,
@@ -200,7 +222,7 @@ def preview_docker_target_selection(
     override_image_repository: str | None = None,
     override_image_tag: str | None = None,
     image_digest: str | None = None,
-) -> dict[str, Any]:
+) -> DockerTargetSelectionPayload:
     """Return shell-consumable JSON data for Docker Target selection."""
     selection = select_docker_target(
         target_id,

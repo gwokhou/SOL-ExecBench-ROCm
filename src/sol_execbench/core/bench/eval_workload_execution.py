@@ -7,7 +7,6 @@ from __future__ import annotations
 import gc
 import os
 from pathlib import Path
-from typing import Any
 
 import torch
 
@@ -38,6 +37,7 @@ from sol_execbench.core.bench.reward_hack import (
 )
 from sol_execbench.core.data.trace import (
     CacheClearEvidence,
+    Correctness,
     EvaluationStatus,
     Performance,
 )
@@ -123,7 +123,7 @@ def _measure_and_emit(
     row_index: int,
     resolved_axes: dict[str, int],
     timing_case: ReferenceTimingCase,
-    correctness: Any,
+    correctness: Correctness,
 ) -> None:
     _release_device_cache()
     # Event guards catch every standard Python thread start during timing,

@@ -16,7 +16,6 @@ CURRENT_DOCS = (
     ROOT / "HANDSOFF.md",
     *sorted((ROOT / "docs").rglob("*.md")),
     ROOT / "scripts" / "internal" / "README.md",
-    *sorted((ROOT / "scripts" / "patches").rglob("*.md")),
 )
 RETIRED_REFERENCES = (
     "docs/internal/solar-three-stage-readiness.md",
@@ -46,6 +45,7 @@ RETIRED_REFERENCES = (
     "diagnostics lifecycle gc \\\n  --store-root data/store --delete",
     "scripts/mvp_v1",
     "py312_compat.py",
+    "scripts/patches/gfx1200_sq_wave_cycles",
 )
 REQUIRED_REFERENCES = {
     "docs/performance-diagnostics.md": (

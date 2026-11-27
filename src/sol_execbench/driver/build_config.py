@@ -9,7 +9,6 @@ import re
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
 
 from sol_execbench.core.data.solution import CompileOptions, SupportedHardware
 from sol_execbench.core.platform.runtime import resolve_rocm_tool
@@ -63,18 +62,31 @@ def gfx_to_offload_arch(gfx: str) -> str:
 
 
 def inject_offload_arch_flags(
-    sol_dict: dict[str, Any],
+    sol_dict: dict[str, object],
     *,
     local_gfx_getter: Callable[[], str | None] = get_local_gfx,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Auto-inject HIP offload architecture flags when none are explicit."""
-    spec = sol_dict["spec"]
-    compile_options = dict(spec.get("compile_options") or {})
+    spec_obj = sol_dict["spec"]
+    if not isinstance(spec_obj, dict):
+        raise TypeError("solution spec must be a mapping")
+    spec: dict[str, object] = {str(k): v for k, v in spec_obj.items()}
+    raw_compile_options = spec.get("compile_options")
+    compile_options: dict[str, object] = (
+        {str(k): v for k, v in raw_compile_options.items()}
+        if isinstance(raw_compile_options, dict)
+        else {}
+    )
     if "hip_cflags" not in compile_options:
         # Preserve the CompileOptions default (e.g. -O3) instead of clobbering
         # it with an empty list when no flags were specified.
         compile_options["hip_cflags"] = list(CompileOptions().hip_cflags)
-    hip_cflags = list(compile_options["hip_cflags"])
+    raw_hip_cflags = compile_options["hip_cflags"]
+    hip_cflags = (
+        [str(flag) for flag in raw_hip_cflags]
+        if isinstance(raw_hip_cflags, list)
+        else []
+    )
 
     if any(
         flag.startswith(("--offload-arch", "-offload-arch", "--amdgpu-target"))
@@ -83,7 +95,10 @@ def inject_offload_arch_flags(
         return sol_dict
 
     offload_arches: list[str] = []
-    target_hw = set(spec.get("target_hardware", []))
+    raw_target_hw = spec.get("target_hardware")
+    target_hw = (
+        set(raw_target_hw) if isinstance(raw_target_hw, (list, set)) else set()
+    )
 
     for hardware in SupportedHardware:
         if hardware is not SupportedHardware.LOCAL and hardware in target_hw:
