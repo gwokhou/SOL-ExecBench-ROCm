@@ -13,7 +13,7 @@
 | 观察 | 证据 | 可以说明什么 |
 | --- | --- | --- |
 | application 与 kernel replay 都有六个 dispatch；`SQ_WAVES` 均为 32，`SQ_INSTS_VALU` 全为 0 | [既有回执](../../data/outputs/stack-upgrade-followup-20261011/counter-replay-final/report.json) | 两种采集模式共同出现异常；replay 模式不是目前最有区分力的变量 |
-| 向量加法及原地更新结果正确 | 同一回执、[探针](../../scripts/internal/upgrade/counter_probe.py) | 输出正确不能证明计数器有效；六个 dispatch 还包含 fill 和 copy，不能全部等同于算术核心 |
+| 向量加法及原地更新结果正确 | 同一回执、探针（`scripts/internal/upgrade/counter_probe.py`，已归档于 tag `v0.1`） | 输出正确不能证明计数器有效；六个 dispatch 还包含 fill 和 copy，不能全部等同于算术核心 |
 | 使用 gfx1200 镜像、`ROCR_VISIBLE_DEVICES=GPU-0000000000000001`、每个 PMC 带 `:device=0` | [实际命令](../../data/outputs/stack-upgrade-followup-20261011/counter-replay-final/pilot.json) | 已有明确设备限定，不应先删掉限定重试所有 GPU |
 | counter CSV 的 `Agent 1` 对应 agent 表中的 gfx1200；agent 表也枚举 gfx1036 | [agent 表](../../data/outputs/stack-upgrade-followup-20261011/counter-replay-final/kernel/probe_agent_info.csv)、[CSV](../../data/outputs/stack-upgrade-followup-20261011/counter-replay-final/kernel/probe_counter_collection.csv) | 枚举到 iGPU 不等于选中它采集；不能把 warning 单独当成错卡证据 |
 | 升级性能采集前后均记录 `AMDSMI_DEV_PERF_LEVEL_AUTO` | [前置快照](../../data/outputs/stack-upgrade-followup-20261011/timing-clocks-before.json)、[后置快照](../../data/outputs/stack-upgrade-followup-20261011/timing-clocks-after.json) | 支持 AUTO 假设，但这不是每次 replay dispatch 同时取得的状态证明；下次 PMC 需独立前后核验 |

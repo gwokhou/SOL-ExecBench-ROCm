@@ -54,7 +54,7 @@
 
 对 24 份已封存的 `d0` 归档比较了 ZIP deflate 和 Zstandard，全部逐成员复核 NPY 字节。Zstandard 6 的编码耗时中位数之和为 1.42 秒，deflate 6 为 5.04 秒。样本总量前者约 32.82 MiB，后者约 32.39 MiB。Zstandard 6 对 LayerNorm 两组样本略省空间，其他组增加，单独换编码不足以抵消全分母的存储缺口。结果见 `data/outputs/solar-e2-dev-calibration-20261118/archive-codec-probe.json`。
 
-第一批 1,332 份离线展开归档含 151,967,428 字节压缩后的重复原始成员。以 GEMM、sum、LayerNorm 的各一份已封存归档验证 [分离式诊断存储](../../scripts/internal/solar/e2_offline_storage.py)，原始包和新增 oracle 包分别保留，收据绑定两份 SHA。对 LayerNorm L0 的一个实际早拒会话重新运行独立诊断，展开包为 206,490 字节，分离包为 184,842 字节，oracle 结果逐字节一致且原数值拒绝仍可查。证据见 `split-archive-probe.json` 和 `split-offline-check.json`。
+第一批 1,332 份离线展开归档含 151,967,428 字节压缩后的重复原始成员。以 GEMM、sum、LayerNorm 的各一份已封存归档验证 分离式诊断存储（`scripts/internal/solar/e2_offline_storage.py`，已归档于 tag `v0.1`），原始包和新增 oracle 包分别保留，收据绑定两份 SHA。对 LayerNorm L0 的一个实际早拒会话重新运行独立诊断，展开包为 206,490 字节，分离包为 184,842 字节，oracle 结果逐字节一致且原数值拒绝仍可查。证据见 `split-archive-probe.json` 和 `split-offline-check.json`。
 
 [输出去重](../../scripts/internal/solar/e2_archive_arrays.py)只复用 dtype、形状和字节均相同的实际／参考／oracle 舍入输出。五份存档经重编码并逐数组复核。在最重 L3 的诊断样本中，归档从 2,316,845 降至 2,217,898 字节，对应原检查样本从 235,857 降至 137,044 字节。证据见 `compact-array-probe.json`。需要在相同执行身份下用完整成本会话测墙钟、实际分配与中断留证，再将两种节省纳入完整预算。
 

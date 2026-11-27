@@ -18,17 +18,17 @@ L3/P0 的反序配对中，在线诊断侧 190 次调用用时 163.23 秒，具�
 
 对全部 26 个正确性槽的 201 份原始工件校验 SHA 后，按原容差复核最小余量。以独立 oracle 的舍入值为中心，按同次调用实际测得的参考偏差逐元素求余量上下界。191 次严格为正，4 次严格为负，6 次跨零或贴近零。GEMM G2、sum R0 和 LayerNorm L3 的三个 P1 见证均有严格负余量。共有 7 次 reference/oracle 分歧。上文 L0/L1 的拒绝点均跨零，仍列为不确定，不能计入已确认误拒。
 
-开发复核录于 `reference-margin-development-review.json`，其源码为 [e2_reference_margin.py](../../scripts/internal/solar/e2_reference_margin.py)。该方法只约束观察到的有限参考偏差；进入后继确认前还需登记适用条件和分类规则。
+开发复核录于 `reference-margin-development-review.json`，其源码为 e2_reference_margin.py（`scripts/internal/solar/e2_reference_margin.py`，已归档于 tag `v0.1`）。该方法只约束观察到的有限参考偏差；进入后继确认前还需登记适用条件和分类规则。
 
 ## 留证预算的实现复核
 
-[预算检查](../../scripts/internal/solar/e2_evidence_budget.py)在前一写入者排水后清点逻辑字节与实际分配块，显式保留下一写入者上限和收尾空间。关闭的在线子树实测 1,878,097,414 逻辑字节、1,886,560,256 分配字节，后者包含目录和台账。记录见 `evidence-admission-fixture.json`。
+预算检查（`scripts/internal/solar/e2_evidence_budget.py`，已归档于 tag `v0.1`）在前一写入者排水后清点逻辑字节与实际分配块，显式保留下一写入者上限和收尾空间。关闭的在线子树实测 1,878,097,414 逻辑字节、1,886,560,256 分配字节，后者包含目录和台账。记录见 `evidence-admission-fixture.json`。
 
-[匿名采集](../../scripts/internal/solar/e2_archive_spool.py)在写入前按文件系统分配单位预留块，拒绝超过上限的下一份包，再用已写文件的实际分配块复核。取 L3 反序配对最后一份原始包，在 CPU 夹具中写入、发布并复验 SHA，保留 2,308,327 逻辑字节，匿名文件预留 2,310,144 字节。记录见 `archive-spool-fixture.json`。这两项组件验证用于后继执行器集成。正式活动启动仍依赖全分母预算和实际中断验证。
+匿名采集（`scripts/internal/solar/e2_archive_spool.py`，已归档于 tag `v0.1`）在写入前按文件系统分配单位预留块，拒绝超过上限的下一份包，再用已写文件的实际分配块复核。取 L3 反序配对最后一份原始包，在 CPU 夹具中写入、发布并复验 SHA，保留 2,308,327 逻辑字节，匿名文件预留 2,310,144 字节。记录见 `archive-spool-fixture.json`。这两项组件验证用于后继执行器集成。正式活动启动仍依赖全分母预算和实际中断验证。
 
-[后继采集进程](../../scripts/internal/solar/e2_successor_capture.py)持有候选进程的 Linux PID 文件描述符，在其退出后发布归档和 nonce。独立分支的暂存评测进程在私有连接关闭后退出，由既有进程组管理器排水。参考进程启用 Linux nondumpable 属性。固定镜像、无设备容器验证了两个 `d0` 会话。GEMM G0/P0 通过并发布 11 个原始包，G2/P1 被原数值检查拒绝并发布 1 个原始包。源码与镜像身份见 `data/outputs/solar-e2-successor-cpu-20261118/launch.json`，判定见同目录 `publication-fixture.json`。
+后继采集进程（`scripts/internal/solar/e2_successor_capture.py`，已归档于 tag `v0.1`）持有候选进程的 Linux PID 文件描述符，在其退出后发布归档和 nonce。独立分支的暂存评测进程在私有连接关闭后退出，由既有进程组管理器排水。参考进程启用 Linux nondumpable 属性。固定镜像、无设备容器验证了两个 `d0` 会话。GEMM G0/P0 通过并发布 11 个原始包，G2/P1 被原数值检查拒绝并发布 1 个原始包。源码与镜像身份见 `data/outputs/solar-e2-successor-cpu-20261118/launch.json`，判定见同目录 `publication-fixture.json`。
 
-[独立输入重放](../../scripts/internal/solar/e2_input_replay.py)使用发布的 nonce、冻结实例 seed、实际 workload 身份和调用坐标复验 12/12 个量化输入，并核对原始包、参考输出、候选输出的摘要。错误 seed 在两个会话上均被拒绝，结果录于 `input-replay.json`。这验证了正常收尾与证据重放接缝，近峰值时的同身份中断还待验证。
+独立输入重放（`scripts/internal/solar/e2_input_replay.py`，已归档于 tag `v0.1`）使用发布的 nonce、冻结实例 seed、实际 workload 身份和调用坐标复验 12/12 个量化输入，并核对原始包、参考输出、候选输出的摘要。错误 seed 在两个会话上均被拒绝，结果录于 `input-replay.json`。这验证了正常收尾与证据重放接缝，近峰值时的同身份中断还待验证。
 
 ## 第一批核验终态与后续补测
 

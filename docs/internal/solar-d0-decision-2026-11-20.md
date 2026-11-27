@@ -2,7 +2,7 @@
 
 > [!IMPORTANT]
 > 本报告正式闭合 [下一轮迭代计划](solar-next-iteration-plan-2026-11-07.md) 的收官里程碑 **`M3 / D0`**（纯 CPU 核验与文档决策，未启动新的 GPU 实验）：
-> - **跨线证据索引核验完成**：由 [d0_synthesis.py](../../scripts/internal/solar/d0_synthesis.py) 对 **`47` 份封存运行收据**与 **`14` 份 M0–M2 不可变报告**完成逐文件 SHA-256 校验，并在未提交目录 `` `data/outputs/solar-next-iteration/20261120-d0/` `` 原子产出四分索引包（`d0-manifest.json` SHA-256 `18dbca28ba6a9cb4a2672d640eaef8d6ae7ed83760b29f07dcd20c349b6557d4`）。
+> - **跨线证据索引核验完成**：由 d0_synthesis.py（`scripts/internal/solar/d0_synthesis.py`，已归档于 tag `v0.1`） 对 **`47` 份封存运行收据**与 **`14` 份 M0–M2 不可变报告**完成逐文件 SHA-256 校验，并在未提交目录 `` `data/outputs/solar-next-iteration/20261120-d0/` `` 原子产出四分索引包（`d0-manifest.json` SHA-256 `18dbca28ba6a9cb4a2672d640eaef8d6ae7ed83760b29f07dcd20c349b6557d4`）。
 > - **官方契约与关键基线不变**：正式评分契约、已发布官方分数 `gfx1200-official-score-v2`（`0.497818327`）、默认 `IRBackend` 与原生算子注册表在本轮均未更改；**`L3-d` 新前端继续暂缓**（`0/12` C3 缺口候选）。
 > - **下一轮立项选定（严格遵守 `<= 3` 项硬上限，推荐执行顺序 `F2 -> F1 -> F3`）**：
 >   1. **`F2`（P0，顺序 1）**：修复 `solar_bridge` / `OrojenesisRunner` 嵌套进程组（Nested-PGID）超时写盘竞态，并将 `7,200 s` `timeloop-mapper` 超时明确归类为显式超时码（纯 CPU 修复，前置解锁 C3 无漂移 `--resume`）。
@@ -34,7 +34,7 @@
 | `C-2` | C 线 | **`BOUNDED_INCOMPLETE`**（12h 有界终态） | `r2` 在 `12.0 h`（`43,200.38 s`）自动停于预算上限，证据体积 `243.92 MiB`（vs `50 GiB`）：已执行 `168/360`（`40 passed`、`111 failed`、`16 unproved`、`1 budget_exhausted`、`0 infrastructure_error`），`192` 行 `not_reached`；`8/20` 定义全 9 槽闭合、`12/20` 仅 `smoke` | [C2/C3 终态报告](solar-c2-c3-results-2026-11-20.md)（`a0da91f1...`）；`` `target-coverage.json` ``（`86dd98e5...`）、`` `c3-resume-closeout.json` ``（`9ec4b4fe...`） | 不可写成完整 `LLM_CORE` 覆盖完成；后续扩展归立项 **`F3`** |
 | `C-3` | C 线 | `PASSED`（覆盖差分洞察） | `0/8` 完整 `make_fx_aten` 定义具 9 槽均一性（`local_global`、`batched_bias`、`batched_matmul` 在非 smoke 槽退化）；`formal:mapper` 占用 **`40,272.21 s`（93.2%）**；双路径共同通过仅 `4` 组 `smoke` `norm_activation` | `` `c3-summary.json` ``（`ba77a820...`） | 证明 `smoke` 不可外推至全槽位；`96` 对双路径行仍 `not_reached` |
 | `C-4` | C 线 | `PASSED`（审计与根因） | 无设备终态审计验证全部 `168` 行语义收据且非超时瞬态 `0` 漂移，并准确定位 `row-167` 嵌套进程组（`PGID_2` `timeloop-mapper` 晚刷盘 `+3.189 s`）导致原目录 `--resume` 受阻；`r1` smoke（`851acbfe...`）与 `r2` 保留件均逐字节未变 | `` `c3-final-audit.json` ``（`91fc0ebd...`）、`` `c3-exposure-ledger.json` ``（`e6969c96...`） | 修复此竞态前保持禁止直接续跑带超时漂移的目录，由立项 **`F2`** 首要解决 |
-| `D-1` | 跨线 | `INVARIANT_PRESERVED` | C3 全部 `12` 类去重缺口的 `l3d_frontend_candidate` 均为 `false`；本轮结束时正式契约、注册表、默认 `IRBackend` 与 `start700` 暂停状态均保持未动 | `` `c3-summary.json` ``（`ba77a820...`）、[d0_synthesis.py](../../scripts/internal/solar/d0_synthesis.py) | `L3-d` 暂缓维持到出现跨双路径不可消解的系统性前端表达缺口为止 |
+| `D-1` | 跨线 | `INVARIANT_PRESERVED` | C3 全部 `12` 类去重缺口的 `l3d_frontend_candidate` 均为 `false`；本轮结束时正式契约、注册表、默认 `IRBackend` 与 `start700` 暂停状态均保持未动 | `` `c3-summary.json` ``（`ba77a820...`）、d0_synthesis.py（`scripts/internal/solar/d0_synthesis.py`，已归档于 tag `v0.1`） | `L3-d` 暂缓维持到出现跨双路径不可消解的系统性前端表达缺口为止 |
 
 ---
 

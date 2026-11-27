@@ -220,8 +220,9 @@ def test_p0_2_vllm_rope_cos_sin_dtype_and_aiter_fp8_moe_bf16(
     monkeypatch.setattr(
         "sol_execbench.vertical.adapters.common._is_rocm_torch", lambda: True
     )
-    x = torch.randn((4, 2, 16), dtype=torch.bfloat16)
-    res = torch.randn((4, 2, 16), dtype=torch.bfloat16)
+    gen = torch.Generator().manual_seed(0)
+    x = torch.randn((4, 2, 16), generator=gen, dtype=torch.bfloat16)
+    res = torch.randn((4, 2, 16), generator=gen, dtype=torch.bfloat16)
     w = torch.ones((16,), dtype=torch.bfloat16)
     cs_f32 = torch.ones((4, 16), dtype=torch.float32)
 

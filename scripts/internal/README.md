@@ -28,3 +28,5 @@ setup.
 
 Retired campaign entry points and their Git recovery locations are recorded in
 the [retirement decisions](../../docs/internal/history-retirement-2026-11-08.md).
+Frozen pre-pivot campaign scaffolding (E2/C2/C3/L3/D0, RDNA4 successor probes,
+and one-off upgrade scripts) was retired after tag `v0.1` (`git show v0.1:<path>`).

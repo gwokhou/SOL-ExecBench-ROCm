@@ -60,36 +60,6 @@ def test_aka_calibration_blocks_before_gpu_records(
         require_evaluation_gpu_lock()
 
 
-def test_diagnostic_calibration_blocks_before_run(
-    load_script: Any,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    script = load_script(
-        "scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py"
-    )
-    ran = False
-    arguments = SimpleNamespace(
-        stage="run",
-        output=Path("calibration.json"),
-        qualification_root=Path("qualification"),
-        gpu_id="gpu",
-        tuning_batches=3,
-        estimation_batches=5,
-    )
-
-    def run(**_kwargs):
-        nonlocal ran
-        ran = True
-
-    monkeypatch.setattr(script, "_parse_args", lambda: arguments)
-    monkeypatch.setattr(script, "_verify_qualification", _reject)
-    monkeypatch.setattr(script, "run_calibration", run)
-
-    with pytest.raises(ValueError, match="gate missing"):
-        script.main()
-    assert ran is False
-
-
 @pytest.mark.usefixtures("native_gpu_cpu_observation")
 def test_resource_peak_successor_blocks_before_legacy_producer(
     load_script: Any,
@@ -140,37 +110,3 @@ def test_resource_peak_successor_blocks_before_legacy_producer(
     assert writes == []  # A missing CPU gate must not acquire or set clocks.
     with pytest.raises(GPULockVerificationError):
         require_evaluation_gpu_lock()
-
-
-def test_cross_path_focus_blocks_before_formal_workers(
-    load_script: Any,
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    script = load_script("scripts/internal/solar/run_cross_path_focus.py")
-    ran = False
-    arguments = SimpleNamespace(
-        stage="run",
-        manifest=tmp_path / "manifest.yaml",
-        timeout=10,
-        output=tmp_path / "output",
-        orojenesis_home=tmp_path / "orojenesis",
-        qualification_root=tmp_path / "qualification",
-        device="cuda:0",
-        resume=False,
-    )
-
-    def run(*_args, **_kwargs):
-        nonlocal ran
-        ran = True
-
-    monkeypatch.setattr(script, "_parse_args", lambda _argv=None: arguments)
-    monkeypatch.setattr(
-        script.AKACorpusManifest, "load", lambda _path: object()
-    )
-    monkeypatch.setattr(script, "_verify_qualification", _reject)
-    monkeypatch.setattr(script, "run_focus", run)
-
-    with pytest.raises(ValueError, match="gate missing"):
-        script.main([])
-    assert ran is False
