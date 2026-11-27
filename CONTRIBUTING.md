@@ -27,20 +27,26 @@ uv run ty check
 uv run pytest tests/
 ```
 
-The CI workflow splits static quality, CPU-safe package tests, and Solar tests
-with branch coverage into three parallel jobs. Each job uses the locked
-dependency set and the shared uv cache:
+The CI workflow splits dependency review, static quality (Ruff, Ty, and
+architecture guardrails), package tests with `sol_execbench` coverage gates,
+the default eight-worker suite + standalone wheel verification, macOS
+development checks, and Solar branch-coverage tests into parallel jobs. Each
+Python job uses the locked dependency set and the shared uv cache:
 
 ```bash
 uv sync --locked --all-groups
 uv run --no-sync ruff check .
 uv run --no-sync ruff format --check .
 uv run --no-sync ty check
-uv run --no-sync pytest tests/sol_execbench \
-  --ignore=tests/sol_execbench/driver/test_eval_driver.py \
-  --ignore=tests/sol_execbench/test_e2e.py
-uv run --no-sync pytest tests/tools
+uv run --no-sync coverage run -m pytest -n 0 tests/sol_execbench
+uv run --no-sync coverage combine
+uv run --no-sync coverage json -o sol-execbench-coverage.json
+uv run --no-sync python scripts/check_solar_coverage.py \
+  sol-execbench-coverage.json \
+  --policy scripts/sol_execbench_coverage_policy.json
+uv run --no-sync pytest tests/tools tests/scripts
 uv run --no-sync coverage run -m pytest -n 0 tests/solar
+uv run --no-sync coverage combine
 uv run --no-sync coverage json -o coverage.json
 uv run --no-sync python scripts/check_solar_coverage.py coverage.json
 ```
@@ -56,8 +62,10 @@ and [Testing](docs/user/TESTING.md) for more detail.
 
 ## Coding Standards
 
-- Use Python `>=3.14,<3.15,!=3.14.1` on Linux x86-64; `.python-version` pins local development to
-  Python 3.14.
+- Use Python `>=3.14,<3.15,!=3.14.1` locally on Linux x86-64 (`.python-version`
+  pins local development to Python 3.14), while keeping all first-party Python
+  source syntax compatible with Python 3.12+ (`[tool.ruff] target-version = "py312"`)
+  for cloud MI300X ROCm containers.
 - Follow Ruff formatting and linting from `pyproject.toml`.
 - Run Ty type checks over `src` and `tests`.
 - Use `snake_case` for modules, functions, and variables.
@@ -80,9 +88,10 @@ Type check:
 uv run ty check
 ```
 
-The `Python Quality` GitHub Actions workflow runs three parallel jobs on Python
-3.14: static quality, CPU-safe package tests, and Solar tests with branch
-coverage.
+The `Python Quality` GitHub Actions workflow runs parallel jobs on Python 3.14
+for static quality, `sol_execbench` package/tools/scripts tests with coverage
+gates, the default eight-worker test suite + wheel isolation check, macOS
+development checks, and Solar tests with branch coverage.
 
 Default pre-commit setup installs Ruff hooks, the commit-message DCO check,
 and the pre-push Ty check:
@@ -141,26 +150,30 @@ For hardware-sensitive changes, record the ROCm version, GPU architecture, GPU
 product, container target if used, exact test commands, ROCm timing evidence,
 AMD-native score, and any NVFP4/MXFP4 unsupported status in the PR.
 
-Current CDNA3 evidence is MI308X (`gfx942`) validation infrastructure evidence,
-not MI300X validation. MI300X and MI308X are sibling GPU products under the
-CDNA3 architecture family and share `gfx942`, but do not describe MI308X runs
-as MI300X hardware validation. For any CDNA3 validation change, record whether
-the run produced the relevant evidence chain: full pytest log, dataset summary,
-environment report, clock-lock evidence, per-problem traces, ROCm timing evidence,
-AMD-native score report, FP8 status, and NVFP4/MXFP4 unsupported status. Until that
-evidence exists for the exact claim, describe CDNA3 work as schema support, test
-readiness, infrastructure evidence, or a bounded validation gap.
+For `v0.1` vertical 3-tier SOL diagnosis on `MI300X (gfx942)`, see
+[docs/v0.1_mi300x_sol_report.md](docs/v0.1_mi300x_sol_report.md) and
+[HANDSOFF.md](HANDSOFF.md). Separately, formal `sol-execbench solar analyze`
+publication and official scoring remain `gfx1200`-only: MI300X and MI308X are
+sibling GPU products under the CDNA3 architecture family (`gfx942`), so never
+conflate MI308X validation infrastructure evidence with MI300X evidence or with
+formal `gfx942` SOLAR calibration. For any CDNA3 formal-path validation change,
+record whether the run produced the relevant evidence chain: full pytest log,
+dataset summary, environment report, clock-lock evidence, per-problem traces,
+ROCm timing evidence, AMD-native score report, FP8 status, and NVFP4/MXFP4
+unsupported status. Until that evidence exists for the exact claim, describe
+formal CDNA3 work as schema support, test readiness, infrastructure evidence,
+or a bounded validation gap.
 
 NVFP4/MXFP4 Quant ROCm adaptation has no representative CDNA4 hardware
 evidence. CDNA3 expected skips for those problems are not CPU validation,
 dequantized benchmark validation, or performance evidence.
 
-The non-formal gfx942 path selects spec-derived engineering artifacts — the
-`MI300X` SOLAR profile, the provisional `gfx942_v1.yaml` counter manifest, and
-the provisional `cdna3_total_memory_class.v1` VRAM policy — and reports
-engineering/inexact results. These must be re-derived on real gfx942 hardware
-(HANDSOFF P1) before any formal gfx942 publication. Formal SOLAR analysis and
-official scoring remain gfx1200-only.
+The non-formal `gfx942` SOLAR path selects spec-derived engineering artifacts —
+the `MI300X` SOLAR profile, the `gfx942_v1.yaml` counter manifest, and the
+provisional `cdna3_total_memory_class.v1` VRAM policy — and reports
+engineering/inexact results; formal `gfx942` calibration remains out of scope
+under the `v0.1` stop-loss policy in [HANDSOFF.md](HANDSOFF.md). Formal SOLAR
+analysis and official scoring remain `gfx1200`-only.
 
 ## Documentation
 
@@ -221,10 +234,11 @@ PRs should include:
 No repository PR template is currently present under `.github/`, so include
 these details directly in the pull request description.
 
-The `Python Quality` GitHub Actions workflow runs three parallel Python 3.14
-jobs for static quality, CPU-safe package tests, and Solar branch coverage.
-Every job uses `uv sync --locked --all-groups`, the shared uv cache, and bounded
-job timeouts.
+The `Python Quality` GitHub Actions workflow runs parallel Python 3.14 jobs for
+static quality, `sol_execbench` package/tools/scripts tests with coverage, the
+default eight-worker suite + wheel verification, macOS development checks, and
+Solar branch coverage. Every Python job uses `uv sync --locked --all-groups`,
+the shared uv cache, and bounded job timeouts.
 
 ## Issue Reporting
 

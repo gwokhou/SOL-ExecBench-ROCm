@@ -44,6 +44,8 @@ RETIRED_REFERENCES = (
     "diagnostics lifecycle status \\\n  --run data/store/runs/",
     "diagnostics lifecycle resume \\\n  --run data/store/runs/",
     "diagnostics lifecycle gc \\\n  --store-root data/store --delete",
+    "scripts/mvp_v1",
+    "py312_compat.py",
 )
 REQUIRED_REFERENCES = {
     "docs/performance-diagnostics.md": (

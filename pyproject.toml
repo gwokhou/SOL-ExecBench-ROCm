@@ -263,7 +263,6 @@ missing-type-argument = "ignore"
 
 [[tool.ty.overrides]]
 include = [
-    "src/sol_execbench/vertical/kernels.py",
     "src/sol_execbench/vertical/triton_kernels.py",
     "src/sol_execbench/vertical/triton_ops_ext.py",
 ]

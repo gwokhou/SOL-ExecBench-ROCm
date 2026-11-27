@@ -28,9 +28,9 @@ MVP_BACKEND="${MVP_BACKEND:-auto}"
 MVP_COUNTERS_FLAG="${MVP_COUNTERS_FLAG:---collect-counters}"
 MVP_CLOCKS_FLAG="${MVP_CLOCKS_FLAG:---lock-clocks}"
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
-OUT_DIR="${MVP_OUTPUT_DIR:-${REPO_ROOT}/data/outputs/mvp_v1_cloud_${TS}}"
+OUT_DIR="${VERTICAL_OUTPUT_DIR:-${MVP_OUTPUT_DIR:-${REPO_ROOT}/data/outputs/vertical_cloud_${TS}}}"
 
-echo "=== v0.1 MVP Cloud Preflight ==="
+echo "=== v0.1 Vertical Cloud Preflight ==="
 "${PY}" -c '
 import torch
 print("torch:", torch.__version__, "hip:", getattr(torch.version, "hip", None), "cuda_avail:", torch.cuda.is_available())

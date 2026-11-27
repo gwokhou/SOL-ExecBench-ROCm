@@ -6,6 +6,10 @@
     "branch": 60.0
   },
   "files": {
+    "src/sol_execbench/cli/commands/vertical.py": {
+      "line": 80.0,
+      "branch": 75.0
+    },
     "src/sol_execbench/core/bench/eval_output_integrity.py": {
       "line": 80.0,
       "branch": 65.0
@@ -34,9 +38,25 @@
       "line": 85.0,
       "branch": 75.0
     },
+    "src/sol_execbench/vertical/anti_distortion.py": {
+      "line": 75.0,
+      "branch": 50.0
+    },
+    "src/sol_execbench/vertical/cloud_preflight.py": {
+      "line": 72.0,
+      "branch": 50.0
+    },
     "src/sol_execbench/vertical/cloud_runner.py": {
       "line": 85.0,
       "branch": 65.0
+    },
+    "src/sol_execbench/vertical/counter_capture.py": {
+      "line": 72.0,
+      "branch": 40.0
+    },
+    "src/sol_execbench/vertical/kernels.py": {
+      "line": 72.0,
+      "branch": 60.0
     },
     "src/sol_execbench/vertical/report.py": {
       "line": 85.0,

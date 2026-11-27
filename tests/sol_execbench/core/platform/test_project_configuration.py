@@ -241,6 +241,10 @@ def test_quality_workflow_splits_parallel_responsibilities() -> None:
         step.get("run", "") for step in jobs["default-parallel-tests"]["steps"]
     )
     assert "pytest tests/" in parallel_commands
+    assert "sol_execbench.vertical.workloads" in parallel_commands
+    assert (
+        'cli.get_command(click.Context(cli), "vertical")' in parallel_commands
+    )
     macos_commands = "\n".join(
         step.get("run", "") for step in jobs["macos-development"]["steps"]
     )

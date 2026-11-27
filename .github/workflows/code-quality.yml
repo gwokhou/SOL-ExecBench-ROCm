@@ -120,7 +120,7 @@ jobs:
           python -m zipfile -e "$RUNNER_TEMP"/wheel/*.whl "$RUNNER_TEMP/wheel-root"
           cd "$RUNNER_TEMP"
           PYTHONPATH="$RUNNER_TEMP/wheel-root" "$GITHUB_WORKSPACE/.venv/bin/python" -c \
-            'from pathlib import Path; import solar; from sol_execbench.core.platform.docker_matrix import load_docker_target_manifest; assert Path(solar.__file__).is_relative_to(Path.cwd() / "wheel-root"); assert load_docker_target_manifest().default_target_id'
+            'from pathlib import Path; import click, solar; from sol_execbench.cli.main import cli; from sol_execbench.core.platform.docker_matrix import load_docker_target_manifest; from sol_execbench.vertical.workloads import SweepMode, build_workload_specs; assert Path(solar.__file__).is_relative_to(Path.cwd() / "wheel-root"); assert load_docker_target_manifest().default_target_id; assert cli.get_command(click.Context(cli), "vertical") is not None; assert len(build_workload_specs(SweepMode.FULL)) == 34'
 
   macos-development:
     name: macOS development surface

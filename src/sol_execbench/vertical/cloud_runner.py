@@ -344,7 +344,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("data/outputs/mvp_v1"),
+        default=Path("data/outputs/vertical"),
     )
     parser.add_argument(
         "--collect-counters",

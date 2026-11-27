@@ -51,7 +51,10 @@ Downloaded/generated data belongs under uncommitted `data/`.
 
 ## Naming and Resources
 
-Target Python 3.14/Ruff on Linux x86_64 and keep changes local. Import canonical
+Target Python 3.14 locally (`uv sync --all-groups`) on Linux x86_64 while
+keeping all first-party Python syntax compatible with Python 3.12+
+(`[tool.ruff] target-version = "py312"`) for cloud MI300X ROCm containers, and
+keep changes local. Import canonical
 definitions directly; alias only for collisions, clear roles, or conventions such as
 `numpy as np`. Update callers when symbols move; do not add private/self aliases
 or incidental compatibility re-exports.

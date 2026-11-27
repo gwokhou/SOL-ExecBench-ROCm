@@ -236,7 +236,8 @@ def test_measure_reference_latency_rejects_non_numeric_latency():
     assert result.failure == "Reference timing returned non-numeric result: str"
 
 
-def test_load_user_function_imports_python_solution(tmp_path):
+def test_load_user_function_imports_python_solution(tmp_path, monkeypatch):
+    monkeypatch.setattr(sys, "path", list(sys.path))
     (tmp_path / "kernel.py").write_text("def run(x):\n    return x + 2\n")
 
     fn = load_user_function(_solution(), tmp_path)
@@ -244,7 +245,11 @@ def test_load_user_function_imports_python_solution(tmp_path):
     assert fn(3) == 5
 
 
-def test_load_user_function_ignores_existing_simple_module_collision(tmp_path):
+def test_load_user_function_ignores_existing_simple_module_collision(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(sys, "path", list(sys.path))
     (tmp_path / "kernel.py").write_text("def run():\n    return 'staged'\n")
     collision = types.ModuleType("kernel")
     setattr(  # noqa: B010 -- Construct a synthetic dynamic module collision
@@ -265,7 +270,11 @@ def test_load_user_function_ignores_existing_simple_module_collision(tmp_path):
     assert fn() == "staged"
 
 
-def test_load_user_function_ignores_existing_package_module_collision(tmp_path):
+def test_load_user_function_ignores_existing_package_module_collision(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(sys, "path", list(sys.path))
     package_dir = tmp_path / "pkg"
     package_dir.mkdir()
     (package_dir / "helper.py").write_text("VALUE = 'staged'\n")
@@ -278,7 +287,13 @@ def test_load_user_function_ignores_existing_package_module_collision(tmp_path):
         "run",
         lambda: "collision",
     )
-    previous = sys.modules.get("pkg.kernel")
+    saved_modules = {
+        name: sys.modules[name]
+        for name in list(sys.modules)
+        if name == "pkg" or name.startswith("pkg.")
+    }
+    for name in list(saved_modules):
+        sys.modules.pop(name, None)
     sys.modules["pkg.kernel"] = collision
     try:
         fn = load_user_function(
@@ -286,10 +301,10 @@ def test_load_user_function_ignores_existing_package_module_collision(tmp_path):
             tmp_path,
         )
     finally:
-        if previous is None:
-            sys.modules.pop("pkg.kernel", None)
-        else:
-            sys.modules["pkg.kernel"] = previous
+        for name in list(sys.modules):
+            if name == "pkg" or name.startswith("pkg."):
+                sys.modules.pop(name, None)
+        sys.modules.update(saved_modules)
 
     assert fn() == "staged"
 

@@ -8,7 +8,6 @@ from __future__ import annotations
 import math
 from collections.abc import Callable
 from enum import StrEnum
-from functools import cache
 
 import torch
 
@@ -29,11 +28,11 @@ from sol_execbench.vertical.adapters import (
 )
 from sol_execbench.vertical.adapters.common import _as_int, _as_tensor
 from sol_execbench.vertical.triton_kernels import (
-    TritonKernel,
     allocate_fused_moe_workspace,
     allocate_splitk_gqa_workspace,
     run_fused_moe_triton,
     run_gqa_paged_decode_splitk,
+    run_gqa_paged_decode_triton,
     select_gqa_num_splits,
     supports_splitk_gqa,
 )
@@ -364,11 +363,33 @@ def make_fused_moe_runner(
     top_k = _as_int(prototype_args[5])
     workspace = allocate_fused_moe_workspace(tokens, gate_w.shape[2], top_k)
 
-    def _run_triton_moe(*args: object) -> torch.Tensor:
-        return run_fused_moe_triton(*args, workspace=workspace)
+    def _run_triton_moe(
+        tokens_in: torch.Tensor,
+        gate_w_in: torch.Tensor,
+        up_w_in: torch.Tensor,
+        down_w_in: torch.Tensor,
+        gate_logits_in: torch.Tensor,
+        top_k_in: int,
+    ) -> torch.Tensor:
+        return run_fused_moe_triton(
+            tokens_in,
+            gate_w_in,
+            up_w_in,
+            down_w_in,
+            gate_logits_in,
+            top_k_in,
+            workspace=workspace,
+        )
 
     try:
-        _run_triton_moe(*prototype_args)
+        _run_triton_moe(
+            tokens,
+            gate_w,
+            _as_tensor(prototype_args[2]),
+            _as_tensor(prototype_args[3]),
+            _as_tensor(prototype_args[4]),
+            top_k,
+        )
         return PreparedRunner(
             fn=_run_triton_moe,
             implementation_name="triton_fused_swiglu_moe",
@@ -414,102 +435,6 @@ def ref_gqa_paged_decode(
     return out
 
 
-@cache
-def _load_triton_paged_decode_kernel() -> TritonKernel:
-    """Compile and cache the portable Triton NHD GQA Paged Decode kernel."""
-    import triton
-    import triton.language as tl
-
-    @triton.jit
-    def _paged_gqa_kernel(
-        q_ptr,  # noqa: ANN001 -- Triton JIT pointer
-        k_ptr,  # noqa: ANN001 -- Triton JIT pointer
-        v_ptr,  # noqa: ANN001 -- Triton JIT pointer
-        indptr_ptr,  # noqa: ANN001 -- Triton JIT pointer
-        indices_ptr,  # noqa: ANN001 -- Triton JIT pointer
-        last_len_ptr,  # noqa: ANN001 -- Triton JIT pointer
-        out_ptr,  # noqa: ANN001 -- Triton JIT pointer
-        kv_heads: tl.constexpr,
-        page_size: tl.constexpr,
-        head_dim: tl.constexpr,
-    ) -> None:
-        b = tl.program_id(0)
-        hq = tl.program_id(1)
-        q_heads = tl.num_programs(1)
-        hk = hq // (q_heads // kv_heads)
-        d_offs = tl.arange(0, head_dim)
-        p_offs = tl.arange(0, page_size)
-        sm_scale = 1.0 / tl.sqrt(float(head_dim))
-
-        q_off = (b * q_heads + hq) * head_dim + d_offs
-        q_vec = tl.load(q_ptr + q_off).to(tl.float32)
-        start_page = tl.load(indptr_ptr + b)
-        end_page = tl.load(indptr_ptr + b + 1)
-        last_len = tl.load(last_len_ptr + b)
-
-        m_i = -float("inf")
-        l_i = 0.0
-        acc = tl.zeros([head_dim], dtype=tl.float32)
-        stride_kp = page_size * kv_heads * head_dim
-        stride_kn = kv_heads * head_dim
-        stride_kh = head_dim
-
-        for p_iter in range(start_page, end_page):
-            phys_page = tl.load(indices_ptr + p_iter)
-            valid_toks = tl.where(p_iter + 1 == end_page, last_len, page_size)
-            mask_n = p_offs < valid_toks
-            kv_base = phys_page * stride_kp + hk * stride_kh
-            offs_kv = kv_base + p_offs[:, None] * stride_kn + d_offs[None, :]
-            k_tile = tl.load(k_ptr + offs_kv, mask=mask_n[:, None], other=0.0)
-            v_tile = tl.load(v_ptr + offs_kv, mask=mask_n[:, None], other=0.0)
-            qk = tl.sum(k_tile.to(tl.float32) * q_vec[None, :], axis=1)
-            qk = tl.where(mask_n, qk * sm_scale, -float("inf"))
-            m_ij = tl.maximum(m_i, tl.max(qk, axis=0))
-            p = tl.exp(qk - m_ij)
-            alpha = tl.exp(m_i - m_ij)
-            l_i = l_i * alpha + tl.sum(p, axis=0)
-            acc = acc * alpha + tl.sum(
-                p[:, None] * v_tile.to(tl.float32), axis=0
-            )
-            m_i = m_ij
-
-        tl.store(out_ptr + q_off, (acc / l_i).to(out_ptr.dtype.element_ty))
-
-    return _paged_gqa_kernel
-
-
-def run_gqa_paged_decode_triton(
-    q: torch.Tensor,
-    k_cache: torch.Tensor,
-    v_cache: torch.Tensor,
-    kv_indptr: torch.Tensor,
-    kv_indices: torch.Tensor,
-    kv_last_page_len: torch.Tensor,
-) -> torch.Tensor:
-    """Launch the portable Triton NHD GQA Paged Decode kernel."""
-    q_c = q.contiguous()
-    k_c = k_cache.contiguous()
-    v_c = v_cache.contiguous()
-    batch, q_heads, head_dim = q_c.shape
-    page_size = k_c.shape[1]
-    kv_heads = k_c.shape[2]
-    out = torch.empty_like(q_c)
-    kernel = _load_triton_paged_decode_kernel()
-    kernel[(batch, q_heads)](
-        q_c,
-        k_c,
-        v_c,
-        kv_indptr.contiguous(),
-        kv_indices.contiguous(),
-        kv_last_page_len.contiguous(),
-        out,
-        kv_heads=kv_heads,
-        page_size=page_size,
-        head_dim=head_dim,
-    )
-    return out
-
-
 def _try_splitk_gqa(
     prototype_args: list[object],
 ) -> tuple[Callable[..., torch.Tensor], str] | None:
@@ -531,11 +456,33 @@ def _try_splitk_gqa(
     )
     workspace = allocate_splitk_gqa_workspace(q, num_splits)
 
-    def _run_splitk(*args: object) -> torch.Tensor:
-        return run_gqa_paged_decode_splitk(*args, workspace=workspace)
+    def _run_splitk(
+        q_in: torch.Tensor,
+        k_in: torch.Tensor,
+        v_in: torch.Tensor,
+        indptr_in: torch.Tensor,
+        indices_in: torch.Tensor,
+        last_len_in: torch.Tensor,
+    ) -> torch.Tensor:
+        return run_gqa_paged_decode_splitk(
+            q_in,
+            k_in,
+            v_in,
+            indptr_in,
+            indices_in,
+            last_len_in,
+            workspace=workspace,
+        )
 
     try:
-        _run_splitk(*prototype_args)
+        _run_splitk(
+            q,
+            k_cache,
+            _as_tensor(prototype_args[2]),
+            _as_tensor(prototype_args[3]),
+            kv_indices,
+            _as_tensor(prototype_args[5]),
+        )
         return _run_splitk, "triton_splitk_paged_gqa"
     except Exception:  # noqa: BLE001 -- degrade to single-split kernel
         return None
@@ -577,7 +524,14 @@ def make_gqa_paged_decode_runner(
             candidate_args=prototype_args,
         )
     try:
-        run_gqa_paged_decode_triton(*prototype_args)
+        run_gqa_paged_decode_triton(
+            _as_tensor(prototype_args[0]),
+            _as_tensor(prototype_args[1]),
+            _as_tensor(prototype_args[2]),
+            _as_tensor(prototype_args[3]),
+            _as_tensor(prototype_args[4]),
+            _as_tensor(prototype_args[5]),
+        )
         return PreparedRunner(
             fn=run_gqa_paged_decode_triton,
             implementation_name="triton_paged_gqa",
@@ -618,6 +572,60 @@ def ref_mla_paged_decode(
     return out
 
 
+def _try_splitk_mla(
+    prototype_args: list[object],
+) -> tuple[Callable[..., torch.Tensor], str] | None:
+    q = _as_tensor(prototype_args[0])
+    kv_cache = _as_tensor(prototype_args[1])
+    kv_indices = _as_tensor(prototype_args[3])
+    d_ckv = _as_int(prototype_args[5])
+    if not supports_splitk_mla(q, kv_cache, d_ckv):
+        return None
+    num_cus = (
+        int(torch.cuda.get_device_properties(q.device).multi_processor_count)
+        if q.is_cuda
+        else None
+    )
+    num_splits = select_gqa_num_splits(
+        batch=q.shape[0],
+        kv_heads=1,
+        total_pages=kv_indices.numel(),
+        num_cus=num_cus,
+    )
+    workspace = allocate_splitk_mla_workspace(q, int(d_ckv), num_splits)
+
+    def _run_splitk(
+        q_in: torch.Tensor,
+        kv_in: torch.Tensor,
+        indptr_in: torch.Tensor,
+        indices_in: torch.Tensor,
+        last_len_in: torch.Tensor,
+        d_ckv_in: int,
+    ) -> torch.Tensor:
+        return run_mla_paged_decode_splitk(
+            q_in,
+            kv_in,
+            indptr_in,
+            indices_in,
+            last_len_in,
+            d_ckv_in,
+            workspace=workspace,
+        )
+
+    try:
+        _run_splitk(
+            q,
+            kv_cache,
+            _as_tensor(prototype_args[2]),
+            kv_indices,
+            _as_tensor(prototype_args[4]),
+            d_ckv,
+        )
+        return _run_splitk, "triton_splitk_paged_mla"
+    except Exception:  # noqa: BLE001 -- degrade cleanly if triton fails
+        return None
+
+
 def make_mla_paged_decode_runner(
     *,
     prototype_args: list[object],
@@ -645,42 +653,13 @@ def make_mla_paged_decode_runner(
             implementation_name="pytorch_mla_ref",
             candidate_args=prototype_args,
         )
-    q = _as_tensor(prototype_args[0])
-    kv_cache = _as_tensor(prototype_args[1])
-    kv_indices = _as_tensor(prototype_args[3])
-    d_ckv = _as_int(prototype_args[5])
-    if supports_splitk_mla(q, kv_cache, d_ckv):
-        num_cus = (
-            int(
-                torch.cuda.get_device_properties(q.device).multi_processor_count
-            )
-            if q.is_cuda
-            else None
+    splitk = _try_splitk_mla(prototype_args)
+    if splitk is not None:
+        return PreparedRunner(
+            fn=splitk[0],
+            implementation_name=splitk[1],
+            candidate_args=prototype_args,
         )
-        num_splits = select_gqa_num_splits(
-            batch=q.shape[0],
-            kv_heads=1,
-            total_pages=kv_indices.numel(),
-            num_cus=num_cus,
-        )
-        workspace = allocate_splitk_mla_workspace(q, int(d_ckv), num_splits)
-
-        def _run_splitk(*args: object) -> torch.Tensor:
-            return run_mla_paged_decode_splitk(*args, workspace=workspace)
-
-        try:
-            _run_splitk(*prototype_args)
-            return PreparedRunner(
-                fn=_run_splitk,
-                implementation_name="triton_splitk_paged_mla",
-                candidate_args=prototype_args,
-            )
-        except Exception:  # noqa: BLE001 -- degrade cleanly if triton fails
-            return PreparedRunner(
-                fn=ref_mla_paged_decode,
-                implementation_name="pytorch_mla_ref_fallback",
-                candidate_args=prototype_args,
-            )
     return PreparedRunner(
         fn=ref_mla_paged_decode,
         implementation_name="pytorch_mla_ref_fallback",
@@ -737,7 +716,12 @@ def make_fused_rmsnorm_rope_runner(
             candidate_args=prototype_args,
         )
     try:
-        run_fused_rmsnorm_rope_triton(*prototype_args)
+        run_fused_rmsnorm_rope_triton(
+            _as_tensor(prototype_args[0]),
+            _as_tensor(prototype_args[1]),
+            _as_tensor(prototype_args[2]),
+            _as_tensor(prototype_args[3]),
+        )
         return PreparedRunner(
             fn=run_fused_rmsnorm_rope_triton,
             implementation_name="triton_fused_rmsnorm_rope",
@@ -819,7 +803,7 @@ def make_swiglu_fp8_quant_runner(
         return run_swiglu_fp8_quant_triton(gu_in, fp8_dtype=fp8_dtype)
 
     try:
-        _run_triton(*prototype_args)
+        _run_triton(_as_tensor(prototype_args[0]))
         return PreparedRunner(
             fn=_run_triton,
             implementation_name="triton_swiglu_fp8_quant",

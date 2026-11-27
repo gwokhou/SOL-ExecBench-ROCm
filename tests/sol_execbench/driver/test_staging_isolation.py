@@ -191,12 +191,27 @@ def test_load_staged_user_function_appends_candidate_dir_at_end_of_sys_path(
     cleaned = [entry for entry in sys.path if entry != cand_str]
     monkeypatch.setattr(sys, "path", cleaned)
 
-    fn = load_staged_user_function(solution, tmp_path)
-    assert sys.path[-1] == cand_str
-    assert sys.path[0] != str(tmp_path)
-    x = torch.tensor([1.0, 2.0])
-    y = torch.tensor([3.0, 4.0])
-    assert torch.equal(cast(torch.Tensor, fn(x, y)), torch.tensor([4.0, 6.0]))
+    saved_modules = {
+        name: sys.modules[name]
+        for name in list(sys.modules)
+        if name == "pkg" or name.startswith("pkg.")
+    }
+    for name in list(saved_modules):
+        sys.modules.pop(name, None)
+    try:
+        fn = load_staged_user_function(solution, tmp_path)
+        assert sys.path[-1] == cand_str
+        assert sys.path[0] != str(tmp_path)
+        x = torch.tensor([1.0, 2.0])
+        y = torch.tensor([3.0, 4.0])
+        assert torch.equal(
+            cast(torch.Tensor, fn(x, y)), torch.tensor([4.0, 6.0])
+        )
+    finally:
+        for name in list(sys.modules):
+            if name == "pkg" or name.startswith("pkg."):
+                sys.modules.pop(name, None)
+        sys.modules.update(saved_modules)
 
 
 def test_resolve_stageable_safetensors_rejects_symlinks_escaping_root(

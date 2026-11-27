@@ -256,6 +256,102 @@ def run_gqa_paged_decode_splitk(
     return out
 
 
+@cache
+def _load_triton_paged_decode_kernel() -> TritonKernel:
+    """Compile and cache the portable Triton NHD GQA Paged Decode kernel."""
+    import triton
+    import triton.language as tl
+
+    @triton.jit
+    def _paged_gqa_kernel(
+        q_ptr,  # noqa: ANN001 -- Triton JIT pointer
+        k_ptr,  # noqa: ANN001 -- Triton JIT pointer
+        v_ptr,  # noqa: ANN001 -- Triton JIT pointer
+        indptr_ptr,  # noqa: ANN001 -- Triton JIT pointer
+        indices_ptr,  # noqa: ANN001 -- Triton JIT pointer
+        last_len_ptr,  # noqa: ANN001 -- Triton JIT pointer
+        out_ptr,  # noqa: ANN001 -- Triton JIT pointer
+        kv_heads: tl.constexpr,
+        page_size: tl.constexpr,
+        head_dim: tl.constexpr,
+    ) -> None:
+        b = tl.program_id(0)
+        hq = tl.program_id(1)
+        q_heads = tl.num_programs(1)
+        hk = hq // (q_heads // kv_heads)
+        d_offs = tl.arange(0, head_dim)
+        p_offs = tl.arange(0, page_size)
+        sm_scale = 1.0 / tl.sqrt(float(head_dim))
+
+        q_off = (b * q_heads + hq) * head_dim + d_offs
+        q_vec = tl.load(q_ptr + q_off).to(tl.float32)
+        start_page = tl.load(indptr_ptr + b)
+        end_page = tl.load(indptr_ptr + b + 1)
+        last_len = tl.load(last_len_ptr + b)
+
+        m_i = -float("inf")
+        l_i = 0.0
+        acc = tl.zeros([head_dim], dtype=tl.float32)
+        stride_kp = page_size * kv_heads * head_dim
+        stride_kn = kv_heads * head_dim
+        stride_kh = head_dim
+
+        for p_iter in range(start_page, end_page):
+            phys_page = tl.load(indices_ptr + p_iter)
+            valid_toks = tl.where(p_iter + 1 == end_page, last_len, page_size)
+            mask_n = p_offs < valid_toks
+            kv_base = phys_page * stride_kp + hk * stride_kh
+            offs_kv = kv_base + p_offs[:, None] * stride_kn + d_offs[None, :]
+            k_tile = tl.load(k_ptr + offs_kv, mask=mask_n[:, None], other=0.0)
+            v_tile = tl.load(v_ptr + offs_kv, mask=mask_n[:, None], other=0.0)
+            qk = tl.sum(k_tile.to(tl.float32) * q_vec[None, :], axis=1)
+            qk = tl.where(mask_n, qk * sm_scale, -float("inf"))
+            m_ij = tl.maximum(m_i, tl.max(qk, axis=0))
+            p = tl.exp(qk - m_ij)
+            alpha = tl.exp(m_i - m_ij)
+            l_i = l_i * alpha + tl.sum(p, axis=0)
+            acc = acc * alpha + tl.sum(
+                p[:, None] * v_tile.to(tl.float32), axis=0
+            )
+            m_i = m_ij
+
+        tl.store(out_ptr + q_off, (acc / l_i).to(out_ptr.dtype.element_ty))
+
+    return _paged_gqa_kernel
+
+
+def run_gqa_paged_decode_triton(
+    q: torch.Tensor,
+    k_cache: torch.Tensor,
+    v_cache: torch.Tensor,
+    kv_indptr: torch.Tensor,
+    kv_indices: torch.Tensor,
+    kv_last_page_len: torch.Tensor,
+) -> torch.Tensor:
+    """Launch the portable Triton NHD GQA Paged Decode kernel."""
+    q_c = q.contiguous()
+    k_c = k_cache.contiguous()
+    v_c = v_cache.contiguous()
+    batch, q_heads, head_dim = q_c.shape
+    page_size = k_c.shape[1]
+    kv_heads = k_c.shape[2]
+    out = torch.empty_like(q_c)
+    kernel = _load_triton_paged_decode_kernel()
+    kernel[(batch, q_heads)](
+        q_c,
+        k_c,
+        v_c,
+        kv_indptr.contiguous(),
+        kv_indices.contiguous(),
+        kv_last_page_len.contiguous(),
+        out,
+        kv_heads=kv_heads,
+        page_size=page_size,
+        head_dim=head_dim,
+    )
+    return out
+
+
 def _build_moe_tile_schedule(
     gate_logits: torch.Tensor,
     top_k: int,
